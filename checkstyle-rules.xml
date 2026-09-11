@@ -1,0 +1,271 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+    HDFView Checkstyle Configuration
+    Based on Google Java Style with HDFView-specific adaptations
+    Compatible with Checkstyle 10.12.5+ (Java 21 support)
+-->
+
+<module name="Checker">
+    <property name="severity" value="warning"/>
+    <property name="fileExtensions" value="java, properties, xml"/>
+
+    <!-- Excludes for external libraries and generated code -->
+    <module name="BeforeExecutionExclusionFileFilter">
+        <property name="fileNamePattern" value="module\-info\.java$"/>
+    </module>
+
+    <!-- File-level checks -->
+    <module name="FileLength">
+        <property name="max" value="2500"/>
+        <property name="fileExtensions" value="java"/>
+    </module>
+
+    <module name="FileTabCharacter">
+        <property name="eachLine" value="false"/>
+    </module>
+
+    <!-- Line length check with flexibility for imports and URLs -->
+    <!-- <module name="LineLength"> -->
+    <!--     <property name="fileExtensions" value="java"/> -->
+    <!--     <property name="max" value="120"/> -->
+    <!--     <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/> -->
+    <!-- </module> -->
+    <!-- Reason: Will not be fixed this release, deferred to future refactoring -->
+
+    <!-- Whitespace checks -->
+    <module name="NewlineAtEndOfFile">
+        <property name="lineSeparator" value="lf"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- Naming conventions -->
+        <module name="ConstantName">
+            <!-- Allow 'log' as a valid constant name for SLF4J loggers -->
+            <property name="format" value="^([A-Z][A-Z0-9]*(_[A-Z0-9]+)*|log)$"/>
+        </module>
+        <module name="LocalFinalVariableName"/>
+        <module name="LocalVariableName"/>
+        <module name="MemberName"/>
+        <module name="MethodName"/>
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+        <module name="ParameterName"/>
+        <module name="StaticVariableName"/>
+        <module name="TypeName"/>
+
+        <!-- Import checks -->
+        <module name="AvoidStarImport">
+            <property name="excludes" value="java.io,java.net,java.lang.Math"/>
+            <property name="allowClassImports" value="false"/>
+            <property name="allowStaticMemberImports" value="false"/>
+        </module>
+        <module name="IllegalImport"/>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports">
+            <property name="processJavadoc" value="false"/>
+        </module>
+        <!-- <module name="ImportOrder"> -->
+        <!--     <property name="groups" value="/^java\./,javax,org,com"/> -->
+        <!--     <property name="ordered" value="true"/> -->
+        <!--     <property name="separated" value="true"/> -->
+        <!--     <property name="option" value="top"/> -->
+        <!--     <property name="sortStaticImportsAlphabetically" value="true"/> -->
+        <!-- </module> -->
+        <!-- Reason: Style-only rule, different tools have different preferences, avoiding conflicts -->
+
+        <!-- Size violations -->
+        <!-- <module name="MethodLength"> -->
+        <!--     <property name="max" value="200"/> -->
+        <!--     <property name="countEmpty" value="false"/> -->
+        <!-- </module> -->
+        <!-- Reason: Will not be fixed this release, deferred to future refactoring -->
+
+        <module name="ParameterNumber">
+            <property name="max" value="10"/>
+            <property name="ignoreOverriddenMethods" value="true"/>
+        </module>
+        <!-- <module name="AnonInnerLength"> -->
+        <!--     <property name="max" value="20"/> -->
+        <!-- </module> -->
+        <!-- Reason: Will not be fixed this release, deferred to future refactoring -->
+
+        <!-- Whitespace checks - DISABLED: Using clang-format for code formatting -->
+        <!-- Uncomment these if you want Checkstyle to enforce whitespace rules -->
+        <!--
+        <module name="EmptyForIteratorPad"/>
+        <module name="GenericWhitespace"/>
+        <module name="MethodParamPad"/>
+        <module name="NoWhitespaceAfter">
+            <property name="tokens" value="AT, INC, DEC, UNARY_MINUS, UNARY_PLUS, BNOT, LNOT, DOT, ARRAY_DECLARATOR, INDEX_OP"/>
+        </module>
+        <module name="NoWhitespaceBefore">
+            <property name="tokens" value="COMMA, SEMI, POST_INC, POST_DEC, DOT, ELLIPSIS, METHOD_REF"/>
+            <property name="allowLineBreaks" value="true"/>
+        </module>
+        <module name="OperatorWrap">
+            <property name="option" value="NL"/>
+            <property name="tokens" value="BAND, BOR, BSR, BXOR, DIV, EQUAL, GE, GT, LAND, LE, LITERAL_INSTANCEOF, LOR, LT, MINUS, MOD, NOT_EQUAL, PLUS, QUESTION, SL, SR, STAR, METHOD_REF"/>
+        </module>
+        <module name="ParenPad"/>
+        <module name="TypecastParenPad"/>
+        <module name="WhitespaceAfter">
+            <property name="tokens" value="COMMA, SEMI, TYPECAST, LITERAL_IF, LITERAL_ELSE, LITERAL_WHILE, LITERAL_DO, LITERAL_FOR, DO_WHILE"/>
+        </module>
+        <module name="WhitespaceAround">
+            <property name="allowEmptyConstructors" value="true"/>
+            <property name="allowEmptyMethods" value="true"/>
+            <property name="allowEmptyTypes" value="true"/>
+            <property name="allowEmptyLoops" value="true"/>
+            <property name="ignoreEnhancedForColon" value="false"/>
+            <property name="tokens" value="ASSIGN, BAND, BAND_ASSIGN, BOR, BOR_ASSIGN, BSR, BSR_ASSIGN, BXOR, BXOR_ASSIGN, COLON, DIV, DIV_ASSIGN, DO_WHILE, EQUAL, GE, GT, LAMBDA, LAND, LCURLY, LE, LITERAL_CATCH, LITERAL_DO, LITERAL_ELSE, LITERAL_FINALLY, LITERAL_FOR, LITERAL_IF, LITERAL_RETURN, LITERAL_SWITCH, LITERAL_SYNCHRONIZED, LITERAL_TRY, LITERAL_WHILE, LOR, LT, MINUS, MINUS_ASSIGN, MOD, MOD_ASSIGN, NOT_EQUAL, PLUS, PLUS_ASSIGN, QUESTION, RCURLY, SL, SLIST, SL_ASSIGN, SR, SR_ASSIGN, STAR, STAR_ASSIGN, LITERAL_ASSERT, TYPE_EXTENSION_AND"/>
+        </module>
+        -->
+
+        <!-- Modifier checks -->
+        <module name="ModifierOrder"/>
+        <module name="RedundantModifier"/>
+
+        <!-- Block checks -->
+        <module name="AvoidNestedBlocks">
+            <property name="allowInSwitchCase" value="true"/>
+        </module>
+        <module name="EmptyBlock">
+            <property name="option" value="TEXT"/>
+            <property name="tokens" value="LITERAL_TRY, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_SWITCH"/>
+        </module>
+        <!-- Brace placement checks DISABLED: Using clang-format for code formatting -->
+        <!--
+        <module name="LeftCurly">
+            <property name="option" value="eol"/>
+        </module>
+        <module name="NeedBraces">
+            <property name="allowSingleLineStatement" value="true"/>
+        </module>
+        <module name="RightCurly">
+            <property name="option" value="same"/>
+            <property name="tokens" value="LITERAL_TRY, LITERAL_CATCH, LITERAL_FINALLY, LITERAL_IF, LITERAL_ELSE, LITERAL_DO"/>
+        </module>
+        -->
+
+        <!-- Common coding problems -->
+        <module name="EmptyStatement"/>
+        <module name="EqualsHashCode"/>
+        <module name="HiddenField">
+            <property name="ignoreConstructorParameter" value="true"/>
+            <property name="ignoreSetter" value="true"/>
+            <property name="setterCanReturnItsClass" value="true"/>
+        </module>
+        <module name="IllegalInstantiation"/>
+        <module name="InnerAssignment"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+
+        <!-- Class design -->
+        <module name="FinalClass"/>
+        <module name="HideUtilityClassConstructor"/>
+        <module name="InterfaceIsType"/>
+        <module name="VisibilityModifier">
+            <property name="protectedAllowed" value="true"/>
+            <property name="packageAllowed" value="true"/>
+            <property name="allowPublicFinalFields" value="true"/>
+            <property name="allowPublicImmutableFields" value="true"/>
+        </module>
+
+        <!-- Miscellaneous -->
+        <module name="ArrayTypeStyle"/>
+        <!-- TODO/FIXME comment detection - set to 'info' level for visibility without blocking builds
+             Policy: Critical TODOs should be converted to tracked GitHub issues within 30 days.
+             Format recommendation: TODO(username) [YYYY-MM-DD]: description [Issue #123] -->
+        <module name="TodoComment">
+            <property name="severity" value="info"/>
+            <property name="format" value="(TODO)|(FIXME)"/>
+        </module>
+        <module name="UpperEll"/>
+        <!-- Indentation check DISABLED: Using clang-format for code formatting -->
+        <!--
+        <module name="Indentation">
+            <property name="basicOffset" value="4"/>
+            <property name="braceAdjustment" value="0"/>
+            <property name="caseIndent" value="4"/>
+            <property name="throwsIndent" value="8"/>
+            <property name="lineWrappingIndentation" value="8"/>
+            <property name="arrayInitIndent" value="4"/>
+        </module>
+        -->
+
+        <!-- Additional checks for code quality -->
+        <!-- DISABLED: Noisy rules with low value - December 2025 cleanup -->
+        <!-- <module name="DeclarationOrder"/> -->
+        <!-- Reason: 261 violations, code organization preference, handled in code review -->
+
+        <module name="DefaultComesLast"/>
+        <module name="FallThrough"/>
+
+        <!-- <module name="MultipleStringLiterals"> -->
+        <!--     <property name="allowedDuplicates" value="3"/> -->
+        <!--     <property name="ignoreStringsRegexp" value='^(("")|(" "))$'/> -->
+        <!-- </module> -->
+        <!-- Reason: 143 violations, creates noise, string constants should be refactored when it makes sense -->
+
+        <!-- <module name="NestedIfDepth"> -->
+        <!--     <property name="max" value="3"/> -->
+        <!-- </module> -->
+        <!-- Reason: Will not be fixed this release, deferred to future refactoring -->
+
+        <!-- <module name="NestedTryDepth"> -->
+        <!--     <property name="max" value="2"/> -->
+        <!-- </module> -->
+        <!-- Reason: Will not be fixed this release, deferred to future refactoring -->
+
+        <module name="NoClone"/>
+        <module name="NoFinalizer"/>
+        <module name="OneStatementPerLine"/>
+        <module name="OverloadMethodsDeclarationOrder"/>
+        <module name="PackageDeclaration"/>
+        <module name="StringLiteralEquality"/>
+
+        <!-- <module name="UnnecessaryParentheses"/> -->
+        <!-- Reason: 987 violations, style preference, many parentheses improve readability -->
+
+        <!-- Annotations -->
+        <module name="AnnotationLocation">
+            <property name="id" value="AnnotationLocationMostCases"/>
+            <property name="tokens" value="CLASS_DEF, INTERFACE_DEF, ENUM_DEF, METHOD_DEF, CTOR_DEF"/>
+        </module>
+        <module name="AnnotationLocation">
+            <property name="id" value="AnnotationLocationVariables"/>
+            <property name="tokens" value="VARIABLE_DEF"/>
+            <property name="allowSamelineMultipleAnnotations" value="true"/>
+        </module>
+        <module name="AnnotationUseStyle"/>
+
+        <!-- Javadoc checks (relaxed for existing codebase) -->
+        <!-- Note: Many properties deprecated/removed in Checkstyle 10.x -->
+        <module name="InvalidJavadocPosition"/>
+        <module name="JavadocMethod">
+            <property name="severity" value="info"/>
+            <!-- Only use properties compatible with Checkstyle 10.x -->
+        </module>
+        <module name="JavadocType">
+            <property name="severity" value="info"/>
+            <property name="allowMissingParamTags" value="true"/>
+        </module>
+        <module name="JavadocVariable">
+            <property name="severity" value="info"/>
+            <property name="scope" value="public"/>
+        </module>
+        <module name="JavadocStyle">
+            <property name="severity" value="info"/>
+            <property name="checkEmptyJavadoc" value="true"/>
+        </module>
+
+    </module>
+
+</module>

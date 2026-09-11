@@ -1,0 +1,546 @@
+name: Maven Quality Gates
+
+on:
+  workflow_call:
+    inputs:
+      hdf4_version:
+        description: 'HDF4 version to use'
+        type: string
+        required: false
+        default: '4.4.0'
+      hdf5_version:
+        description: 'HDF5 version to use'
+        type: string
+        required: false
+        default: '2.2.0'
+  workflow_dispatch:
+    inputs:
+      hdf4_version:
+        description: 'HDF4 version to use'
+        type: string
+        required: false
+        default: '4.4.0'
+      hdf5_version:
+        description: 'HDF5 version to use'
+        type: string
+        required: false
+        default: '2.2.0'
+  push:
+  pull_request:
+    branches: [ master ]
+  schedule:
+    # Run quality analysis daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  security-events: write
+
+env:
+  # HDF library versions (centralized defaults, overridable via workflow inputs)
+  HDF4_VERSION: ${{ inputs.hdf4_version || '4.4.0' }}
+  HDF5_VERSION: ${{ inputs.hdf5_version || '2.2.0' }}
+
+  # Note: java.awt.headless NOT set to true - SWT GUI tests need display (Xvfb)
+  MAVEN_OPTS: >-
+    -Xmx3g
+    -Xms1g
+    -XX:+UseParallelGC
+
+jobs:
+  quality-analysis:
+    name: Quality Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Cache Maven Dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.m2/repository
+          !~/.m2/repository/org/hdfgroup
+        key: ${{ runner.os }}-maven-quality-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-quality-
+          ${{ runner.os }}-maven-
+
+    - name: Cache Analysis Data
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.sonar/cache
+          **/target/pmd-cache
+          **/target/checkstyle-cache
+        key: ${{ runner.os }}-analysis-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-analysis-
+
+    - name: Cache HDF Libraries
+      id: cache-hdf
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/hdf4
+          ${{ github.workspace }}/hdf5
+        key: ${{ runner.os }}-hdf-github-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-hdf-github-
+
+    - name: Download and Install HDF4 from GitHub
+      if: steps.cache-hdf.outputs.cache-hit != 'true'
+      run: |
+        HDF4_VERSION="${{ env.HDF4_VERSION }}"
+        echo "Downloading HDF4 ${HDF4_VERSION} release..."
+
+        PATTERN="hdf${HDF4_VERSION}-ubuntu-2404_gcc.tar.gz"
+        echo "Using pattern $PATTERN"
+        gh release download hdf${HDF4_VERSION} \
+          --repo HDFGroup/hdf4 \
+          --pattern "$PATTERN" \
+          --clobber
+
+        echo "After gh download"
+        ls
+
+        # Extract outer tar.gz (creates hdf4/ directory)
+        tar -zxvf *-ubuntu-2404_gcc.tar.gz
+        [ -d hdf4 ] || mv hdf4-* hdf4
+
+        # Extract inner tar.gz into hdf4/ directory
+        cd "${{ github.workspace }}/hdf4"
+        echo "Before extracting inner tar.gz"
+        ls
+        tar -zxvf HDF-${HDF4_VERSION}-Linux.tar.gz --strip-components 1
+
+        # Set HDF4 library path
+        HDF4LIB_PATH=${{ github.workspace }}/hdf4/HDF_Group/HDF/${HDF4_VERSION}
+        echo "HDF4LIB_PATH=$HDF4LIB_PATH" >> $GITHUB_ENV
+
+        echo "HDF4 installed to: $HDF4LIB_PATH"
+        ls -la "$HDF4LIB_PATH"
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Download and Install HDF5 from GitHub
+      if: steps.cache-hdf.outputs.cache-hit != 'true'
+      run: |
+        HDF5_VERSION="${{ env.HDF5_VERSION }}"
+        echo "Downloading HDF5 ${HDF5_VERSION} release..."
+
+        PATTERN="hdf5-${HDF5_VERSION}-ubuntu-2404_gcc.tar.gz"
+        gh release download ${HDF5_VERSION} \
+          --repo HDFGroup/hdf5 \
+          --pattern "$PATTERN" \
+          --clobber
+
+        # Extract outer tar.gz (creates hdf5/ directory)
+        tar -zxvf $PATTERN
+        [ -d hdf5 ] || mv hdf5-* hdf5
+
+        # Extract inner tar.gz into hdf5/ directory
+        cd "${{ github.workspace }}/hdf5"
+        tar -zxvf HDF5-${HDF5_VERSION}-Linux.tar.gz --strip-components 1
+
+        # Set HDF5 library path
+        HDF5LIB_PATH=${{ github.workspace }}/hdf5/HDF_Group/HDF5/${HDF5_VERSION}
+        echo "HDF5LIB_PATH=$HDF5LIB_PATH" >> $GITHUB_ENV
+
+        echo "HDF5 installed to: $HDF5LIB_PATH"
+        ls -la "$HDF5LIB_PATH"
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Set Environment Variables from Cache
+      if: steps.cache-hdf.outputs.cache-hit == 'true'
+      run: |
+        HDF4_VERSION="${{ env.HDF4_VERSION }}"
+        HDF5_VERSION="${{ env.HDF5_VERSION }}"
+
+        HDF4LIB_PATH=${{ github.workspace }}/hdf4/HDF_Group/HDF/${HDF4_VERSION}
+        echo "HDF4LIB_PATH=$HDF4LIB_PATH" >> $GITHUB_ENV
+
+        HDF5LIB_PATH=${{ github.workspace }}/hdf5/HDF_Group/HDF5/${HDF5_VERSION}
+        echo "HDF5LIB_PATH=$HDF5LIB_PATH" >> $GITHUB_ENV
+
+        echo "Using cached HDF libraries:"
+        echo "HDF4: $HDF4LIB_PATH"
+        echo "HDF5: $HDF5LIB_PATH"
+
+    - name: Install HDF JARs to Local Maven Repository
+      run: |
+        echo "Installing HDF JARs to local Maven repository..."
+
+        # Copy HDF JARs from downloaded distributions
+        mkdir -p repository/lib
+        cp ${{ env.HDF4LIB_PATH }}/lib/*.jar repository/lib/ 2>/dev/null || echo "No HDF4 JARs found"
+        cp ${{ env.HDF5LIB_PATH }}/lib/*.jar repository/lib/ 2>/dev/null || echo "No HDF5 JARs found"
+
+        # List what we have
+        echo "JARs in repository/lib:"
+        ls -la repository/lib/*.jar 2>/dev/null || echo "No JARs found"
+
+        # Install jarhdf5
+        HDF5_VERSION="${{ env.HDF5_VERSION }}"
+        if [ -f repository/lib/jarhdf5-*.jar ]; then
+          JAR_FILE=$(ls repository/lib/jarhdf5-*.jar | head -1)
+          mvn install:install-file -Dfile="$JAR_FILE" \
+            -DgroupId=jarhdf5 -DartifactId=jarhdf5 -Dversion=${HDF5_VERSION} \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: $JAR_FILE"
+        fi
+
+        # Install jarhdf (HDF4)
+        HDF4_VERSION="${{ env.HDF4_VERSION }}"
+        if [ -f repository/lib/jarhdf-*.jar ]; then
+          JAR_FILE=$(ls repository/lib/jarhdf-*.jar | head -1)
+          mvn install:install-file -Dfile="$JAR_FILE" \
+            -DgroupId=jarhdf -DartifactId=jarhdf -Dversion=${HDF4_VERSION} \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: $JAR_FILE"
+        fi
+
+        # Install fits.jar
+        if [ -f repository/lib/fits.jar ]; then
+          mvn install:install-file -Dfile=repository/lib/fits.jar \
+            -DgroupId=fits -DartifactId=fits -Dversion=1.0.0 \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: fits.jar"
+        fi
+
+        # Install netcdf.jar
+        if [ -f repository/lib/netcdf.jar ]; then
+          mvn install:install-file -Dfile=repository/lib/netcdf.jar \
+            -DgroupId=netcdf -DartifactId=netcdf -Dversion=1.0.0 \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: netcdf.jar"
+        fi
+
+        # Install slf4j-api if present
+        if [ -f repository/lib/slf4j-api-*.jar ]; then
+          JAR_FILE=$(ls repository/lib/slf4j-api-*.jar | head -1)
+          VERSION=$(echo "$JAR_FILE" | grep -oP 'slf4j-api-\K[0-9.]+')
+          mvn install:install-file -Dfile="$JAR_FILE" \
+            -DgroupId=org.slf4j -DartifactId=slf4j-api -Dversion="$VERSION" \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: $JAR_FILE"
+        fi
+
+        # Install SWTBot JARs for UI testing
+        if [ -f repository/lib/org.eclipse.swtbot.swt.finder.jar ]; then
+          mvn install:install-file -Dfile=repository/lib/org.eclipse.swtbot.swt.finder.jar \
+            -DgroupId=org.eclipse.local -DartifactId=org.eclipse.swtbot.swt.finder -Dversion=4.2.1 \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: org.eclipse.swtbot.swt.finder.jar"
+        fi
+
+        if [ -f repository/lib/org.eclipse.swtbot.nebula.nattable.finder.jar ]; then
+          mvn install:install-file -Dfile=repository/lib/org.eclipse.swtbot.nebula.nattable.finder.jar \
+            -DgroupId=org.eclipse.local -DartifactId=org.eclipse.swtbot.nebula.nattable.finder -Dversion=4.2.1 \
+            -Dpackaging=jar -DgeneratePom=true
+          echo "Installed: org.eclipse.swtbot.nebula.nattable.finder.jar"
+        fi
+
+    - name: Set up Xvfb for Headless GUI Testing
+      run: |
+        echo "Installing Xvfb and GTK dependencies for headless SWT testing..."
+        sudo apt-get update
+        sudo apt-get install -y xvfb libgtk-3-0 libgtk-3-dev x11-xserver-utils
+        echo "Xvfb and GTK installed successfully"
+
+    - name: Set up build.properties
+      run: |
+        cat > build.properties << EOF
+        # CI Build Properties for HDFView Quality Analysis
+        # Generated automatically for GitHub Actions
+        # Using HDF libraries from GitHub releases
+
+        # HDF5 Configuration
+        hdf5.lib.dir=${{ env.HDF5LIB_PATH }}/lib
+        hdf5.plugin.dir=${{ env.HDF5LIB_PATH }}/lib/plugin
+
+        # HDF4 Configuration
+        hdf.lib.dir=${{ env.HDF4LIB_PATH }}/lib
+
+        # Platform Configuration
+        platform.hdf.lib=${{ env.HDF5LIB_PATH }}/lib
+
+        # CI-specific settings
+        ci.build=true
+        quality.analysis=true
+        EOF
+
+        echo "Generated build.properties for Quality Analysis:"
+        cat build.properties
+
+        # Set LD_LIBRARY_PATH for test execution
+        echo "LD_LIBRARY_PATH=${{ env.HDF5LIB_PATH }}/lib:${{ env.HDF4LIB_PATH }}/lib" >> $GITHUB_ENV
+
+    - name: Build All Modules
+      run: |
+        echo "::group::Build and Install Dependencies"
+        # Install parent POM first (required for properties plugin and child module resolution)
+        mvn install -B -N -Ddependency-check.skip=true
+
+        # Build repository module (needed by object) but don't install it
+        mvn compile -pl repository -B -Ddependency-check.skip=true
+
+        # Install only object and hdfview modules
+        # This avoids repository module's install-file executions
+        # HDF JARs are already installed in the previous step from downloaded distributions
+        # Skip OWASP security check (runs in separate maven-security.yml workflow)
+        mvn install -pl object,hdfview -DskipTests -Ddependency-check.skip=true -B
+        echo "::endgroup::"
+
+    - name: Run Tests with Coverage
+      run: |
+        echo "::group::Test Execution with Coverage"
+        # Skip hdfview UI tests until verified locally - only run object tests
+        # Run object tests with coverage, no need for Xvfb since object tests are non-GUI
+        # Don't use 'clean' here - we need the installed object module
+        # WORKAROUND: Pass required JVM args via argLine property (JaCoCo prepends its agent)
+        mvn jacoco:prepare-agent test jacoco:report -B -pl object \
+          -Dmaven.test.failure.ignore=false \
+          -Djacoco.excludes="**/Test*,**/Mock*,**/Stub*" \
+          -DargLine="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.time=ALL-UNNAMED --add-opens java.base/java.time.format=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --enable-native-access=jarhdf5 -Djava.library.path=${HDF5LIB_PATH}/lib"
+        echo "::endgroup::"
+
+    - name: Code Coverage Analysis
+      run: |
+        echo "::group::Coverage Analysis"
+
+        # Generate coverage report for object module only
+        mvn jacoco:report -pl object
+
+        # Extract coverage percentage from object module
+        if [ -f object/target/site/jacoco/index.html ]; then
+          COVERAGE=$(grep -o 'Total[^%]*%' object/target/site/jacoco/index.html | grep -o '[0-9]*%' | head -1)
+          echo "Current code coverage (object module): ${COVERAGE:-Unknown}"
+          echo "COVERAGE_PERCENT=${COVERAGE:-0%}" >> $GITHUB_ENV
+        fi
+
+        # Check coverage threshold for object module
+        mvn jacoco:check -pl object -Djacoco.haltOnFailure=false || echo "Coverage below threshold - check required"
+        echo "::endgroup::"
+
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./object/target/site/jacoco/jacoco.xml
+        flags: unittests
+        name: codecov-hdfview-object
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Generate Coverage Badge
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master-maven'
+      run: |
+        # Create a simple coverage badge
+        COVERAGE_NUM=$(echo $COVERAGE_PERCENT | sed 's/%//')
+        if [ -n "$COVERAGE_NUM" ] && [ "$COVERAGE_NUM" -ge 80 ]; then
+          COLOR="brightgreen"
+        elif [ -n "$COVERAGE_NUM" ] && [ "$COVERAGE_NUM" -ge 60 ]; then
+          COLOR="yellow"
+        else
+          COLOR="red"
+        fi
+
+        echo "Coverage: $COVERAGE_PERCENT (Color: $COLOR)"
+
+    - name: Static Analysis - PMD
+      run: |
+        echo "::group::PMD Analysis"
+        # Run PMD on object module only (matching test scope)
+        mvn pmd:pmd pmd:cpd -B -pl object \
+          -Dpmd.failOnViolation=false \
+          -Dpmd.analysisCache=true
+        echo "::endgroup::"
+
+    - name: Static Analysis - Checkstyle
+      run: |
+        echo "::group::Checkstyle Analysis"
+        # Run Checkstyle on object module only (matching test scope)
+        mvn checkstyle:checkstyle -B -pl object \
+          -Dcheckstyle.failOnViolation=false \
+          -Dcheckstyle.cache.file=target/checkstyle-cache
+        echo "::endgroup::"
+
+    - name: Quality Gate Evaluation
+      id: quality-gate
+      run: |
+        echo "::group::Quality Gate Evaluation"
+
+        # Initialize counters
+        QUALITY_ISSUES=0
+        QUALITY_WARNINGS=0
+
+        # Check coverage threshold (object module only)
+        # NOTE: Coverage checks temporarily disabled due to JaCoCo/Maven integration issues
+        # See docs/code-coverage-alternatives.md for details and future options
+        COVERAGE_NUM=$(echo "${COVERAGE_PERCENT:-0%}" | sed 's/%//' | tr -d '\n')
+        # Validate COVERAGE_NUM is a number
+        if [ -z "$COVERAGE_NUM" ] || ! [[ "$COVERAGE_NUM" =~ ^[0-9]+$ ]]; then
+          COVERAGE_NUM=0
+        fi
+
+        if [ "$COVERAGE_NUM" -lt 60 ]; then
+          echo "⚠️  Coverage below 60%: ${COVERAGE_PERCENT:-0%} (non-blocking - known issue)"
+          QUALITY_WARNINGS=$((QUALITY_WARNINGS + 1))
+        else
+          echo "✅ Coverage acceptable: ${COVERAGE_PERCENT:-Unknown}"
+        fi
+
+        # Check PMD results (object module)
+        # Progressive quality improvement: Start with baseline, reduce over time
+        # Current baseline: ~3850 violations (as of December 2024)
+        # Target reduction: -500 violations per quarter
+        if [ -f object/target/pmd.xml ]; then
+          PMD_VIOLATIONS=$(grep -c '<violation' object/target/pmd.xml || echo "0")
+          if [ "$PMD_VIOLATIONS" -gt 4000 ]; then
+            echo "❌ PMD violations too high: $PMD_VIOLATIONS (max 4000)"
+            QUALITY_ISSUES=$((QUALITY_ISSUES + 1))
+          elif [ "$PMD_VIOLATIONS" -gt 3500 ]; then
+            echo "⚠️  PMD violations elevated: $PMD_VIOLATIONS (target: <3500)"
+            QUALITY_WARNINGS=$((QUALITY_WARNINGS + 1))
+          else
+            echo "✅ PMD violations acceptable: $PMD_VIOLATIONS"
+          fi
+        else
+          echo "⚠️  PMD results not found"
+          QUALITY_WARNINGS=$((QUALITY_WARNINGS + 1))
+        fi
+
+        # Check Checkstyle results (object module)
+        if [ -f object/target/checkstyle-result.xml ]; then
+          CHECKSTYLE_ERRORS=$(grep -c 'severity="error"' object/target/checkstyle-result.xml || echo "0")
+          if [ "$CHECKSTYLE_ERRORS" -gt 0 ]; then
+            echo "❌ Checkstyle errors found: $CHECKSTYLE_ERRORS"
+            QUALITY_ISSUES=$((QUALITY_ISSUES + 1))
+          else
+            echo "✅ No Checkstyle errors"
+          fi
+        else
+          echo "⚠️  Checkstyle results not found"
+          QUALITY_WARNINGS=$((QUALITY_WARNINGS + 1))
+        fi
+
+        # Set outputs
+        echo "quality_issues=$QUALITY_ISSUES" >> $GITHUB_OUTPUT
+        echo "quality_warnings=$QUALITY_WARNINGS" >> $GITHUB_OUTPUT
+        echo "coverage_percent=${COVERAGE_PERCENT:-0%}" >> $GITHUB_OUTPUT
+
+        # Summary
+        echo "Quality Gate Summary:"
+        echo "- Issues (blocking): $QUALITY_ISSUES"
+        echo "- Warnings: $QUALITY_WARNINGS"
+        echo "- Coverage: ${COVERAGE_PERCENT:-Unknown}"
+
+        if [ "$QUALITY_ISSUES" -gt 0 ]; then
+          echo "QUALITY_GATE_STATUS=failed" >> $GITHUB_ENV
+          echo "::error::Quality gate failed with $QUALITY_ISSUES issues"
+        else
+          echo "QUALITY_GATE_STATUS=passed" >> $GITHUB_ENV
+          echo "Quality gate passed"
+        fi
+
+        echo "::endgroup::"
+
+    - name: Comment PR with Quality Report
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      continue-on-error: true  # May fail on forks due to permissions
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          let qualityReport = `## 🔍 Quality Analysis Report
+
+          | Metric | Status | Value |
+          |--------|--------|-------|
+          | **Code Coverage** | ${process.env.COVERAGE_PERCENT && parseInt(process.env.COVERAGE_PERCENT) >= 60 ? '✅' : '❌'} | ${process.env.COVERAGE_PERCENT || 'Unknown'} |
+          | **Quality Gate** | ${process.env.QUALITY_GATE_STATUS === 'passed' ? '✅ Passed' : '❌ Failed'} | ${{ steps.quality-gate.outputs.quality_issues }} issues |
+          `;
+
+          // Add PMD information if available
+          try {
+            const pmdFile = 'target/pmd.xml';
+            if (fs.existsSync(pmdFile)) {
+              const pmdContent = fs.readFileSync(pmdFile, 'utf8');
+              const violations = (pmdContent.match(/<violation/g) || []).length;
+              qualityReport += `| **PMD Analysis** | ${violations <= 20 ? '✅' : violations <= 50 ? '⚠️' : '❌'} | ${violations} violations |\n`;
+            }
+          } catch (e) {
+            console.log('PMD report not available');
+          }
+
+          qualityReport += `
+
+          ### Details
+          - **Coverage Threshold**: 60% minimum (non-blocking - JaCoCo integration issue)
+          - **PMD Violations**: Maximum 4000 allowed (progressive reduction target)
+          - **Checkstyle**: No errors allowed
+
+          `;
+
+          if (process.env.QUALITY_GATE_STATUS === 'failed') {
+            qualityReport += `
+          ⚠️ **Quality gate failed!** Please address the issues above before merging.
+
+          For help with quality issues, see [Quality Guidelines](docs/quality-guidelines.md)
+          `;
+          }
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: qualityReport
+          });
+
+    - name: Archive Quality Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: quality-reports-${{ github.run_number }}
+        path: |
+          **/target/site/jacoco/
+          **/target/pmd.xml
+          **/target/checkstyle-result.xml
+          **/target/site/pmd.html
+          **/target/site/checkstyle.html
+        retention-days: 30
+
+    - name: Quality Summary
+      if: always()
+      run: |
+        echo "## 🔍 Quality Analysis Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: $QUALITY_GATE_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage**: ${COVERAGE_PERCENT:-Unknown}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Issues**: ${{ steps.quality-gate.outputs.quality_issues }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Warnings**: ${{ steps.quality-gate.outputs.quality_warnings }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Reports Available" >> $GITHUB_STEP_SUMMARY
+        echo "- Code Coverage: target/site/jacoco/index.html" >> $GITHUB_STEP_SUMMARY
+        echo "- PMD Analysis: target/site/pmd.html" >> $GITHUB_STEP_SUMMARY
+        echo "- Checkstyle: target/site/checkstyle.html" >> $GITHUB_STEP_SUMMARY
+
+    # Fail the workflow if quality gate failed
+    - name: Quality Gate Check
+      if: env.QUALITY_GATE_STATUS == 'failed'
+      run: |
+        echo "Quality gate failed with ${{ steps.quality-gate.outputs.quality_issues }} issues"
+        exit 1

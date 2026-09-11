@@ -1,0 +1,133 @@
+name: Maven Build for Release
+
+# Reusable workflow for building HDFView release artifacts with Maven
+# Downloads HDF4 and HDF5 libraries from HDF Group GitHub releases
+on:
+  workflow_call:
+    inputs:
+      artifact_basename:
+        description: 'Base name for all build artifacts (e.g., hdfview-master-abc1234 or HDFView-3.4.0)'
+        type: string
+        required: true
+      build_type:
+        description: 'Build type: release, pre-release, or snapshot'
+        type: string
+        required: false
+        default: 'snapshot'
+      hdf4_release_tag:
+        description: 'HDF4 GitHub release tag to download from (e.g., snapshot, hdf4.3.1)'
+        type: string
+        required: false
+        default: 'snapshot'
+      hdf4_artifact_basename:
+        description: 'HDF4 artifact base filename pattern (e.g., hdf4.3.1, hdf-master-abc1234)'
+        type: string
+        required: false
+        default: 'snapshot'
+      hdf5_release_tag:
+        description: 'HDF5 GitHub release tag to download from (e.g., snapshot, 2.0.0)'
+        type: string
+        required: false
+        default: 'snapshot'
+      hdf5_artifact_basename:
+        description: 'HDF5 artifact base filename pattern (e.g., 2.0.0, hdf5-develop-xyz7890)'
+        type: string
+        required: false
+        default: 'snapshot'
+      hdf4_version:
+        description: 'HDF4 version number (e.g., 4.3.1) - if provided, skips parsing from JAR filename'
+        type: string
+        required: false
+        default: ''
+      hdf5_version:
+        description: 'HDF5 version number (e.g., 2.0.0) - if provided, skips parsing from JAR filename'
+        type: string
+        required: false
+        default: ''
+      hdf5_prefix:
+        description: 'Prefix for HDF5 release file patterns: "" for snapshot, "hdf5-" for tagged releases'
+        type: string
+        required: false
+        default: ''
+      build_environment:
+        description: 'Environment (snapshot, release, or pre-release)'
+        type: string
+        required: false
+        default: 'snapshot'
+      publish_to_maven_registry:
+        description: 'Publish artifacts to GitHub Packages Maven registry'
+        type: boolean
+        required: false
+        default: false
+   
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  MAVEN_OPTS: >-
+    -Xmx2g
+    -Xms1g
+    -XX:+UseParallelGC
+    -XX:+TieredCompilation
+    -XX:TieredStopAtLevel=1
+    -Djava.awt.headless=true
+
+jobs:
+  build-linux-artifacts:
+    uses: ./.github/workflows/build-linux.yml
+    secrets: inherit
+    with:
+      artifact_basename: ${{ inputs.artifact_basename }}
+      build_type: ${{ inputs.build_type }}
+      hdf4_release_tag: ${{ inputs.hdf4_release_tag }}
+      hdf4_artifact_basename: ${{ inputs.hdf4_artifact_basename }}
+      hdf5_release_tag: ${{ inputs.hdf5_release_tag }}
+      hdf5_artifact_basename: ${{ inputs.hdf5_artifact_basename }}
+      hdf4_version: ${{ inputs.hdf4_version }}
+      hdf5_version: ${{ inputs.hdf5_version }}
+      hdf5_prefix: ${{ inputs.hdf5_prefix }}
+
+  build-windows-artifacts:
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit
+    with:
+      artifact_basename: ${{ inputs.artifact_basename }}
+      build_type: ${{ inputs.build_type }}
+      hdf4_release_tag: ${{ inputs.hdf4_release_tag }}
+      hdf4_artifact_basename: ${{ inputs.hdf4_artifact_basename }}
+      hdf5_release_tag: ${{ inputs.hdf5_release_tag }}
+      hdf5_artifact_basename: ${{ inputs.hdf5_artifact_basename }}
+      hdf4_version: ${{ inputs.hdf4_version }}
+      hdf5_version: ${{ inputs.hdf5_version }}
+      hdf5_prefix: ${{ inputs.hdf5_prefix }}
+
+  build-macos-artifacts:
+    uses: ./.github/workflows/build-macos.yml
+    secrets: inherit
+    with:
+      artifact_basename: ${{ inputs.artifact_basename }}
+      build_type: ${{ inputs.build_type }}
+      hdf4_release_tag: ${{ inputs.hdf4_release_tag }}
+      hdf4_artifact_basename: ${{ inputs.hdf4_artifact_basename }}
+      hdf5_release_tag: ${{ inputs.hdf5_release_tag }}
+      hdf5_artifact_basename: ${{ inputs.hdf5_artifact_basename }}
+      hdf4_version: ${{ inputs.hdf4_version }}
+      hdf5_version: ${{ inputs.hdf5_version }}
+      hdf5_prefix: ${{ inputs.hdf5_prefix }}
+
+  publish-packages:
+    if: inputs.publish_to_maven_registry == true
+    uses: ./.github/workflows/publish-maven-packages.yml
+    secrets: inherit
+    with:
+      artifact_basename: ${{ inputs.artifact_basename }}
+      build_type: ${{ inputs.build_type }}
+      hdf4_release_tag: ${{ inputs.hdf4_release_tag }}
+      hdf4_artifact_basename: ${{ inputs.hdf4_artifact_basename }}
+      hdf5_release_tag: ${{ inputs.hdf5_release_tag }}
+      hdf5_artifact_basename: ${{ inputs.hdf5_artifact_basename }}
+      hdf4_version: ${{ inputs.hdf4_version }}
+      hdf5_version: ${{ inputs.hdf5_version }}
+      hdf5_prefix: ${{ inputs.hdf5_prefix }}

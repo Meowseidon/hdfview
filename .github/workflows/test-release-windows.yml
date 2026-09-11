@@ -1,0 +1,359 @@
+name: Test HDFView Release - Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'HDFView release tag (e.g., HDFView-3.4.0, snapshot)'
+        type: string
+        required: true
+        default: 'snapshot'
+      hdf4_version:
+        description: 'HDF4 version used in release'
+        type: string
+        required: false
+        default: '4.4.0'
+      hdf5_version:
+        description: 'HDF5 version used in release'
+        type: string
+        required: false
+        default: '2.2.0'
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'HDFView release tag (e.g., HDFView-3.4.0, snapshot)'
+        type: string
+        required: true
+      hdf4_version:
+        description: 'HDF4 version used in release'
+        type: string
+        required: false
+        default: '4.4.0'
+      hdf5_version:
+        description: 'HDF5 version used in release'
+        type: string
+        required: false
+        default: '2.2.0'
+
+permissions:
+  contents: read
+
+jobs:
+  test-app-binary:
+    name: Test App Binary (zip)
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Remove pre-installed Java and unset environment variables
+        shell: pwsh
+        run: |
+          Write-Host "Unsetting Java environment variables..."
+
+          # Remove Java environment variables
+          $javaVars = @('JAVA_HOME', 'JDK_HOME', 'JRE_HOME', 'CLASSPATH')
+          foreach ($var in $javaVars) {
+            if (Test-Path "Env:\$var") {
+              Remove-Item "Env:\$var" -ErrorAction SilentlyContinue
+              Write-Host "Removed Env:\$var"
+            }
+          }
+
+          # Remove GitHub Actions Java setup variables (JAVA_HOME_<version>_<arch>)
+          Get-ChildItem Env: | Where-Object { $_.Name -like 'JAVA_HOME_*' } | ForEach-Object {
+            Remove-Item "Env:\$($_.Name)" -ErrorAction SilentlyContinue
+            Write-Host "Removed Env:\$($_.Name)"
+          }
+
+          # Remove Java paths from PATH
+          $currentPath = $env:PATH
+          $pathEntries = $currentPath -split ';' | Where-Object {
+            $_ -notmatch '(java|jdk|jre)'
+          }
+          $env:PATH = $pathEntries -join ';'
+
+          Write-Host "Removing pre-installed Java directories..."
+
+          # Remove common Java installation directories
+          $javaPaths = @(
+            "C:\hostedtoolcache\Java",
+            "C:\Program Files\Java",
+            "C:\Program Files (x86)\Java",
+            "C:\Program Files\Eclipse Adoptium",
+            "C:\Program Files\Microsoft"
+          )
+
+          foreach ($path in $javaPaths) {
+            if (Test-Path $path) {
+              Write-Host "Removing: $path"
+              Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          Write-Host "Java removed. Verifying:"
+          try {
+            java -version 2>&1
+            Write-Host "Warning: Java still accessible"
+          } catch {
+            Write-Host "✓ Java not found (expected)"
+          }
+
+          Write-Host "Environment check:"
+          Write-Host "JAVA_HOME=$($env:JAVA_HOME ?? '<not set>')"
+          Write-Host "PATH=$env:PATH"
+
+      - name: Download app binary from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          Write-Host "Downloading HDFView app binary from release: ${{ inputs.release_tag }}"
+          gh release download ${{ inputs.release_tag }} `
+            --repo $env:GITHUB_REPOSITORY `
+            --pattern "HDFView-*App-Windows.zip"
+
+          Write-Host "Downloaded files:"
+          Get-ChildItem -Filter "HDFView-*.zip"
+
+      - name: Extract app binary
+        shell: pwsh
+        run: |
+          Write-Host "Extracting app binary..."
+          $zipFile = Get-ChildItem -Filter "HDFView-*App-Windows.zip" | Select-Object -First 1
+          Expand-Archive -Path $zipFile.FullName -DestinationPath . -Force
+
+          Write-Host "App structure:"
+          Get-ChildItem -Recurse HDFView | Select-Object FullName
+
+      - name: Run smoke test (launch app verification)
+        shell: pwsh
+        run: |
+          Write-Host "Running smoke test: Launch HDFView and verify stability"
+          Write-Host "Windows runners have native GUI display support"
+
+          # Find the launcher
+          $launcher = Get-ChildItem -Path "HDFView" -Filter "HDFView.exe" -Recurse | Select-Object -First 1
+
+          if (-not $launcher) {
+            Write-Host "✗ HDFView.exe not found in HDFView directory"
+            exit 1
+          }
+
+          Write-Host "Found launcher at: $($launcher.FullName)"
+
+          # Try to launch the application briefly
+          Write-Host "Launching HDFView for stability check..."
+          $app = Start-Process -FilePath $launcher.FullName -PassThru
+
+          # Wait 5 seconds to see if it crashes
+          Start-Sleep -Seconds 5
+
+          # Check if process is still running
+          $stillRunning = Get-Process -Id $app.Id -ErrorAction SilentlyContinue
+
+          if ($stillRunning) {
+            Write-Host "✓ HDFView launched successfully and is running"
+            Stop-Process -Id $app.Id -Force
+            Write-Host "✓ App binary smoke test PASSED"
+          } else {
+            Write-Host "✗ HDFView crashed or exited immediately"
+            exit 1
+          }
+
+      - name: Test Summary
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          ## App Binary Test Summary
+          - **Release Tag**: ${{ inputs.release_tag }}
+          - **HDF4 Version**: ${{ inputs.hdf4_version }}
+          - **HDF5 Version**: ${{ inputs.hdf5_version }}
+          - **Test**: Launch verification (5 second stability check)
+          - **Display**: Native Windows GUI display
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+  test-msi-installer:
+    name: Test MSI Installer
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Remove pre-installed Java and unset environment variables
+        shell: pwsh
+        run: |
+          Write-Host "Unsetting Java environment variables..."
+
+          # Remove Java environment variables
+          $javaVars = @('JAVA_HOME', 'JDK_HOME', 'JRE_HOME', 'CLASSPATH')
+          foreach ($var in $javaVars) {
+            if (Test-Path "Env:\$var") {
+              Remove-Item "Env:\$var" -ErrorAction SilentlyContinue
+              Write-Host "Removed Env:\$var"
+            }
+          }
+
+          # Remove GitHub Actions Java setup variables (JAVA_HOME_<version>_<arch>)
+          Get-ChildItem Env: | Where-Object { $_.Name -like 'JAVA_HOME_*' } | ForEach-Object {
+            Remove-Item "Env:\$($_.Name)" -ErrorAction SilentlyContinue
+            Write-Host "Removed Env:\$($_.Name)"
+          }
+
+          # Remove Java paths from PATH
+          $currentPath = $env:PATH
+          $pathEntries = $currentPath -split ';' | Where-Object {
+            $_ -notmatch '(java|jdk|jre)'
+          }
+          $env:PATH = $pathEntries -join ';'
+
+          Write-Host "Removing pre-installed Java directories..."
+
+          # Remove common Java installation directories
+          $javaPaths = @(
+            "C:\hostedtoolcache\Java",
+            "C:\Program Files\Java",
+            "C:\Program Files (x86)\Java",
+            "C:\Program Files\Eclipse Adoptium",
+            "C:\Program Files\Microsoft"
+          )
+
+          foreach ($path in $javaPaths) {
+            if (Test-Path $path) {
+              Write-Host "Removing: $path"
+              Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          Write-Host "Java removed. Verifying:"
+          try {
+            java -version 2>&1
+            Write-Host "Warning: Java still accessible"
+          } catch {
+            Write-Host "✓ Java not found (expected)"
+          }
+
+          Write-Host "Environment check:"
+          Write-Host "JAVA_HOME=$($env:JAVA_HOME ?? '<not set>')"
+          Write-Host "PATH=$env:PATH"
+
+      - name: Download MSI installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          Write-Host "Downloading MSI installer from release: ${{ inputs.release_tag }}"
+          gh release download ${{ inputs.release_tag }} `
+            --repo $env:GITHUB_REPOSITORY `
+            --pattern "HDFView-*-Windows.msi"
+
+          Write-Host "Downloaded installer:"
+          Get-ChildItem -Filter "HDFView-*.msi"
+
+      - name: Install MSI package
+        shell: pwsh
+        run: |
+          Write-Host "Installing MSI package..."
+          $msiFile = Get-ChildItem -Filter "HDFView-*.msi" | Select-Object -First 1
+
+          $arguments = @(
+            "/i",
+            $msiFile.FullName,
+            "/qn",
+            "/norestart",
+            "/L*V",
+            "install.log"
+          )
+
+          $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $arguments -Wait -PassThru
+
+          if ($process.ExitCode -ne 0) {
+            Write-Host "Installation failed with exit code: $($process.ExitCode)"
+            if (Test-Path "install.log") {
+              Write-Host "Installation log:"
+              Get-Content "install.log" | Select-Object -Last 50
+            }
+            exit $process.ExitCode
+          }
+
+          Write-Host "Installation completed successfully"
+
+      - name: Verify installation and launch test
+        shell: pwsh
+        run: |
+          Write-Host "Searching for installed HDFView..."
+          Write-Host "Note: MSI uses --win-per-user-install, so it installs to LocalAppData"
+
+          # Per-user installation paths (default for --win-per-user-install)
+          # Installation path is: %LOCALAPPDATA%\HDFView\<version>\
+          $localAppData = $env:LOCALAPPDATA
+          $possiblePaths = @(
+            "$localAppData\HDFView",
+            "C:\Program Files\HDFView",
+            "C:\Program Files (x86)\HDFView"
+          )
+
+          $installPath = $null
+          foreach ($path in $possiblePaths) {
+            Write-Host "Checking: $path"
+            if (Test-Path $path) {
+              # For per-user install, the actual app is in a version subdirectory
+              # Try to find HDFView.exe recursively
+              $exePath = Get-ChildItem -Path $path -Filter "HDFView.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($exePath) {
+                $installPath = $exePath.DirectoryName
+                Write-Host "✓ Found at: $installPath"
+                break
+              }
+            }
+          }
+
+          if (-not $installPath) {
+            Write-Host "✗ HDFView installation not found in expected locations"
+            Write-Host "Searching LocalAppData recursively..."
+            Get-ChildItem -Path $localAppData -Filter "HDFView.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+            exit 1
+          }
+
+          Write-Host "✓ Installation found at: $installPath"
+
+          # Find the launcher
+          $launcher = Get-ChildItem -Path $installPath -Filter "HDFView.exe" -Recurse | Select-Object -First 1
+
+          if (-not $launcher) {
+            Write-Host "✗ HDFView.exe not found in installation directory"
+            exit 1
+          }
+
+          Write-Host "Found launcher at: $($launcher.FullName)"
+
+          # Try to launch the application briefly
+          Write-Host "Launching HDFView for stability check..."
+          $app = Start-Process -FilePath $launcher.FullName -PassThru
+
+          # Wait 5 seconds to see if it crashes
+          Start-Sleep -Seconds 5
+
+          # Check if process is still running
+          $stillRunning = Get-Process -Id $app.Id -ErrorAction SilentlyContinue
+
+          if ($stillRunning) {
+            Write-Host "✓ HDFView launched successfully and is running"
+            Stop-Process -Id $app.Id -Force
+            Write-Host "✓ MSI installer smoke test PASSED"
+          } else {
+            Write-Host "✗ HDFView crashed or exited immediately"
+            exit 1
+          }
+
+      - name: Test Summary
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          ## MSI Installer Test Summary
+          - **Release Tag**: ${{ inputs.release_tag }}
+          - **HDF4 Version**: ${{ inputs.hdf4_version }}
+          - **HDF5 Version**: ${{ inputs.hdf5_version }}
+          - **Test**: Launch verification (5 second stability check)
+          - **Display**: Native Windows GUI display
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

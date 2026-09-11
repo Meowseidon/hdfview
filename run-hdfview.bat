@@ -1,0 +1,301 @@
+@echo off
+REM =============================================================================
+REM HDFView Launcher Script for Windows
+REM
+REM This script validates the environment and launches an already-built HDFView.
+REM Build the project first using: mvn clean package -DskipTests
+REM
+REM Launch options:
+REM   1. Maven exec:java (for development)
+REM   2. Direct JAR execution (recommended)
+REM
+REM Requirements:
+REM   - Java 21+
+REM   - Maven 3.6+ (only for option 1)
+REM   - HDF5 and HDF4 native libraries (configured in build.properties)
+REM   - HDFView must be built before running this script
+REM =============================================================================
+
+setlocal enabledelayedexpansion
+
+REM Script configuration
+set SCRIPT_DIR=%~dp0
+cd /d "%SCRIPT_DIR%"
+
+echo.
+echo === HDFView Environment Check ^& Launcher ===
+echo.
+
+REM =============================================================================
+REM Function to load properties from build.properties
+REM =============================================================================
+set "PROPS_FILE=build.properties"
+if not exist "%PROPS_FILE%" (
+    echo [ERROR] build.properties file not found!
+    exit /b 1
+)
+
+echo [INFO] Loading build.properties...
+
+REM Parse build.properties file
+for /f "usebackq tokens=1,* delims==" %%a in ("%PROPS_FILE%") do (
+    set "line=%%a"
+    set "value=%%b"
+
+    REM Skip empty lines and comments
+    if not "!line!"=="" (
+        echo !line! | findstr /r "^#" >nul
+        if errorlevel 1 (
+            REM Replace dots with underscores for variable names
+            set "key=!line:.=_!"
+            set "!key!=!value!"
+        )
+    )
+)
+
+echo [OK] build.properties loaded
+echo.
+
+REM =============================================================================
+REM Environment Validation
+REM =============================================================================
+
+echo [INFO] Checking project structure...
+if not exist "pom.xml" (
+    echo [ERROR] Not in HDFView project root directory
+    exit /b 1
+)
+if not exist "%PROPS_FILE%" (
+    echo [ERROR] build.properties not found
+    exit /b 1
+)
+echo [OK] Found project files
+echo.
+
+REM Check Java
+echo [INFO] Checking Java version...
+java -version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Java not found in PATH
+    echo [ERROR] Please install Java 21 or later
+    exit /b 1
+)
+
+REM Get Java version
+for /f "tokens=3" %%v in ('java -version 2^>^&1 ^| findstr /i "version"') do (
+    set JAVA_VERSION=%%v
+    set JAVA_VERSION=!JAVA_VERSION:"=!
+    goto :java_version_done
+)
+:java_version_done
+echo [OK] Java !JAVA_VERSION! detected
+echo.
+
+REM Check Maven
+echo [INFO] Checking Maven...
+call mvn -version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Maven not found in PATH
+    echo [ERROR] Please install Maven 3.6 or later
+    exit /b 1
+)
+
+for /f "tokens=3" %%v in ('call mvn -version 2^>^&1 ^| findstr /i "Apache Maven"') do (
+    set MVN_VERSION=%%v
+    goto :mvn_version_done
+)
+:mvn_version_done
+echo [OK] Maven !MVN_VERSION! found
+echo.
+
+REM Check HDF5 libraries
+echo [INFO] Checking HDF5 libraries...
+if "!hdf5_lib_dir!"=="" (
+    echo [ERROR] hdf5.lib.dir not configured in build.properties
+    exit /b 1
+)
+if not exist "!hdf5_lib_dir!" (
+    echo [ERROR] HDF5 library directory not found: !hdf5_lib_dir!
+    echo [ERROR] Set hdf5.lib.dir in build.properties
+    exit /b 1
+)
+echo [OK] HDF5 library directory found: !hdf5_lib_dir!
+
+if not "!hdf5_plugin_dir!"=="" (
+    if exist "!hdf5_plugin_dir!" (
+        echo [OK] HDF5 plugin directory found: !hdf5_plugin_dir!
+    ) else (
+        echo [WARN] HDF5 plugin directory not found: !hdf5_plugin_dir!
+    )
+)
+echo.
+
+REM Check HDF4 libraries (optional)
+echo [INFO] Checking HDF4 libraries (optional)...
+if not "!hdf_lib_dir!"=="" (
+    if exist "!hdf_lib_dir!" (
+        echo [OK] HDF4 library directory found: !hdf_lib_dir!
+    ) else (
+        echo [WARN] HDF4 library directory not found: !hdf_lib_dir!
+    )
+) else (
+    echo [INFO] HDF4 support not configured (optional)
+)
+echo.
+
+REM Check build status
+echo [INFO] Checking build status...
+set "HDFVIEW_JAR="
+for %%f in (libs\hdfview-*.jar) do (
+    set "jarname=%%~nxf"
+    echo !jarname! | findstr /i "sources javadoc" >nul
+    if errorlevel 1 (
+        set "HDFVIEW_JAR=%%f"
+        goto :jar_found
+    )
+)
+:jar_found
+if "!HDFVIEW_JAR!"=="" (
+    echo [ERROR] HDFView JAR not found: libs\hdfview-*.jar
+    echo [ERROR] Build the project first: mvn clean package -DskipTests
+    exit /b 1
+)
+for %%f in (!HDFVIEW_JAR!) do set "HDFVIEW_JAR_NAME=%%~nxf"
+echo [OK] HDFView JAR found: !HDFVIEW_JAR_NAME!
+echo.
+
+REM Check platform
+echo [INFO] Checking SWT platform support...
+echo [OK] Windows platform detected - SWT support available
+echo.
+
+echo [INFO] Environment validation complete!
+echo.
+
+REM Set up runtime environment
+set "PATH=!hdf5_lib_dir!;!hdf_lib_dir!;!PATH!"
+if not "!hdf5_plugin_dir!"=="" (
+    set "HDF5_PLUGIN_PATH=!hdf5_plugin_dir!"
+)
+
+REM JVM arguments for proper module access
+set JVM_ARGS=--add-opens java.base/java.lang=ALL-UNNAMED
+set JVM_ARGS=%JVM_ARGS% --add-opens java.base/java.time=ALL-UNNAMED
+set JVM_ARGS=%JVM_ARGS% --add-opens java.base/java.time.format=ALL-UNNAMED
+set JVM_ARGS=%JVM_ARGS% --add-opens java.base/java.util=ALL-UNNAMED
+set JVM_ARGS=%JVM_ARGS% --enable-native-access=jarhdf5
+set JVM_ARGS=%JVM_ARGS% -Djava.library.path=!hdf5_lib_dir!;!hdf_lib_dir!
+
+REM Parse command line arguments
+set SLF4J_IMPL=nop
+set LAUNCH_MODE=jar
+
+:parse_args
+if "%1"=="" goto :args_done
+if "%1"=="--debug" (
+    set SLF4J_IMPL=simple
+    shift
+    goto :parse_args
+)
+if "%1"=="--choose" (
+    set LAUNCH_MODE=choose
+    shift
+    goto :parse_args
+)
+if "%1"=="--maven" (
+    set LAUNCH_MODE=maven
+    shift
+    goto :parse_args
+)
+if "%1"=="--validate" (
+    set LAUNCH_MODE=validate
+    shift
+    goto :parse_args
+)
+shift
+goto :parse_args
+
+:args_done
+REM Check environment variable for debug
+if "%HDFVIEW_DEBUG%"=="1" set SLF4J_IMPL=simple
+
+if "!SLF4J_IMPL!"=="simple" (
+    echo [INFO] Debug logging enabled (slf4j-simple^)
+) else (
+    echo [INFO] Logging disabled (slf4j-nop^). Use --debug or set HDFVIEW_DEBUG=1 to enable.
+)
+echo.
+
+REM Launch options
+if "!LAUNCH_MODE!"=="choose" (
+    echo Choose launch method:
+    echo 1. Maven exec:java
+    echo 2. Direct JAR execution ^(recommended^)
+    echo 3. Just validate environment ^(no launch^)
+    echo.
+    set /p CHOICE="Enter choice [1-3]: "
+
+    if "!CHOICE!"=="1" goto :maven_exec
+    if "!CHOICE!"=="2" goto :jar_exec
+    if "!CHOICE!"=="3" goto :validate
+    echo [ERROR] Invalid choice. Exiting.
+    exit /b 1
+)
+
+REM Map launch mode to target
+if "!LAUNCH_MODE!"=="maven" goto :maven_exec
+if "!LAUNCH_MODE!"=="jar" goto :jar_exec
+if "!LAUNCH_MODE!"=="validate" goto :validate
+
+:maven_exec
+echo [INFO] Launching HDFView via Maven...
+echo Command: mvn exec:java -Dexec.mainClass="hdf.view.HDFView" -pl hdfview
+echo.
+call mvn exec:java -Dexec.mainClass="hdf.view.HDFView" -pl hdfview
+goto :end
+
+:jar_exec
+echo [INFO] Launching HDFView via direct JAR execution...
+if "!HDFVIEW_JAR!"=="" (
+    echo [ERROR] JAR file not found. Build the project first.
+    exit /b 1
+)
+
+if not exist "hdfview\target\lib" (
+    echo [ERROR] Dependencies not found: hdfview\target\lib
+    echo [ERROR] Build the project first: mvn clean package -DskipTests
+    exit /b 1
+)
+
+REM Build classpath, excluding slf4j-nop or slf4j-simple based on debug mode
+set CLASSPATH=!HDFVIEW_JAR!
+for %%j in (hdfview\target\lib\*.jar) do (
+    set "jarname=%%~nxj"
+    if "!SLF4J_IMPL!"=="simple" (
+        REM Skip nop, include simple
+        echo !jarname! | findstr /i "^slf4j-nop" >nul
+        if errorlevel 1 set "CLASSPATH=!CLASSPATH!;%%j"
+    ) else (
+        REM Skip simple, include nop
+        echo !jarname! | findstr /i "^slf4j-simple" >nul
+        if errorlevel 1 set "CLASSPATH=!CLASSPATH!;%%j"
+    )
+)
+
+echo Command: java %JVM_ARGS% -cp "..." hdf.view.HDFView
+echo.
+java %JVM_ARGS% -cp "%CLASSPATH%" hdf.view.HDFView
+goto :end
+
+:validate
+echo [OK] Environment validation complete. Ready to run HDFView!
+echo.
+echo To launch manually:
+echo Option 1 (Maven^): mvn exec:java -Dexec.mainClass="hdf.view.HDFView" -pl hdfview
+echo Option 2 (JAR^): java %JVM_ARGS% -cp "!HDFVIEW_JAR!;hdfview\target\lib\*" hdf.view.HDFView
+goto :end
+
+:end
+echo.
+echo [OK] Script completed!
+endlocal

@@ -1,0 +1,89 @@
+name: hdfview remove old artifacts
+
+# This workflow removes old snapshot artifacts from GitHub releases to prevent accumulation.
+# It deletes the previous build's files (based on artifact_basename) from the specified release tag.
+# This is typically called by daily-build.yml to clean up old snapshots before uploading new ones.
+
+# Triggers the workflow on a call from another workflow
+on:
+  workflow_call:
+    inputs:
+      release_version_tag:
+        description: 'Release version tag'
+        type: string
+        required: false
+        default: HDFView-99.99.99
+      build_environment:
+        description: 'Environment to locate files'
+        type: string
+        required: true
+        default: snapshot
+      artifact_basename:
+        description: "Base name for all build artifacts (e.g., hdfview-master-abc1234 or HDFView-3.4.0)"
+        required: true
+        type: string
+
+# Minimal permissions to be inherited by any job that doesn't declare its own permissions
+permissions:
+  contents: read
+
+# Previous workflows must pass to get here so tag the commit that created the files
+jobs:
+  PreRelease-delfiles:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.build_environment }}
+    permissions:
+        contents: write
+    steps:
+      # Checkout repository to read VERSION file
+      - name: Get Sources
+        uses: actions/checkout@9a9194f87191a7e9055e3e9b95b8cfb13023bb08 # v4.1.7
+        with:
+          fetch-depth: 0
+          ref: '${{ github.head_ref || github.ref_name }}'
+
+      - name: Get artifact basename and version
+        id: get-artifact-info
+        run: |
+          ARTIFACT_NAME=$(echo "${{ inputs.artifact_basename }}")
+          echo "ARTIFACT_BASENAME=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          # Read HDFVIEW_VERSION from VERSION file (same as maven-build.yml)
+          HDFVIEW_VERSION=$(grep "^HDFVIEW_VERSION=" VERSION | cut -d'=' -f2)
+          echo "VERSION=$HDFVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Artifact basename: $ARTIFACT_NAME"
+          echo "HDFView version: $HDFVIEW_VERSION"
+
+      - name: List files to delete (debug)
+        run: |
+          echo "=== Files to be deleted from release ==="
+          echo "Tag: ${{ inputs.release_version_tag }}"
+          echo "File base: ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}"
+          echo ""
+          echo "Files that will be deleted:"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.sha256sums.txt"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.tar.gz"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.zip"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}-Linux-x86_64.tar.gz"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.msi (NEW!)"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.dmg (NEW!)"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}App-Linux-x86_64.tar.gz"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}App-win64.zip"
+          echo "  - ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}App-Darwin.tar.gz"
+
+      - name: PreRelease delete from tag
+        id: delete_prerelease
+        if: ${{ (inputs.build_environment == 'snapshot') }}
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ github.token }}
+          tag: "${{ inputs.release_version_tag }}"
+          assets: |
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.sha256sums.txt
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.tar.gz
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.zip
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}-Linux-x86_64.tar.gz
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.msi
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}.dmg
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}App-Linux-x86_64.tar.gz
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}App-win64.zip
+              ${{ steps.get-artifact-info.outputs.ARTIFACT_BASENAME }}App-Darwin.tar.gz

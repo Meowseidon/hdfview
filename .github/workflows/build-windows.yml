@@ -1,0 +1,877 @@
+name: Build Windows Release Artifacts
+
+on:
+    workflow_call:
+        inputs:
+            artifact_basename:
+              description: 'Base name for all build artifacts (e.g., hdfview-master-abc1234 or HDFView-3.4.0)'
+              type: string
+              required: true
+            build_type:
+              description: 'Build type: release, pre-release, or snapshot'
+              type: string
+              required: false
+              default: 'snapshot'
+            hdf4_release_tag:
+              description: 'HDF4 GitHub release tag to download from (e.g., snapshot, hdf4.3.1)'
+              type: string
+              required: false
+              default: 'snapshot'
+            hdf4_artifact_basename:
+              description: 'HDF4 artifact base filename pattern (e.g., hdf4.3.1, hdf-master-abc1234)'
+              type: string
+              required: false
+              default: 'snapshot'
+            hdf5_release_tag:
+              description: 'HDF5 GitHub release tag to download from (e.g., snapshot, 2.0.0)'
+              type: string
+              required: false
+              default: 'snapshot'
+            hdf5_artifact_basename:
+              description: 'HDF5 artifact base filename pattern (e.g., 2.0.0, hdf5-develop-xyz7890)'
+              type: string
+              required: false
+              default: 'snapshot'
+            hdf4_version:
+              description: 'HDF4 version number (e.g., 4.3.1) - if provided, skips parsing from JAR filename'
+              type: string
+              required: false
+              default: ''
+            hdf5_version:
+              description: 'HDF5 version number (e.g., 2.0.0) - if provided, skips parsing from JAR filename'
+              type: string
+              required: false
+              default: ''
+            hdf5_prefix:
+              description: 'Prefix for HDF5 release file patterns: "" for snapshot, "hdf5-" for tagged releases'
+              type: string
+              required: false
+              default: ''
+  
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+    build-windows-binary:
+      name: Build Windows Binary
+      runs-on: windows-latest
+      timeout-minutes: 30
+
+      steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'oracle'
+
+      - name: Cache Maven Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+              ~/.m2/repository
+              !~/.m2/repository/org/hdfgroup
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+              ${{ runner.os }}-maven-
+
+      - name: Download and Install HDF4 from GitHub
+        shell: pwsh
+        run: |
+          Write-Host "Downloading HDF4 from release tag: ${{ inputs.hdf4_release_tag }}"
+          
+          $PATTERN = "${{ inputs.hdf4_artifact_basename }}-win-vs2026_cl.zip"
+          Write-Host "Using pattern: $PATTERN"
+
+          gh release download "${{ inputs.hdf4_release_tag }}" `
+              --repo HDFGroup/hdf4 `
+              --pattern $PATTERN `
+              --clobber
+
+          Write-Host "Extracting HDF4..."
+          7z x *-win-vs2026_cl.zip
+          # Rename hdf4-* directory to hdf4 if needed
+          $hdf4Dir = Get-ChildItem -Directory -Filter "hdf4*" | Select-Object -First 1
+          if ($hdf4Dir.Name -ne "hdf4") {
+              Rename-Item $hdf4Dir.FullName "hdf4"
+          }
+          Set-Location hdf4
+          7z x HDF-*-win64.zip
+
+          # Windows structure: hdf4/HDF-4.3.1-win64/lib, hdf4/HDF-4.3.1-win64/bin
+          # Find the extracted HDF-*-win64 directory
+          $HDF4DIR = Get-ChildItem -Path . -Filter "HDF-*-win64" -Directory | Select-Object -First 1
+          if (-not $HDF4DIR) {
+              Write-Error "HDF-*-win64 directory not found!"
+              Get-ChildItem -Directory | ForEach-Object { Write-Host $_.Name }
+              exit 1
+          }
+          $HDF4LIB_PATH = $HDF4DIR.FullName
+          echo "HDF4LIB_PATH=$HDF4LIB_PATH" >> $env:GITHUB_ENV
+          Write-Host "HDF4 installed to: $HDF4LIB_PATH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download and Install HDF5 from GitHub
+        shell: pwsh
+        run: |
+          Write-Host "Downloading HDF5 from release tag: ${{ inputs.hdf5_release_tag }}"
+
+          $PATTERN = "${{ inputs.hdf5_prefix }}${{ inputs.hdf5_artifact_basename }}-win-vs2026_cl.zip"
+          Write-Host "Using pattern: $PATTERN"
+
+          gh release download "${{ inputs.hdf5_release_tag }}" `
+              --repo HDFGroup/hdf5 `
+              --pattern $PATTERN `
+              --clobber
+
+          Write-Host "Extracting HDF5..."
+          7z x hdf5-*-win-vs2026_cl.zip
+          # Rename hdf5-* directory to hdf5 if needed
+          $hdf5Dir = Get-ChildItem -Directory -Filter "hdf5*" | Select-Object -First 1
+          if ($hdf5Dir.Name -ne "hdf5") {
+              Rename-Item $hdf5Dir.FullName "hdf5"
+          }
+          Set-Location hdf5
+          7z x HDF5-*-win64.zip
+
+          # Windows structure: hdf5/HDF5-x.y.z-win64/lib, hdf5/HDF5-x.y.z-win64/bin
+          # Find the extracted HDF5-*-win64 directory
+          $HDF5DIR = Get-ChildItem -Path . -Filter "HDF5-*-win64" -Directory | Select-Object -First 1
+          if (-not $HDF5DIR) {
+              Write-Error "HDF5-*-win64 directory not found!"
+              Get-ChildItem -Directory | ForEach-Object { Write-Host $_.Name }
+              exit 1
+          }
+          $HDF5LIB_PATH = $HDF5DIR.FullName
+          echo "HDF5LIB_PATH=$HDF5LIB_PATH" >> $env:GITHUB_ENV
+          Write-Host "HDF5 installed to: $HDF5LIB_PATH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Set up build.properties
+        shell: pwsh
+        run: |
+          # Convert Windows paths to use forward slashes (Java/Maven compatible)
+          $HDF5_PATH = $env:HDF5LIB_PATH -replace '\\', '/'
+          $HDF4_PATH = $env:HDF4LIB_PATH -replace '\\', '/'
+
+          @"
+          hdf5.lib.dir=$HDF5_PATH/lib
+          hdf5.plugin.dir=$HDF5_PATH/lib/plugin
+          hdf.lib.dir=$HDF4_PATH/lib
+          platform.hdf.lib=$HDF5_PATH/bin;$HDF4_PATH/bin
+          "@ | Out-File -FilePath build.properties -Encoding utf8
+
+          Write-Host "Generated build.properties:"
+          Get-Content build.properties
+
+      - name: Install HDF JARs to Local Maven Repository
+        shell: pwsh
+        run: |
+          Write-Host "Installing HDF JARs to local Maven repository..."
+          New-Item -Path "repository\lib" -ItemType Directory -Force | Out-Null
+
+          if (Test-Path "$env:HDF4LIB_PATH\lib\*.jar") {
+              Copy-Item "$env:HDF4LIB_PATH\lib\*.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+          }
+          if (Test-Path "$env:HDF5LIB_PATH\lib\*.jar") {
+              Copy-Item "$env:HDF5LIB_PATH\lib\*.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+          }
+          if (Test-Path "lib\fits.jar") {
+              Copy-Item "lib\fits.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+          }
+          if (Test-Path "lib\netcdf.jar") {
+              Copy-Item "lib\netcdf.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+          }
+
+          $jarhdf5 = Get-ChildItem "repository\lib\jarhdf5-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($jarhdf5) {
+              $HDF5_VERSION = $jarhdf5.Name -replace 'jarhdf5-([0-9.]+)\.jar', '$1'
+              mvn install:install-file "-Dfile=$($jarhdf5.FullName)" `
+                "-DgroupId=jarhdf5" "-DartifactId=jarhdf5" "-Dversion=$HDF5_VERSION" "-Dpackaging=jar" "-DgeneratePom=true"
+              Write-Host "Installed: $($jarhdf5.Name) as version $HDF5_VERSION"
+              "HDF5_VERSION=$HDF5_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
+          $jarhdf = Get-ChildItem "repository\lib\jarhdf-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($jarhdf) {
+              $HDF4_VERSION = $jarhdf.Name -replace 'jarhdf-([0-9.]+)\.jar', '$1'
+              mvn install:install-file "-Dfile=$($jarhdf.FullName)" `
+                "-DgroupId=jarhdf" "-DartifactId=jarhdf" "-Dversion=$HDF4_VERSION" "-Dpackaging=jar" "-DgeneratePom=true"
+              Write-Host "Installed: $($jarhdf.Name) as version $HDF4_VERSION"
+              "HDF4_VERSION=$HDF4_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
+          if (Test-Path "repository\lib\fits.jar") {
+              mvn install:install-file "-Dfile=repository\lib\fits.jar" `
+                "-DgroupId=fits" "-DartifactId=fits" "-Dversion=1.0.0" "-Dpackaging=jar" "-DgeneratePom=true"
+          }
+
+          if (Test-Path "repository\lib\netcdf.jar") {
+              mvn install:install-file "-Dfile=repository\lib\netcdf.jar" `
+                "-DgroupId=netcdf" "-DartifactId=netcdf" "-Dversion=1.0.0" "-Dpackaging=jar" "-DgeneratePom=true"
+          }
+
+      - name: Install SWTBot JARs to Local Maven Repository
+        shell: pwsh
+        run: |
+          Write-Host "Installing SWTBot JARs to local Maven repository..."
+
+          if (Test-Path "repository\lib\org.eclipse.swtbot.swt.finder.jar") {
+              mvn install:install-file "-Dfile=repository\lib\org.eclipse.swtbot.swt.finder.jar" `
+                "-DgroupId=org.eclipse.local" `
+                "-DartifactId=org.eclipse.swtbot.swt.finder" `
+                "-Dversion=4.2.1" `
+                "-Dpackaging=jar" `
+                "-DgeneratePom=true"
+              Write-Host "SWTBot SWT finder JAR installed"
+          } else {
+              Write-Host "WARNING: org.eclipse.swtbot.swt.finder.jar not found"
+          }
+
+          if (Test-Path "repository\lib\org.eclipse.swtbot.nebula.nattable.finder.jar") {
+              mvn install:install-file "-Dfile=repository\lib\org.eclipse.swtbot.nebula.nattable.finder.jar" `
+                "-DgroupId=org.eclipse.local" `
+                "-DartifactId=org.eclipse.swtbot.nebula.nattable.finder" `
+                "-Dversion=4.2.1" `
+                "-Dpackaging=jar" `
+                "-DgeneratePom=true"
+              Write-Host "SWTBot Nebula NatTable finder JAR installed"
+          } else {
+              Write-Host "WARNING: org.eclipse.swtbot.nebula.nattable.finder.jar not found"
+          }
+
+      - name: Build with Maven
+        shell: pwsh
+        run: |
+          Write-Host "Building HDFView with Maven (standard build process)..."
+
+          # Step 1: Install repository module
+          Write-Host "Installing repository module..."
+          mvn clean install "-DskipTests" `
+            "-Djacoco.skip=true" `
+            "-Dpmd.skip=true" `
+            "-Ddependency-check.skip=true" `
+            "-pl" "repository" `
+            -B
+
+          # Step 2: Install all modules (including parent POM)
+          Write-Host "Installing all modules..."
+          mvn clean install "-DskipTests" `
+            "-Djacoco.skip=true" `
+            "-Dpmd.skip=true" `
+            "-Ddependency-check.skip=true" `
+            -B
+
+          # Step 3: Package
+          Write-Host "Packaging..."
+          mvn package "-DskipTests" `
+            "-Djacoco.skip=true" `
+            "-Dpmd.skip=true" `
+            "-Ddependency-check.skip=true" `
+            -B
+
+          # Step 4: Run verify phase with jpackage profiles to create app-image
+          # Note: This job creates a basic binary archive, not a full app-image
+          # So we skip the verify step here (it's done in build-windows-app job)
+          Write-Host "✓ Build complete"
+
+      - name: Extract version from VERSION file
+        id: get-version-binary
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION | Select-String "^HDFVIEW_VERSION=").ToString().Split('=')[1]
+          echo "HDFVIEW_VERSION=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "HDFView version: $version"
+
+      - name: Create Windows Binary Archive
+        shell: pwsh
+        run: |
+          New-Item -Path "hdfview-dist" -ItemType Directory -Force
+
+          # Copy JARs
+          Copy-Item "libs\*.jar" -Destination "hdfview-dist\"
+          Copy-Item "hdfview\target\*.jar" -Destination "hdfview-dist\" -ErrorAction SilentlyContinue
+          Copy-Item "object\target\*.jar" -Destination "hdfview-dist\" -ErrorAction SilentlyContinue
+
+          # Create lib directory and copy DLLs
+          New-Item -Path "hdfview-dist\lib" -ItemType Directory -Force
+          Copy-Item "$env:HDF4LIB_PATH\bin\*.dll" -Destination "hdfview-dist\lib\" -ErrorAction SilentlyContinue
+          Copy-Item "$env:HDF5LIB_PATH\bin\*.dll" -Destination "hdfview-dist\lib\" -ErrorAction SilentlyContinue
+
+          # Create ZIP archive with standard name: HDFView-{VERSION}App-Windows.zip
+          Compress-Archive -Path "hdfview-dist\*" -DestinationPath "HDFView-${{ steps.get-version-binary.outputs.HDFVIEW_VERSION }}App-Windows.zip"
+
+      - name: Upload Windows Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zip-win-vs2022-binary
+          path: HDFView-*App-Windows.zip
+          retention-days: 30
+
+    build-windows-app:
+      name: Build Windows Application Package
+      runs-on: windows-latest
+      timeout-minutes: 30
+      env:
+        # Set secrets as env vars at job level so they can be checked in step conditions
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+        AZURE_CODE_SIGNING_NAME: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
+        AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+
+      steps:
+        - name: Checkout Code
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+
+        - name: Extract version from VERSION file
+          id: get-version
+          shell: pwsh
+          run: |
+            # Read HDFVIEW_VERSION from VERSION file
+            $version = (Get-Content VERSION | Select-String "^HDFVIEW_VERSION=").ToString().Split('=')[1]
+            echo "HDFVIEW_VERSION=$version" >> $env:GITHUB_OUTPUT
+            Write-Host "HDFView version: $version"
+
+        - name: Set up JDK 21
+          uses: actions/setup-java@v4
+          with:
+            java-version: '21'
+            distribution: 'oracle'
+  
+        - name: Cache Maven Dependencies
+          uses: actions/cache@v4
+          with:
+            path: |
+              ~/.m2/repository
+              !~/.m2/repository/org/hdfgroup
+            key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+            restore-keys: |
+              ${{ runner.os }}-maven-
+  
+        - name: Download and Install HDF4 from GitHub
+          shell: pwsh
+          run: |
+            Write-Host "Downloading HDF4 from release tag: ${{ inputs.hdf4_release_tag }}"
+  
+            $PATTERN = "${{ inputs.hdf4_artifact_basename }}-win-vs2026_cl.zip"
+            Write-Host "Using pattern: $PATTERN"
+  
+            gh release download "${{ inputs.hdf4_release_tag }}" --repo HDFGroup/hdf4 --pattern $PATTERN --clobber
+            7z x *-win-vs2026_cl.zip
+            # Rename hdf4-* directory to hdf4 if needed
+            $hdf4Dir = Get-ChildItem -Directory -Filter "hdf4*" | Select-Object -First 1
+            if ($hdf4Dir.Name -ne "hdf4") {
+              Rename-Item $hdf4Dir.FullName "hdf4"
+            }
+            Set-Location hdf4
+            7z x HDF-*-win64.zip
+            # Windows structure: hdf4/HDF-4.3.1-win64/lib, hdf4/HDF-4.3.1-win64/bin
+            $HDF4DIR = Get-ChildItem -Path . -Filter "HDF-*-win64" -Directory | Select-Object -First 1
+            if (-not $HDF4DIR) {
+              Write-Error "HDF-*-win64 directory not found!"
+              exit 1
+            }
+            echo "HDF4LIB_PATH=$($HDF4DIR.FullName)" >> $env:GITHUB_ENV
+          env:
+            GH_TOKEN: ${{ github.token }}
+  
+        - name: Download and Install HDF5 from GitHub
+          shell: pwsh
+          run: |
+            Write-Host "Downloading HDF5 from release tag: ${{ inputs.hdf5_release_tag }}"
+  
+            $PATTERN = "${{ inputs.hdf5_prefix }}${{ inputs.hdf5_artifact_basename }}-win-vs2026_cl.zip"
+            Write-Host "Using pattern: $PATTERN"
+  
+            gh release download "${{ inputs.hdf5_release_tag }}" --repo HDFGroup/hdf5 --pattern $PATTERN --clobber
+            7z x hdf5-*-win-vs2026_cl.zip
+            # Rename hdf5-* directory to hdf5 if needed
+            $hdf5Dir = Get-ChildItem -Directory -Filter "hdf5*" | Select-Object -First 1
+            if ($hdf5Dir.Name -ne "hdf5") {
+              Rename-Item $hdf5Dir.FullName "hdf5"
+            }
+            Set-Location hdf5
+            7z x HDF5-*-win64.zip
+            # Windows structure: hdf5/HDF5-x.y.z-win64/lib, hdf5/HDF5-x.y.z-win64/bin
+            $HDF5DIR = Get-ChildItem -Path . -Filter "HDF5-*-win64" -Directory | Select-Object -First 1
+            if (-not $HDF5DIR) {
+              Write-Error "HDF5-*-win64 directory not found!"
+              exit 1
+            }
+            echo "HDF5LIB_PATH=$($HDF5DIR.FullName)" >> $env:GITHUB_ENV
+          env:
+            GH_TOKEN: ${{ github.token }}
+  
+        - name: Set up build.properties
+          shell: pwsh
+          run: |
+            # Convert Windows paths to use forward slashes (Java/Maven compatible)
+            $HDF5_PATH = $env:HDF5LIB_PATH -replace '\\', '/'
+            $HDF4_PATH = $env:HDF4LIB_PATH -replace '\\', '/'
+  
+            @"
+            hdf5.lib.dir=$HDF5_PATH/lib
+            hdf5.plugin.dir=$HDF5_PATH/lib/plugin
+            hdf.lib.dir=$HDF4_PATH/lib
+            platform.hdf.lib=$HDF5_PATH/bin;$HDF4_PATH/bin
+            "@ | Out-File -FilePath build.properties -Encoding utf8
+  
+            Write-Host "Generated build.properties:"
+            Get-Content build.properties
+  
+        - name: Install HDF JARs to Local Maven Repository
+          shell: pwsh
+          run: |
+            New-Item -Path "repository\lib" -ItemType Directory -Force | Out-Null
+            if (Test-Path "$env:HDF4LIB_PATH\lib\*.jar") {
+              Copy-Item "$env:HDF4LIB_PATH\lib\*.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+            }
+            if (Test-Path "$env:HDF5LIB_PATH\lib\*.jar") {
+              Copy-Item "$env:HDF5LIB_PATH\lib\*.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+            }
+            if (Test-Path "lib\fits.jar") {
+              Copy-Item "lib\fits.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+            }
+            if (Test-Path "lib\netcdf.jar") {
+              Copy-Item "lib\netcdf.jar" -Destination "repository\lib\" -ErrorAction SilentlyContinue
+            }
+            $jarhdf5 = Get-ChildItem "repository\lib\jarhdf5-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($jarhdf5) {
+              $HDF5_VERSION = $jarhdf5.Name -replace 'jarhdf5-([0-9.]+)\.jar', '$1'
+              mvn install:install-file "-Dfile=$($jarhdf5.FullName)" `
+                "-DgroupId=jarhdf5" "-DartifactId=jarhdf5" "-Dversion=$HDF5_VERSION" "-Dpackaging=jar" "-DgeneratePom=true"
+              Write-Host "Installed: $($jarhdf5.Name) as version $HDF5_VERSION"
+              "HDF5_VERSION=$HDF5_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            }
+            $jarhdf = Get-ChildItem "repository\lib\jarhdf-*.jar" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($jarhdf) {
+              $HDF4_VERSION = $jarhdf.Name -replace 'jarhdf-([0-9.]+)\.jar', '$1'
+              mvn install:install-file "-Dfile=$($jarhdf.FullName)" `
+                "-DgroupId=jarhdf" "-DartifactId=jarhdf" "-Dversion=$HDF4_VERSION" "-Dpackaging=jar" "-DgeneratePom=true"
+              Write-Host "Installed: $($jarhdf.Name) as version $HDF4_VERSION"
+              "HDF4_VERSION=$HDF4_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            }
+            if (Test-Path "repository\lib\fits.jar") {
+              mvn install:install-file "-Dfile=repository\lib\fits.jar" `
+                "-DgroupId=fits" "-DartifactId=fits" "-Dversion=1.0.0" "-Dpackaging=jar" "-DgeneratePom=true"
+            }
+            if (Test-Path "repository\lib\netcdf.jar") {
+              mvn install:install-file "-Dfile=repository\lib\netcdf.jar" `
+                "-DgroupId=netcdf" "-DartifactId=netcdf" "-Dversion=1.0.0" "-Dpackaging=jar" "-DgeneratePom=true"
+            }
+  
+        - name: Install SWTBot JARs to Local Maven Repository
+          shell: pwsh
+          run: |
+            Write-Host "Installing SWTBot JARs to local Maven repository..."
+  
+            if (Test-Path "repository\lib\org.eclipse.swtbot.swt.finder.jar") {
+              mvn install:install-file "-Dfile=repository\lib\org.eclipse.swtbot.swt.finder.jar" `
+                "-DgroupId=org.eclipse.local" `
+                "-DartifactId=org.eclipse.swtbot.swt.finder" `
+                "-Dversion=4.2.1" `
+                "-Dpackaging=jar" `
+                "-DgeneratePom=true"
+              Write-Host "SWTBot SWT finder JAR installed"
+            } else {
+              Write-Host "WARNING: org.eclipse.swtbot.swt.finder.jar not found"
+            }
+  
+            if (Test-Path "repository\lib\org.eclipse.swtbot.nebula.nattable.finder.jar") {
+              mvn install:install-file "-Dfile=repository\lib\org.eclipse.swtbot.nebula.nattable.finder.jar" `
+                "-DgroupId=org.eclipse.local" `
+                "-DartifactId=org.eclipse.swtbot.nebula.nattable.finder" `
+                "-Dversion=4.2.1" `
+                "-Dpackaging=jar" `
+                "-DgeneratePom=true"
+              Write-Host "SWTBot Nebula NatTable finder JAR installed"
+            } else {
+              Write-Host "WARNING: org.eclipse.swtbot.nebula.nattable.finder.jar not found"
+            }
+  
+        - name: Build and Package Application
+          shell: pwsh
+          run: |
+            Write-Host "Building HDFView with Maven (standard build process)..."
+
+            # Step 1: Install repository module
+            Write-Host "Installing repository module..."
+            mvn clean install "-DskipTests" `
+              "-Djacoco.skip=true" `
+              "-Dpmd.skip=true" `
+              "-Ddependency-check.skip=true" `
+              "-pl" "repository" `
+              -B
+
+            # Step 2: Install all modules (including parent POM)
+            Write-Host "Installing all modules..."
+            mvn clean install "-DskipTests" `
+              "-Djacoco.skip=true" `
+              "-Dpmd.skip=true" `
+              "-Ddependency-check.skip=true" `
+              -B
+
+            # Step 3: Package
+            Write-Host "Packaging..."
+            mvn package "-DskipTests" `
+              "-Djacoco.skip=true" `
+              "-Dpmd.skip=true" `
+              "-Ddependency-check.skip=true" `
+              -B
+  
+        - name: Prepare jpackage Input Directory
+          shell: pwsh
+          run: |
+            Write-Host "Preparing jpackage input directory manually (Windows-specific fix)..."
+            Write-Host "This step manually prepares the staging directory to ensure native libraries are included."
+            Write-Host ""
+  
+            # Create staging directory
+            $JPACKAGE_INPUT = "hdfview\target\jpackage-input"
+            Write-Host "Creating staging directory: $JPACKAGE_INPUT"
+            if (Test-Path $JPACKAGE_INPUT) {
+              Remove-Item -Recurse -Force $JPACKAGE_INPUT
+            }
+            New-Item -ItemType Directory -Path $JPACKAGE_INPUT | Out-Null
+
+            # Stage the core DLLs at the app-image root so that they take
+            # priority over other HDF libraries in the system PATH
+            $JPACKAGE_CORELIBS = "hdfview\target\jpackage-corelibs"
+            Write-Host "Creating core library directory: $JPACKAGE_CORELIBS"
+            if (Test-Path $JPACKAGE_CORELIBS) {
+              Remove-Item -Recurse -Force $JPACKAGE_CORELIBS
+            }
+            New-Item -ItemType Directory -Path $JPACKAGE_CORELIBS | Out-Null
+
+            # JNI wrappers stay in the input directory
+            function Copy-NativeLibraries {
+              param([System.IO.FileInfo[]]$Dlls)
+              foreach ($dll in $Dlls) {
+                $dest = if ($dll.Name -like '*_java.dll') { $JPACKAGE_INPUT } else { $JPACKAGE_CORELIBS }
+                Copy-Item -LiteralPath $dll.FullName -Destination $dest -ErrorAction Stop
+              }
+            }
+  
+            # Copy main JARs from libs/
+            Write-Host "Copying main JARs from libs/..."
+            Copy-Item "libs\hdfview-*.jar" $JPACKAGE_INPUT\ -ErrorAction Stop
+            Copy-Item "libs\object-*.jar" $JPACKAGE_INPUT\ -ErrorAction Stop
+            Write-Host "  ✓ Main JARs copied"
+  
+            # Copy all runtime dependencies from hdfview/target/lib
+            Write-Host "Copying runtime dependencies from hdfview\target\lib..."
+            $jarCount = (Get-ChildItem "hdfview\target\lib\*.jar").Count
+            Copy-Item "hdfview\target\lib\*.jar" $JPACKAGE_INPUT\ -ErrorAction Stop
+            Write-Host "  ✓ Copied $jarCount dependency JARs"
+  
+            # Copy HDF5 native libraries
+            Write-Host "Copying HDF5 native libraries from $env:HDF5LIB_PATH..."
+            if (Test-Path "$env:HDF5LIB_PATH\bin") {
+              $hdf5Dlls = Get-ChildItem "$env:HDF5LIB_PATH\bin\*.dll" -ErrorAction SilentlyContinue
+              if ($hdf5Dlls) {
+                Copy-NativeLibraries -Dlls $hdf5Dlls
+                Write-Host "  ✓ Copied $($hdf5Dlls.Count) HDF5 DLLs"
+              } else {
+                Write-Warning "  ⚠ No HDF5 DLLs found in $env:HDF5LIB_PATH\bin"
+              }
+            } else {
+              Write-Error "  ✗ HDF5 bin directory not found: $env:HDF5LIB_PATH\bin"
+              exit 1
+            }
+  
+            # Copy HDF4 native libraries
+            Write-Host "Copying HDF4 native libraries from $env:HDF4LIB_PATH..."
+            if (Test-Path "$env:HDF4LIB_PATH\bin") {
+              $hdf4Dlls = Get-ChildItem "$env:HDF4LIB_PATH\bin\*.dll" -ErrorAction SilentlyContinue
+              if ($hdf4Dlls) {
+                Copy-NativeLibraries -Dlls $hdf4Dlls
+                Write-Host "  ✓ Copied $($hdf4Dlls.Count) HDF4 DLLs"
+              } else {
+                Write-Warning "  ⚠ No HDF4 DLLs found in $env:HDF4LIB_PATH\bin"
+              }
+            } else {
+              Write-Error "  ✗ HDF4 bin directory not found: $env:HDF4LIB_PATH\bin"
+              exit 1
+            }
+  
+            # Copy HDF5 plugins
+            Write-Host "Copying HDF5 plugins..."
+            $pluginDir = "$JPACKAGE_INPUT\plugin"
+            New-Item -ItemType Directory -Path $pluginDir -Force | Out-Null
+            if (Test-Path "$env:HDF5_PLUGIN_PATH") {
+              $plugins = Get-ChildItem "$env:HDF5_PLUGIN_PATH\*.dll" -ErrorAction SilentlyContinue
+              if ($plugins) {
+                Copy-Item "$env:HDF5_PLUGIN_PATH\*.dll" $pluginDir\ -ErrorAction Stop
+                Write-Host "  ✓ Copied $($plugins.Count) plugin DLLs"
+              } else {
+                Write-Host "  ⓘ No plugins found"
+              }
+            } else {
+              Write-Host "  ⓘ HDF5_PLUGIN_PATH not set, skipping plugins"
+            }
+  
+            # Copy samples
+            Write-Host "Copying sample files..."
+            $samplesDir = "$JPACKAGE_INPUT\samples"
+            New-Item -ItemType Directory -Path $samplesDir -Force | Out-Null
+            if (Test-Path "samples") {
+              Copy-Item "samples\*" $samplesDir\ -Recurse -ErrorAction Stop
+              $sampleCount = (Get-ChildItem $samplesDir -File).Count
+              Write-Host "  ✓ Copied $sampleCount sample files"
+            } else {
+              Write-Warning "  ⚠ samples directory not found"
+            }
+  
+            # Copy documentation
+            Write-Host "Copying documentation..."
+            $docDir = "$JPACKAGE_INPUT\doc"
+            New-Item -ItemType Directory -Path $docDir -Force | Out-Null
+            if (Test-Path "docs\UsersGuide") {
+              Copy-Item "docs\UsersGuide\*" $docDir\ -Recurse -Include "*.md","*.txt","*.html","*.png","*.jpg","*.gif" -ErrorAction Stop
+              $docCount = (Get-ChildItem $docDir -Recurse -File).Count
+              Write-Host "  ✓ Copied $docCount documentation files"
+            } else {
+              Write-Warning "  ⚠ docs\UsersGuide directory not found"
+            }
+  
+            # Use --app-content to copy files to the app-image root.
+            # Use absolute paths since jpackage runs
+            # from the hdfview module directory
+            $coreLibs = @(Get-ChildItem $JPACKAGE_CORELIBS -Filter *.dll -File)
+            if ($coreLibs.Count -eq 0) {
+              Write-Error "  ✗ No core HDF libraries staged in $JPACKAGE_CORELIBS"
+              exit 1
+            }
+            $appContent = ($coreLibs.FullName -join ',')
+            "JPACKAGE_APP_CONTENT=$appContent" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+            Write-Host ""
+            Write-Host "=== Staging directory prepared ==="
+            Write-Host "Total files: $((Get-ChildItem $JPACKAGE_INPUT -Recurse -File).Count)"
+            Write-Host "Total size: $([math]::Round((Get-ChildItem $JPACKAGE_INPUT -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB, 2)) MB"
+            Write-Host "JAR files: $((Get-ChildItem $JPACKAGE_INPUT -Filter *.jar).Count)"
+            Write-Host "JNI wrappers: $((Get-ChildItem $JPACKAGE_INPUT -Filter *.dll).Count)"
+            Write-Host "Core libraries for the app-image root: $($coreLibs.Count)"
+            $coreLibs | ForEach-Object { Write-Host "  $($_.Name)" }
+            Write-Host ""
+  
+        - name: Create jpackage App Image
+          shell: pwsh
+          run: |
+            Write-Host "Creating distributable application package with jpackage..."
+
+            # Step 4: Run verify phase with jpackage profiles to create app-image
+            # -pl hdfview: Build hdfview module only
+            # -DskipTests: Skip test execution
+            # -Djacoco.skip=true: Skip JaCoCo (not needed for release builds)
+            # -Dpmd.skip=true: Skip PMD (static analysis not needed for release)
+            # -Ddependency-check.skip=true: Skip OWASP (runs in separate security workflow)
+            # -Dmaven.antrun.skip=true: Skip Ant plugin (we manually prepared the input directory)
+            # -Djpackage.app.content: The core HDF DLLs, which jpackage places beside the launcher.
+            #   Normally produced by the Ant staging target, which is skipped here.
+            Write-Host "Running verify phase with jpackage profiles to create app-image..."
+            mvn verify "-Pjpackage-app-image,jpackage-win-base" `
+              "-pl" "hdfview" `
+              "-DskipTests" `
+              "-Djacoco.skip=true" `
+              "-Dpmd.skip=true" `
+              "-Ddependency-check.skip=true" `
+              "-Dmaven.antrun.skip=true" `
+              "-Djpackage.app.content=$env:JPACKAGE_APP_CONTENT" `
+              -B
+
+            Write-Host "Verifying jpackage output..."
+            $appImage = "hdfview\target\dist\HDFView"
+            if (Test-Path $appImage) {
+              Write-Host "✓ jpackage app-image created successfully"
+              $size = (Get-ChildItem -Recurse $appImage | Measure-Object -Property Length -Sum).Sum / 1MB
+              Write-Host "Package size: $([math]::Round($size, 2)) MB"
+              $wrappers = (Get-ChildItem "$appImage\app\*.dll" -ErrorAction SilentlyContinue).Count
+              Write-Host "JNI wrappers in app\: $wrappers .dll files"
+              $jars = (Get-ChildItem -Recurse "$appImage\app\*.jar" -ErrorAction SilentlyContinue).Count
+              Write-Host "JAR files: $jars JARs"
+            } else {
+              Write-Error "✗ jpackage app-image creation failed"
+              exit 1
+            }
+
+            $rootDlls = @(Get-ChildItem "$appImage\*.dll" -File -ErrorAction SilentlyContinue)
+            Write-Host "Core libraries beside HDFView.exe: $($rootDlls.Count)"
+            $rootDlls | ForEach-Object { Write-Host "  $($_.Name)" }
+
+            $failures = @()
+            foreach ($staged in $env:JPACKAGE_APP_CONTENT -split ',') {
+              $name = Split-Path $staged -Leaf
+              if (-not (Test-Path "$appImage\$name")) {
+                $failures += "$name was staged as app content but is not beside HDFView.exe"
+              }
+            }
+            $strays = @($rootDlls | Where-Object { $_.Name -like '*_java.dll' })
+            if ($strays.Count -gt 0) {
+              $failures += "JNI wrappers were placed at the root, out of reach of java.library.path: $($strays.Name -join ', ')"
+            }
+            if ((Get-ChildItem "$appImage\app\*_java.dll" -ErrorAction SilentlyContinue).Count -eq 0) {
+              $failures += "no JNI wrappers in app\, where java.library.path looks for them"
+            }
+            if ($failures.Count -gt 0) {
+              foreach ($failure in $failures) { Write-Host "  FAILED: $failure" }
+              Write-Error "✗ Native library layout is wrong; see above"
+              exit 1
+            }
+            Write-Host "✓ Core libraries sit beside HDFView.exe, ahead of the system folder and PATH"
+
+        - name: Install Microsoft Trusted Signing
+          if: github.repository == 'HDFGroup/hdfview' && env.AZURE_TENANT_ID != ''
+          shell: pwsh
+          run: |
+            Write-Host "Installing Microsoft Trusted Signing tools..."
+            Invoke-WebRequest -Uri https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile .\nuget.exe
+            .\nuget.exe install Microsoft.Windows.SDK.BuildTools -Version 10.0.22621.3233 -x
+            .\nuget.exe install Microsoft.Trusted.Signing.Client -Version 1.0.53 -x
+
+        - name: Create Trusted Signing credentials file
+          if: github.repository == 'HDFGroup/hdfview' && env.AZURE_TENANT_ID != ''
+          uses: jsdaniell/create-json@v1.2.3
+          with:
+            name: "credentials.json"
+            json: '{"Endpoint": "${{ env.AZURE_ENDPOINT }}","CodeSigningAccountName": "${{ env.AZURE_CODE_SIGNING_NAME }}","CertificateProfileName": "${{ env.AZURE_CERT_PROFILE_NAME }}"}'
+
+        - name: Sign Windows Executable
+          if: github.repository == 'HDFGroup/hdfview' && env.AZURE_TENANT_ID != ''
+          shell: pwsh
+          run: |
+            Write-Host "Signing Windows executable..."
+
+            # Find the exe file in the jpackage output
+            $exeFile = Get-ChildItem -Recurse "hdfview\target\dist\HDFView" -Filter "HDFView.exe" | Select-Object -First 1
+
+            if (-not $exeFile) {
+              Write-Error "HDFView.exe not found in jpackage output"
+              Get-ChildItem -Recurse "hdfview\target\dist\HDFView" -Filter "*.exe"
+              exit 1
+            }
+
+            Write-Host "Found executable: $($exeFile.FullName)"
+
+            # Remove write protection to allow signing
+            Write-Host "Removing write protection..."
+            Set-ItemProperty -Path $exeFile.FullName -Name IsReadOnly -Value $false
+
+            $signtoolPath = "${{ github.workspace }}/Microsoft.Windows.SDK.BuildTools/bin/10.0.22621.0/x64/signtool.exe"
+            $dllPath = "${{ github.workspace }}/Microsoft.Trusted.Signing.Client/bin/x64/Azure.CodeSigning.Dlib.dll"
+            $metadataPath = "${{ github.workspace }}/credentials.json"
+
+            & $signtoolPath sign /v /debug /fd SHA256 /tr "http://timestamp.acs.microsoft.com" /td SHA256 /dlib $dllPath /dmdf $metadataPath $exeFile.FullName
+
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Signing failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+            }
+
+            # Verify signature
+            $sig = Get-AuthenticodeSignature -FilePath $exeFile.FullName
+            if ($sig.Status -ne 'Valid') {
+              Write-Error "Signature verification failed: $($sig.Status)"
+              exit 1
+            }
+
+            # Restore write protection
+            Write-Host "Restoring write protection..."
+            Set-ItemProperty -Path $exeFile.FullName -Name IsReadOnly -Value $true
+
+            Write-Host "✓ Executable signed and verified"
+
+        - name: Create Windows Application Archive
+          shell: pwsh
+          run: |
+            # Package the jpackage app-image as a ZIP for distribution
+            # Standard name: HDFView-{VERSION}App-Windows.zip
+            Set-Location "hdfview\target\dist"
+            Compress-Archive -Path "HDFView" -DestinationPath "${{ github.workspace }}\HDFView-${{ steps.get-version.outputs.HDFVIEW_VERSION }}App-Windows.zip"
+
+            Write-Host "Windows application archive created: HDFView-${{ steps.get-version.outputs.HDFVIEW_VERSION }}App-Windows.zip"
+            Get-Item "${{ github.workspace }}\HDFView-${{ steps.get-version.outputs.HDFVIEW_VERSION }}App-Windows.zip" | Select-Object Name, Length
+
+        - name: Upload Windows App Artifact
+          uses: actions/upload-artifact@v4
+          with:
+            name: zip-win-vs2022-app-binary
+            path: HDFView-*App-Windows.zip
+            retention-days: 30
+
+        - name: Create and Prepare MSI Installer
+          shell: pwsh
+          run: |
+            Write-Host "Creating MSI installer..."
+            mvn exec:exec@jpackage -pl hdfview -Pjpackage-installer-windows -B
+
+            # Find the MSI that jpackage created
+            $msiFile = Get-ChildItem "hdfview\target\dist\*.msi" | Select-Object -First 1
+
+            if (-not $msiFile) {
+              Write-Error "No MSI found in hdfview\target\dist\"
+              exit 1
+            }
+
+            # Rename to standard format: HDFView-{VERSION}-Windows.msi
+            $version = "${{ steps.get-version.outputs.HDFVIEW_VERSION }}"
+            $finalMsi = "HDFView-${version}-Windows.msi"
+
+            Copy-Item $msiFile.FullName -Destination $finalMsi
+            Write-Host "✓ MSI prepared: $finalMsi"
+
+        - name: Sign MSI Installer with Microsoft Trusted Signing
+          if: github.repository == 'HDFGroup/hdfview' && env.AZURE_TENANT_ID != ''
+          shell: pwsh
+          run: |
+            # Standard MSI name: HDFView-{VERSION}-Windows.msi
+            $version = "${{ steps.get-version.outputs.HDFVIEW_VERSION }}"
+            $msiFile = "HDFView-${version}-Windows.msi"
+
+            Write-Host "Signing MSI: $msiFile"
+
+            # Remove write protection to allow signing
+            Write-Host "Removing write protection..."
+            Set-ItemProperty -Path $msiFile -Name IsReadOnly -Value $false
+
+            $signtoolPath = "${{ github.workspace }}/Microsoft.Windows.SDK.BuildTools/bin/10.0.22621.0/x64/signtool.exe"
+            $dllPath = "${{ github.workspace }}/Microsoft.Trusted.Signing.Client/bin/x64/Azure.CodeSigning.Dlib.dll"
+            $metadataPath = "${{ github.workspace }}/credentials.json"
+
+            & $signtoolPath sign /v /debug /fd SHA256 /tr "http://timestamp.acs.microsoft.com" /td SHA256 /dlib $dllPath /dmdf $metadataPath $msiFile
+
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Signing failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+            }
+
+            # Verify signature
+            $sig = Get-AuthenticodeSignature -FilePath $msiFile
+            if ($sig.Status -ne 'Valid') {
+              Write-Error "Signature verification failed: $($sig.Status)"
+              exit 1
+            }
+
+            # Restore write protection
+            Write-Host "Restoring write protection..."
+            Set-ItemProperty -Path $msiFile -Name IsReadOnly -Value $true
+
+            Write-Host "✓ MSI signed and verified"
+
+        - name: Upload Windows MSI Installer
+          uses: actions/upload-artifact@v4
+          with:
+            name: msi-win-vs2022-installer
+            path: HDFView-*-Windows.msi
+            retention-days: 5

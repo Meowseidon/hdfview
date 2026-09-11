@@ -1,0 +1,167 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <parent>
+        <groupId>org.hdfgroup.hdfview</groupId>
+        <artifactId>hdfview-bom</artifactId>
+        <version>99.99.99</version>
+    </parent>
+
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>repository</artifactId>
+    <packaging>pom</packaging>
+
+    <!-- SWT profiles removed - SWT is now fetched from Maven Central via platform-specific dependencies in hdfview/pom.xml -->
+    <profiles>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-hdf-jars</id>
+                        <phase>initialize</phase>
+                        <configuration>
+                            <target>
+                                <copy todir="lib">
+                                    <fileset dir="${hdf.lib.dir}" followsymlinks="true">
+                                        <include name="*.jar" />
+                                        <exclude name="slf4j*.jar" />
+                                    </fileset>
+                                    <fileset dir="${hdf5.lib.dir}" followsymlinks="true">
+                                        <include name="*.jar" />
+                                        <exclude name="slf4j*.jar" />
+                                    </fileset>
+                                    <!-- SWTBot, fits.jar, and netcdf.jar are already in repository/lib/ -->
+                                    <!-- SWT is now fetched from Maven Central (no longer manually managed) -->
+                                </copy>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>3.1.4</version>
+                <executions>
+                    <execution>
+                        <id>fits</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>fits</groupId>
+                            <artifactId>fits</artifactId>
+                            <version>1.0.0</version>
+                            <packaging>jar</packaging>
+                            <file>${basedir}/lib/fits.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>netcdf</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>netcdf</groupId>
+                            <artifactId>netcdf</artifactId>
+                            <version>1.0.0</version>
+                            <packaging>jar</packaging>
+                            <file>${basedir}/lib/netcdf.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>jarhdf5</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>jarhdf5</groupId>
+                            <artifactId>jarhdf5</artifactId>
+                            <version>${hdf5.version}</version>
+                            <packaging>jar</packaging>
+                            <file>${basedir}/lib/jarhdf5-${hdf5.version}.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>jarhdf</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>jarhdf</groupId>
+                            <artifactId>jarhdf</artifactId>
+                            <version>${hdf.version}</version>
+                            <packaging>jar</packaging>
+                            <file>${basedir}/lib/jarhdf-${hdf.version}.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+
+                    <execution>
+                        <id>eclipse-swtbot</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>org.eclipse.local</groupId>
+                            <artifactId>org.eclipse.swtbot</artifactId>
+                            <version>4.2.1</version>
+                            <packaging>jar</packaging>
+                            <file>
+                                ${basedir}/lib/org.eclipse.swtbot.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>eclipse-swtbot.nebula.nattable.finder</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>org.eclipse.local</groupId>
+                            <artifactId>org.eclipse.swtbot.nebula.nattable.finder</artifactId>
+                            <version>4.2.1</version>
+                            <packaging>jar</packaging>
+                            <file>
+                                ${basedir}/lib/org.eclipse.swtbot.nebula.nattable.finder.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>eclipse-swtbot.swt.finder</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>org.eclipse.local</groupId>
+                            <artifactId>org.eclipse.swtbot.swt.finder</artifactId>
+                            <version>4.2.1</version>
+                            <packaging>jar</packaging>
+                            <file>
+                                ${basedir}/lib/org.eclipse.swtbot.swt.finder.jar</file>
+                            <generatePom>true</generatePom>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

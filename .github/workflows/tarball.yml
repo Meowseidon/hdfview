@@ -1,0 +1,117 @@
+name: hdfview tarball
+
+# Triggers the workflow on a call from another workflow
+on:
+  workflow_call:
+    inputs:
+      build_environment:
+        description: 'Environment to locate files'
+        type: string
+        required: true
+        default: snapshot
+    outputs:
+      source_base:
+        description: "The common version name of the binaries"
+        value: ${{ jobs.create_tarball.outputs.source_base }}
+      artifact_basename:
+        description: "Base name for all build artifacts (e.g., hdfview-master-abc1234 or HDFView-3.4.0)"
+        value: ${{ jobs.create_tarball.outputs.artifact_basename }}
+      file_branch:
+        description: "The branch used for the source tarballs"
+        value: ${{ jobs.check_commits.outputs.branch_ref }}
+      file_sha:
+        description: "The sha used for the source tarballs"
+        value: ${{ jobs.check_commits.outputs.branch_sha }}
+
+permissions:
+  contents: read
+
+jobs:
+  check_commits:
+    name: Check for recent commits
+    runs-on: ubuntu-latest
+    outputs:
+      branch_ref: ${{ steps.get-branch-name.outputs.BRANCH_REF }}
+      branch_sha: ${{ steps.get-branch-sha.outputs.BRANCH_SHA }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Get branch name
+      id: get-branch-name
+      env:
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
+      #run: echo "${{ env.GITHUB_REF_NAME }} | grep -P '[0-9]+/merge' &> /dev/null && BRANCH_REF=${{ env.GITHUB_HEAD_REF }} || BRANCH_REF=${{ env.GITHUB_REF_NAME }}" >> $GITHUB_OUTPUT
+      run: echo "BRANCH_REF=${{ env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME }}" >> $GITHUB_OUTPUT
+
+    - name: Get branch sha
+      id: get-branch-sha
+      env:
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_WF_SHA: ${{ github.workflow_sha }}
+      run: |
+        SHORT_SHA=$(echo "${{ env.GITHUB_WF_SHA }}" | cut -c1-7)
+        echo "BRANCH_SHA=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+    - run: echo "Short commit sha is ${{ steps.get-branch-sha.outputs.BRANCH_SHA }}!"
+
+  create_tarball:
+    name: Create a source tarball
+    runs-on: ubuntu-latest
+    needs: check_commits
+    if: ${{ (inputs.build_environment == 'snapshot') || (inputs.build_environment == 'release') || (inputs.build_environment == 'pre-release') }}
+    outputs:
+      artifact_basename: ${{ steps.set-artifact-basename.outputs.ARTIFACT_BASENAME }}
+      source_base: ${{ steps.version.outputs.TAG_VERSION }}
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Get Sources
+        uses: actions/checkout@v4.1.7
+        with:
+          path: hdfsrc
+          ref: '${{needs.check_commits.outputs.branch_ref }}'
+
+      - name: Read VERSION file
+        id: getversion
+        run: |
+          # Extract HDFVIEW_VERSION from VERSION file (ignoring comments)
+          HDFVIEW_VERSION=$(grep "^HDFVIEW_VERSION=" hdfsrc/VERSION | cut -d'=' -f2)
+          echo "version=$HDFVIEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Retrieve version
+        id: version
+        run: |
+          # Version is already numeric from HDFVIEW_VERSION property
+          VERSION_BASE="${{ steps.getversion.outputs.version }}"
+          echo "TAG_VERSION=$VERSION_BASE" >> $GITHUB_OUTPUT
+
+      - name: Set artifact base name
+        id: set-artifact-basename
+        run: |
+          if [[ '${{ inputs.build_environment }}' == 'snapshot' ]]
+          then
+            # Replace / with - in branch name to create valid filename
+            BRANCH_NAME=$(echo "${{ needs.check_commits.outputs.branch_ref }}" | sed 's/\//-/g')
+            ARTIFACT_NAME=$(echo "hdfview-${BRANCH_NAME}-${{ needs.check_commits.outputs.branch_sha }}")
+          else
+            ARTIFACT_NAME=$(echo "HDFView-${{ steps.version.outputs.TAG_VERSION }}")
+          fi
+          echo "ARTIFACT_BASENAME=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Save NEWSLETTER
+        uses: actions/upload-artifact@v4
+        with:
+              name: NEWSLETTER
+              path: ./hdfsrc/docs/UsersGuide/CHANGELOG.md
+              if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
+
+      # Save User Guide
+      - name: Save User Guide (Linux)
+        uses: actions/upload-artifact@v4
+        with:
+              name: docs-usersguide
+              path: ./hdfsrc/docs/UsersGuide
+              if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
+

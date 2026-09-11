@@ -1,0 +1,220 @@
+name: hdfview release build
+
+# Triggers the workflow on demand
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type: release, pre-release, or snapshot'
+        type: choice
+        required: true
+        default: snapshot
+        options:
+          - release
+          - pre-release
+          - snapshot
+      hdf4_version:
+        description: 'HDF4 version number (e.g., 4.3.1) - ignored for snapshots'
+        type: string
+        required: false
+        default: '4.4.0'
+      hdf5_version:
+        description: 'HDF5 version number (e.g., 2.0.0) - ignored for snapshots'
+        type: string
+        required: false
+        default: '2.2.0'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  determine-version:
+    runs-on: ubuntu-latest
+    outputs:
+      hdfview_version_with_prefix: ${{ steps.construct-tag.outputs.hdfview_version_with_prefix }}
+      hdfview_version_without_prefix: ${{ steps.construct-tag.outputs.hdfview_version_without_prefix }}
+      release_tag_name: ${{ steps.construct-tag.outputs.release_tag_name }}
+      build_type: ${{ steps.validate-input.outputs.BUILD_TYPE }}
+      hdf4_release_tag: ${{ steps.construct-hdf-tags.outputs.HDF4_RELEASE_TAG }}
+      hdf5_release_tag: ${{ steps.construct-hdf-tags.outputs.HDF5_RELEASE_TAG }}
+      hdf4_artifact_basename: ${{ steps.construct-hdf-tags.outputs.HDF4_ARTIFACT_BASENAME }}
+      hdf5_artifact_basename: ${{ steps.construct-hdf-tags.outputs.HDF5_ARTIFACT_BASENAME }}
+      hdf4_version: ${{ steps.construct-hdf-tags.outputs.HDF4_VERSION }}
+      hdf5_version: ${{ steps.construct-hdf-tags.outputs.HDF5_VERSION }}
+      hdf5_prefix: ${{ steps.construct-hdf-tags.outputs.HDF5_PREFIX }}
+    steps:
+    - name: Validate input
+      id: validate-input
+      env:
+        TAG: ${{ inputs.build_type }}
+      run: |
+          if [[ "$TAG" != "release" && "$TAG" != "pre-release" && "$TAG" != "snapshot" ]]; then
+            echo "Error: build_type must be either 'release', 'pre-release', or 'snapshot', got: $TAG"
+            exit 1
+          fi
+          echo "BUILD_TYPE=$TAG" >> $GITHUB_OUTPUT
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Construct tag name from VERSION file
+      id: construct-tag
+      run: |
+        EXTRACTED_HDFVIEW_VERSION=$(grep "^HDFVIEW_VERSION=" VERSION | cut -d'=' -f2)
+        echo "hdfview_version_without_prefix=$EXTRACTED_HDFVIEW_VERSION" >> $GITHUB_OUTPUT
+        echo "HDFView version (without prefix): $EXTRACTED_HDFVIEW_VERSION"
+
+        BUILD_TYPE="${{ steps.validate-input.outputs.BUILD_TYPE }}"
+
+        if [[ "$BUILD_TYPE" == "release" ]]; then
+          # Extract VERSION (full tag) from VERSION file for release builds
+          EXTRACTED_VERSION=$(grep "^VERSION=" VERSION | cut -d'=' -f2)
+          RELEASE_TAG="v${EXTRACTED_HDFVIEW_VERSION}"
+        elif [[ "$BUILD_TYPE" == "pre-release" ]]; then
+          # For pre-release, construct vX.Y.Z-preN tag with auto-incrementing N
+          BASE_VERSION=$(grep "^VERSION=" VERSION | cut -d'=' -f2)
+          BASE_TAG="v${EXTRACTED_HDFVIEW_VERSION}"
+          N=1
+          while git rev-parse "${BASE_TAG}-pre${N}" >/dev/null 2>&1; do
+            echo "Tag ${BASE_TAG}-pre${N} already exists, incrementing..."
+            ((N++))
+          done
+          EXTRACTED_VERSION="${BASE_VERSION}-pre${N}"
+          RELEASE_TAG="${BASE_TAG}-pre${N}"
+          echo "Pre-release tag: $RELEASE_TAG"
+        else
+          # Use "snapshot" for snapshot builds
+          EXTRACTED_VERSION="snapshot"
+          RELEASE_TAG="snapshot"
+        fi
+        echo "hdfview_version_with_prefix=$EXTRACTED_VERSION" >> $GITHUB_OUTPUT
+        echo "HDFView version with prefix: $EXTRACTED_VERSION"
+        echo "release_tag_name=$RELEASE_TAG" >> $GITHUB_OUTPUT
+        echo "Release tag name: $RELEASE_TAG"
+
+    - name: Construct HDF library release tags
+      id: construct-hdf-tags
+      run: |
+        # For release builds, construct tags from version numbers
+        HDF4_VER="${{ inputs.hdf4_version }}"
+        HDF5_VER="${{ inputs.hdf5_version }}"
+        HDF4_TAG="hdf$HDF4_VER"
+        HDF5_TAG="$HDF5_VER"
+        HDF4_BASENAME="$HDF4_TAG"
+        HDF5_BASENAME="$HDF5_TAG"
+        HDF5_PREFIX="hdf5-"
+
+        echo "HDF4_RELEASE_TAG=$HDF4_TAG" >> $GITHUB_OUTPUT
+        echo "HDF5_RELEASE_TAG=$HDF5_TAG" >> $GITHUB_OUTPUT
+        echo "HDF4_ARTIFACT_BASENAME=$HDF4_BASENAME" >> $GITHUB_OUTPUT
+        echo "HDF5_ARTIFACT_BASENAME=$HDF5_BASENAME" >> $GITHUB_OUTPUT
+        echo "HDF4_VERSION=$HDF4_VER" >> $GITHUB_OUTPUT
+        echo "HDF5_VERSION=$HDF5_VER" >> $GITHUB_OUTPUT
+        echo "HDF5_PREFIX=$HDF5_PREFIX" >> $GITHUB_OUTPUT
+
+        echo "HDF4 release tag: $HDF4_TAG"
+        echo "HDF5 release tag: $HDF5_TAG"
+        echo "HDF4 artifact basename: $HDF4_BASENAME"
+        echo "HDF5 artifact basename: $HDF5_BASENAME"
+        echo "HDF4 version: $HDF4_VER"
+        echo "HDF5 version: $HDF5_VER"
+        echo "HDF5 prefix: $HDF5_PREFIX"
+
+  get-base-names:
+    needs: determine-version
+    runs-on: ubuntu-latest
+    outputs:
+      hdf4_artifact_basename: ${{ steps.get-hdf4-base.outputs.base-name }}
+      hdf5_artifact_basename: ${{ steps.get-hdf5-base.outputs.base-name }}
+    steps:
+      - name: Get HDF4 base name
+        id: get-hdf4-base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # For releases, output empty string (will use determine-version outputs)
+          echo "base-name=" >> $GITHUB_OUTPUT
+          echo "HDF4 base name: (not needed for release)"
+
+      - name: Get HDF5 base name
+        id: get-hdf5-base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # For releases, output empty string (will use determine-version outputs)
+          echo "base-name=" >> $GITHUB_OUTPUT
+          echo "HDF5 base name: (not needed for release)"
+
+  call-workflow-tarball:
+    needs: determine-version
+    uses: ./.github/workflows/tarball.yml
+    with:
+      build_environment: ${{ needs.determine-version.outputs.build_type }}
+
+  call-workflow-maven-build:
+    needs: [determine-version, get-base-names, call-workflow-tarball]
+    uses: ./.github/workflows/maven-build.yml
+    secrets: inherit
+    with:
+      artifact_basename: ${{ needs.call-workflow-tarball.outputs.artifact_basename }}
+      build_type: ${{ needs.determine-version.outputs.build_type }}
+      hdf4_release_tag: ${{ needs.determine-version.outputs.hdf4_release_tag }}
+      hdf4_artifact_basename: ${{ needs.determine-version.outputs.build_type == 'snapshot' && needs.get-base-names.outputs.hdf4_artifact_basename || needs.determine-version.outputs.hdf4_artifact_basename }}
+      hdf4_version: ${{ needs.determine-version.outputs.hdf4_version }}
+      hdf5_release_tag: ${{ needs.determine-version.outputs.hdf5_release_tag }}
+      hdf5_artifact_basename: ${{ needs.determine-version.outputs.build_type == 'snapshot' && needs.get-base-names.outputs.hdf5_artifact_basename || needs.determine-version.outputs.hdf5_artifact_basename }}
+      hdf5_version: ${{ needs.determine-version.outputs.hdf5_version }}
+      hdf5_prefix: ${{ needs.determine-version.outputs.hdf5_prefix }}
+      build_environment: ${{ needs.determine-version.outputs.build_type }}
+      publish_to_maven_registry: ${{ needs.determine-version.outputs.build_type != 'snapshot' }}
+
+  call-workflow-release:
+    needs: [determine-version, call-workflow-tarball, call-workflow-maven-build]
+    permissions:
+      contents: write # In order to allow tag creation
+    uses: ./.github/workflows/release-files.yml
+    with:
+      artifact_basename: ${{ needs.call-workflow-tarball.outputs.artifact_basename }}
+      file_branch: ${{ needs.call-workflow-tarball.outputs.file_branch }}
+      file_sha: ${{ needs.call-workflow-tarball.outputs.file_sha }}
+      release_version_tag: ${{ needs.determine-version.outputs.release_tag_name }}
+      build_environment: ${{ needs.determine-version.outputs.build_type }}
+
+  # Test the released artifacts on all platforms
+  test-release-linux:
+    needs: [determine-version, call-workflow-release]
+    uses: ./.github/workflows/test-release-linux.yml
+    with:
+      release_tag: ${{ needs.determine-version.outputs.release_tag_name }}
+      hdf4_version: ${{ needs.determine-version.outputs.hdf4_version }}
+      hdf5_version: ${{ needs.determine-version.outputs.hdf5_version }}
+
+  test-release-windows:
+    needs: [determine-version, call-workflow-release]
+    uses: ./.github/workflows/test-release-windows.yml
+    with:
+      release_tag: ${{ needs.determine-version.outputs.release_tag_name }}
+      hdf4_version: ${{ needs.determine-version.outputs.hdf4_version }}
+      hdf5_version: ${{ needs.determine-version.outputs.hdf5_version }}
+
+  test-release-macos-arm64:
+    needs: [determine-version, call-workflow-release]
+    uses: ./.github/workflows/test-release-macos.yml
+    with:
+      release_tag: ${{ needs.determine-version.outputs.release_tag_name }}
+      architecture: arm64
+      hdf4_version: ${{ needs.determine-version.outputs.hdf4_version }}
+      hdf5_version: ${{ needs.determine-version.outputs.hdf5_version }}
+
+  test-release-macos-x86_64:
+    needs: [determine-version, call-workflow-release]
+    uses: ./.github/workflows/test-release-macos.yml
+    with:
+      release_tag: ${{ needs.determine-version.outputs.release_tag_name }}
+      architecture: x86_64
+      hdf4_version: ${{ needs.determine-version.outputs.hdf4_version }}
+      hdf5_version: ${{ needs.determine-version.outputs.hdf5_version }}
+
