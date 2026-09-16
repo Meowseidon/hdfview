@@ -159,8 +159,17 @@ public abstract class DefaultBaseTableView implements TableView {
     private static final Logger log = LoggerFactory.getLogger(DefaultBaseTableView.class);
 
     private final Display display = Display.getDefault();
-    /** The reference to the display shell used. */
+    /** The shell used for dialogs and, for standalone views, the top-level view shell. */
     protected final Shell shell;
+
+    /** The Composite which owns all controls belonging to this TableView. */
+    protected final Composite viewParent;
+
+    /** Whether this TableView is mounted in an existing Composite. */
+    protected final boolean isEmbedded;
+
+    /** Whether the TableView has released its data and GUI resources. */
+    private boolean viewDisposed = false;
     /** The current font. */
     protected Font curFont;
 
@@ -282,7 +291,7 @@ public abstract class DefaultBaseTableView implements TableView {
      * @param theView
      *            the main HDFView.
      */
-    public DefaultBaseTableView(DataViewManager theView) { this(theView, null); }
+    public DefaultBaseTableView(DataViewManager theView) { this(theView, null, null); }
 
     /**
      * Constructs a base TableView with the specified data properties.
@@ -300,38 +309,39 @@ public abstract class DefaultBaseTableView implements TableView {
     @SuppressWarnings("rawtypes")
     public DefaultBaseTableView(DataViewManager theView, HashMap dataPropertiesMap)
     {
-        shell = new Shell(display, SWT.SHELL_TRIM);
+        this(theView, dataPropertiesMap, null);
+    }
 
-        shell.setData(this);
+    /**
+     * Constructs a base TableView using either a new top-level Shell or the
+     * supplied Composite as its control parent.
+     *
+     * @param theView            the main HDFView
+     * @param dataPropertiesMap  the properties on how to show the data
+     * @param parent             an existing Composite for an embedded view, or null
+     *                           for the historical standalone window
+     */
+    @SuppressWarnings("rawtypes")
+    protected DefaultBaseTableView(DataViewManager theView, HashMap dataPropertiesMap, Composite parent)
+    {
+        isEmbedded = parent != null;
+        viewParent = isEmbedded ? parent : new Shell(display, SWT.SHELL_TRIM);
+        shell      = viewParent.getShell();
 
-        shell.setLayout(new GridLayout(1, true));
+        if (!isEmbedded)
+            viewParent.setData(this);
+
+        viewParent.setLayout(new GridLayout(1, true));
 
         /*
          * When the table is closed, make sure to prompt the user about saving their
          * changes, then do any pending cleanup work.
          */
-        shell.addDisposeListener(new DisposeListener() {
+        viewParent.addDisposeListener(new DisposeListener() {
             @Override
             public void widgetDisposed(DisposeEvent e)
             {
-                if (dataProvider != null) {
-                    if (dataProvider.getIsValueChanged() && !isReadOnly) {
-                        if (Tools.showConfirm(shell, "Changes Detected",
-                                              "\"" + ((HObject)dataObject).getName() +
-                                                  "\" has changed.\nDo you want to save the changes?"))
-                            updateValueInFile();
-                        else
-                            dataObject.clearData();
-                    }
-                }
-
-                dataValue = null;
-                dataTable = null;
-
-                if (curFont != null)
-                    curFont.dispose();
-
-                viewer.removeDataView(DefaultBaseTableView.this);
+                cleanupView();
             }
         });
 
@@ -382,14 +392,14 @@ public abstract class DefaultBaseTableView implements TableView {
         if ((hObject == null) || !(hObject instanceof DataFormat)) {
             log.debug("data object is null or not an instanceof DataFormat");
             dataObject = null;
-            shell.dispose();
+            closeViewControl();
             return;
         }
 
         dataObject = (DataFormat)hObject;
         if (((HObject)dataObject).getFileFormat() == null) {
             log.debug("DataFormat object cannot access FileFormat");
-            shell.dispose();
+            closeViewControl();
             return;
         }
 
@@ -421,7 +431,7 @@ public abstract class DefaultBaseTableView implements TableView {
             log.debug("data object has null dimensions");
             viewer.showError("Error: Data object '" + ((HObject)dataObject).getName() +
                              "' has null dimensions.");
-            shell.dispose();
+            closeViewControl();
             Tools.showError(display.getActiveShell(), "Error",
                             "Could not open data object '" + ((HObject)dataObject).getName() +
                                 "'. Data object has null dimensions.");
@@ -438,7 +448,7 @@ public abstract class DefaultBaseTableView implements TableView {
             log.debug("data object has dimension of size 0");
             viewer.showError("Error: Data object '" + ((HObject)dataObject).getName() +
                              "' has dimension of size 0.");
-            shell.dispose();
+            closeViewControl();
             Tools.showError(display.getActiveShell(), "Error",
                             "Could not open data object '" + ((HObject)dataObject).getName() +
                                 "'. Data object has dimension of size 0.");
@@ -484,15 +494,17 @@ public abstract class DefaultBaseTableView implements TableView {
         }
 
         /* Create the toolbar area that contains useful shortcuts */
-        ToolBar toolBar = createToolbar(shell);
-        toolBar.setSize(shell.getSize().x, 30);
-        toolBar.setLocation(0, 0);
+        ToolBar toolBar = createToolbar(viewParent);
+        if (!isEmbedded) {
+            toolBar.setSize(shell.getSize().x, 30);
+            toolBar.setLocation(0, 0);
+        }
 
         /*
          * Create the group that contains the text fields for displaying the value and
          * location of the current cell, as well as the index base.
          */
-        indexBaseGroup = new org.eclipse.swt.widgets.Group(shell, SWT.SHADOW_ETCHED_OUT);
+        indexBaseGroup = new org.eclipse.swt.widgets.Group(viewParent, SWT.SHADOW_ETCHED_OUT);
         indexBaseGroup.setFont(curFont);
         indexBaseGroup.setText(indexBase + "-based");
         indexBaseGroup.setLayout(new GridLayout(1, true));
@@ -539,14 +551,18 @@ public abstract class DefaultBaseTableView implements TableView {
         catch (Exception ex) {
             log.debug("loadData(): data not loaded: ", ex);
             viewer.showError("Error: unable to load table data");
-            shell.dispose();
+            closeViewControl();
             Tools.showError(display.getActiveShell(), "Open",
                             "An error occurred while loading data for the table:\n\n" + ex.getMessage());
             return;
         }
 
-        /* Create the Shell's MenuBar */
-        shell.setMenuBar(createMenuBar(shell));
+        /* Create the standalone menu bar or the embedded TableView popup menu. */
+        Menu viewMenu = createMenuBar(shell);
+        if (isEmbedded)
+            viewParent.setMenu(viewMenu);
+        else
+            shell.setMenuBar(viewMenu);
 
         /*
          * Set the default selection on the "Show Hexadecimal/Show Binary", etc. MenuItems.
@@ -585,14 +601,14 @@ public abstract class DefaultBaseTableView implements TableView {
                 log.debug("table creation for object {} failed", ((HObject)dataObject).getName());
                 viewer.showError("Creating table for object '" + ((HObject)dataObject).getName() +
                                  "' failed.");
-                shell.dispose();
+                closeViewControl();
                 Tools.showError(display.getActiveShell(), "Open", "Failed to create Table object");
                 return;
             }
         }
         catch (UnsupportedOperationException ex) {
             log.debug("Subclass does not implement createTable()");
-            shell.dispose();
+            closeViewControl();
             return;
         }
 
@@ -618,7 +634,8 @@ public abstract class DefaultBaseTableView implements TableView {
                 .append("]");
         }
 
-        shell.setText(sb.toString());
+        if (!isEmbedded)
+            shell.setText(sb.toString());
 
         /*
          * Append subsetting information and show this as a status message in the
@@ -659,23 +676,83 @@ public abstract class DefaultBaseTableView implements TableView {
 
         content.setWeights(new int[] {1, 12});
 
-        shell.pack();
+        if (!isEmbedded) {
+            shell.pack();
 
-        int width  = 700 + (ViewProperties.getFontSize() - 12) * 15;
-        int height = 500 + (ViewProperties.getFontSize() - 12) * 10;
-        shell.setSize(width, height);
+            int width  = 700 + (ViewProperties.getFontSize() - 12) * 15;
+            int height = 500 + (ViewProperties.getFontSize() - 12) * 10;
+            shell.setSize(width, height);
+        }
+        else {
+            viewParent.layout(true, true);
+        }
+    }
+
+    /**
+     * Dispose this TableView in either standalone or embedded mode.
+     *
+     * <p>For embedded views this disposes only the TableView-owned root Composite;
+     * the host HDFView window and its TabFolder remain alive.</p>
+     */
+    @Override
+    public void disposeView()
+    {
+        if (viewDisposed)
+            return;
+
+        if (viewParent.isDisposed())
+            cleanupView();
+        else
+            viewParent.dispose();
+    }
+
+    @Override
+    public boolean isViewDisposed() { return viewDisposed || viewParent.isDisposed(); }
+
+    /** Dispose only the TableView-owned controls during constructor failure. */
+    private void closeViewControl()
+    {
+        if (!viewParent.isDisposed())
+            viewParent.dispose();
+    }
+
+    /** Perform the common close/dispose cleanup exactly once. */
+    private void cleanupView()
+    {
+        if (viewDisposed)
+            return;
+
+        if (dataProvider != null && dataProvider.getIsValueChanged() && !isReadOnly && dataObject != null) {
+            if (Tools.showConfirm(shell, "Changes Detected",
+                                  "\"" + ((HObject)dataObject).getName() +
+                                      "\" has changed.\nDo you want to save the changes?"))
+                updateValueInFile();
+            else
+                dataObject.clearData();
+        }
+
+        dataValue = null;
+        dataTable = null;
+
+        if (curFont != null && !curFont.isDisposed())
+            curFont.dispose();
+
+        viewDisposed = true;
+
+        if (!isEmbedded && viewer != null)
+            viewer.removeDataView(DefaultBaseTableView.this);
     }
 
     /**
      * Creates the toolbar for the Shell.
      *
-     * @param theShell - the containing shell object.
+     * @param parent - the containing composite.
      *
      * @return the new toolbar
      */
-    private ToolBar createToolbar(final Shell theShell)
+    private ToolBar createToolbar(final Composite parent)
     {
-        ToolBar toolbar = new ToolBar(theShell, SWT.HORIZONTAL | SWT.RIGHT | SWT.BORDER);
+        ToolBar toolbar = new ToolBar(parent, SWT.HORIZONTAL | SWT.RIGHT | SWT.BORDER);
         toolbar.setFont(curFont);
         toolbar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
@@ -805,7 +882,7 @@ public abstract class DefaultBaseTableView implements TableView {
      */
     protected Menu createMenuBar(final Shell theShell)
     {
-        Menu menuBar       = new Menu(theShell, SWT.BAR);
+        Menu menuBar       = new Menu(theShell, isEmbedded ? SWT.POP_UP : SWT.BAR);
         boolean isEditable = !isReadOnly;
 
         MenuItem tableMenuItem = new MenuItem(menuBar, SWT.CASCADE);
@@ -1002,7 +1079,10 @@ public abstract class DefaultBaseTableView implements TableView {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                theShell.dispose();
+                if (isEmbedded)
+                    disposeView();
+                else
+                    theShell.dispose();
             }
         });
 

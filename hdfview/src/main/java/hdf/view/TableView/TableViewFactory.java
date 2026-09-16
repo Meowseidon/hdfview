@@ -35,6 +35,29 @@ import org.eclipse.swt.widgets.Shell;
  */
 public abstract class TableViewFactory extends DataViewFactory {
 
+    /**
+     * Create a TableView whose controls are mounted in an existing Composite.
+     *
+     * <p>Factories which do not support embedding retain the historical
+     * top-level-window behavior through the default implementation. The
+     * built-in factory overrides this method so that the default Dataset view
+     * reuses the normal TableView implementation inside HDFView.</p>
+     *
+     * @param viewer            the data view manager
+     * @param dataPropertiesMap the data properties map
+     * @param parent            the Composite that owns the TableView controls
+     *
+     * @return the TableView instance
+     *
+     * @throws ClassNotFoundException if a failure occurred
+     */
+    @SuppressWarnings("rawtypes")
+    public TableView getTableView(DataViewManager viewer, HashMap dataPropertiesMap, Composite parent)
+        throws ClassNotFoundException
+    {
+        return getTableView(viewer, dataPropertiesMap);
+    }
+
     @SuppressWarnings("rawtypes")
     @Override
     public final ImageView getImageView(DataViewManager viewer, HashMap dataPropertiesMap)

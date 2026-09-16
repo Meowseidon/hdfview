@@ -113,7 +113,29 @@ public class DefaultScalarDSTableView extends DefaultBaseTableView implements Ta
     {
         super(theView, dataPropertiesMap);
 
-        if (!shell.isDisposed()) {
+        initializeStandaloneView();
+    }
+
+    /**
+     * Constructs a ScalarDS TableView mounted in an existing Composite.
+     *
+     * @param theView            the main HDFView
+     * @param dataPropertiesMap  the properties on how to show the data
+     * @param parent             the Composite that owns the TableView controls
+     */
+    @SuppressWarnings("rawtypes")
+    public DefaultScalarDSTableView(DataViewManager theView, HashMap dataPropertiesMap, Composite parent)
+    {
+        super(theView, dataPropertiesMap, parent);
+
+        initializeStandaloneView();
+    }
+
+    /** Finish setup which is only valid for a top-level TableView window. */
+    private void initializeStandaloneView()
+    {
+        if (!isEmbedded && !shell.isDisposed()) {
+
             if (ViewProperties.isMacOS()) {
                 shell.setImages(ViewProperties.getHdfIcons());
             }

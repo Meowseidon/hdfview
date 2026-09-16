@@ -27,6 +27,8 @@ import hdf.view.DataView.DataViewManager;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
 
+import org.eclipse.swt.widgets.Composite;
+
 /**
  * A simple Factory class which returns concrete instances of the default
  * TableView, based on whether the data object to be viewed is a scalar or
@@ -54,8 +56,21 @@ public class DefaultTableViewFactory extends TableViewFactory {
     public TableView getTableView(DataViewManager viewer, HashMap dataPropertiesMap)
         throws ClassNotFoundException
     {
+        return getTableView(viewer, dataPropertiesMap, null);
+    }
+
+    /**
+     * Create a default TableView in either a standalone Shell or an existing
+     * Composite.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Override
+    public TableView getTableView(DataViewManager viewer, HashMap dataPropertiesMap, Composite parent)
+        throws ClassNotFoundException
+    {
         String dataViewName = null;
-        Object[] initargs   = {viewer, dataPropertiesMap};
+        Object[] initargs   = (parent == null) ? new Object[] {viewer, dataPropertiesMap}
+                                              : new Object[] {viewer, dataPropertiesMap, parent};
         TableView theView   = null;
         HObject dataObject  = null;
 

@@ -104,9 +104,30 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
     {
         super(theView, dataPropertiesMap);
 
+        initializeStandaloneView();
+    }
+
+    /**
+     * Constructs a CompoundDS TableView mounted in an existing Composite.
+     *
+     * @param theView            the main HDFView
+     * @param dataPropertiesMap  the properties on how to show the data
+     * @param parent             the Composite that owns the TableView controls
+     */
+    @SuppressWarnings("rawtypes")
+    public DefaultCompoundDSTableView(DataViewManager theView, HashMap dataPropertiesMap, Composite parent)
+    {
+        super(theView, dataPropertiesMap, parent);
+
+        initializeStandaloneView();
+    }
+
+    /** Finish setup which is only valid for a top-level TableView window. */
+    private void initializeStandaloneView()
+    {
         isDataTransposed = false; // Disable transpose for compound datasets
 
-        if (!shell.isDisposed()) {
+        if (!isEmbedded && !shell.isDisposed()) {
             shell.setImage(ViewProperties.getTableIcon());
 
             viewer.addDataView(this);
