@@ -173,7 +173,9 @@ echo [INFO] Environment validation complete!
 echo.
 
 REM Set up runtime environment
-set "PATH=!hdf5_lib_dir!;!hdf_lib_dir!;!PATH!"
+set "PATH=!platform_hdf_lib!;!PATH!"
+set "SWT_LIBRARY_PATH=!SCRIPT_DIR!hdfview\target\native"
+if not exist "!SWT_LIBRARY_PATH!" mkdir "!SWT_LIBRARY_PATH!" >nul 2>&1
 if not "!hdf5_plugin_dir!"=="" (
     set "HDF5_PLUGIN_PATH=!hdf5_plugin_dir!"
 )
@@ -184,7 +186,8 @@ set JVM_ARGS=%JVM_ARGS% --add-opens java.base/java.time=ALL-UNNAMED
 set JVM_ARGS=%JVM_ARGS% --add-opens java.base/java.time.format=ALL-UNNAMED
 set JVM_ARGS=%JVM_ARGS% --add-opens java.base/java.util=ALL-UNNAMED
 set JVM_ARGS=%JVM_ARGS% --enable-native-access=jarhdf5
-set JVM_ARGS=%JVM_ARGS% -Djava.library.path=!hdf5_lib_dir!;!hdf_lib_dir!
+set JVM_ARGS=%JVM_ARGS% "-Djava.library.path=!platform_hdf_lib!"
+set JVM_ARGS=%JVM_ARGS% "-Dswt.library.path=!SWT_LIBRARY_PATH!"
 
 REM Parse command line arguments
 set SLF4J_IMPL=nop
