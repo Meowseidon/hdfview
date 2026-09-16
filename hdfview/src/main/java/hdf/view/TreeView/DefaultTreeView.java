@@ -2930,6 +2930,18 @@ public class DefaultTreeView implements TreeView {
         BitSet bitmask            = null;
         String dataViewName       = null;
 
+        /*
+         * The ordinary default Dataset path is hosted by HDFView's persistent
+         * right-side TabFolder. Image views and all explicit Open As choices
+         * retain their existing dedicated-window behavior below.
+         */
+        if (isDefaultDisplay && !isImage && (viewer instanceof HDFView) &&
+            (d instanceof Dataset) && !((Dataset)d).isNULL()) {
+            DataView inlineView = ((HDFView)viewer).showInlineDataContent(dataObject);
+            if (inlineView != null)
+                return inlineView;
+        }
+
         if (isDefaultDisplay) { /* Displaying a data object using the default display options */
             DataView existingView = viewer.getDataView((HObject)d);
 

@@ -61,4 +61,20 @@ public interface TableView extends DataView {
      * refresh the data table.
      */
     void refreshDataTable();
+
+    /**
+     * Dispose the view and release its data and GUI resources.
+     *
+     * <p>The default implementation keeps existing third-party TableView
+     * implementations source-compatible. The built-in TableView uses this
+     * hook for both top-level windows and embedded views.</p>
+     */
+    default void disposeView() {}
+
+    /**
+     * Return whether this view has already released its resources.
+     *
+     * @return {@code true} when the view is no longer usable
+     */
+    default boolean isViewDisposed() { return false; }
 }

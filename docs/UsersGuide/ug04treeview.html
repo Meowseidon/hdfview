@@ -87,7 +87,9 @@ open, the root groups of the files are listed at the root in the tree view.</p>
 <p>Groups are presented as folders in the tree viewer. Opening and closing
 folders, you can browse the individual HDF objects in the HDF file. Datasets,
 images and tables are leaf objects in the tree. Double clicking a leaf object allows
-you to see the content of the object displayed in a data/document window. </p>
+you to see the content of the object. Ordinary table datasets are shown in the
+&ldquo;Data Content&rdquo; tab of the main HDFView window; specialized viewers may
+still use their own data/document window. </p>
 
 <center>
 <p><img src="images/treeview.png" />
@@ -105,9 +107,10 @@ to select individual objects, and to view the content of the selected object.</p
 <p>
 You can open a data object in the tree by a double-mouse-click or selecting the
 &ldquo;Open&rdquo; command from the object's popup menu (accessed by right clicking
-on the object). By default, data content is displayed as an image, a table or text
-based on its datatype. See the following chapters for a detailed discussion of the
-data viewers.</p>
+on the object). For an ordinary table dataset, the default data content is
+displayed in the main window's &ldquo;Data Content&rdquo; tab. Images and other
+specialized views continue to use the viewer appropriate for their datatype.
+See the following chapters for a detailed discussion of the data viewers.</p>
 
 <center>
 <p><img src="images/menupopup.png" />

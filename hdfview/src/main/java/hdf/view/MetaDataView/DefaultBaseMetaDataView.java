@@ -141,6 +141,9 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
     private static final int ATTR_TAB_INDEX    = 0;
     private static final int GENERAL_TAB_INDEX = 1;
 
+    /** Whether the caller supplied the long-lived host TabFolder. */
+    private final boolean usesParentTabFolder;
+
     /**
      * The metadata view interface for displaying metadata information.
      *
@@ -153,6 +156,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
         this.parent      = parentComposite;
         this.viewManager = viewer;
         this.dataObject  = theObj;
+        usesParentTabFolder = parentComposite instanceof TabFolder;
 
         numAttributes = 0;
 
@@ -199,33 +203,42 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
         log.trace("dataObject={} isN3={} isH4={} isH5={} numAttributes={}", dataObject, isN3, isH4, isH5,
                   numAttributes);
 
-        contentTabFolder = new TabFolder(parent, SWT.NONE);
-        contentTabFolder.addSelectionListener(new SelectionAdapter() {
-            @Override
-            public void widgetSelected(SelectionEvent e)
-            {
-                switch (contentTabFolder.getSelectionIndex()) {
-                case ATTR_TAB_INDEX:
-                    parent.setData("MetaDataView.LastTabIndex", ATTR_TAB_INDEX);
-                    break;
-                case GENERAL_TAB_INDEX:
-                default:
-                    parent.setData("MetaDataView.LastTabIndex", GENERAL_TAB_INDEX);
-                    break;
+        if (usesParentTabFolder) {
+            contentTabFolder = (TabFolder)parent;
+        }
+        else {
+            contentTabFolder = new TabFolder(parent, SWT.NONE);
+            contentTabFolder.addSelectionListener(new SelectionAdapter() {
+                @Override
+                public void widgetSelected(SelectionEvent e)
+                {
+                    switch (contentTabFolder.getSelectionIndex()) {
+                    case ATTR_TAB_INDEX:
+                        parent.setData("MetaDataView.LastTabIndex", ATTR_TAB_INDEX);
+                        break;
+                    case GENERAL_TAB_INDEX:
+                    default:
+                        parent.setData("MetaDataView.LastTabIndex", GENERAL_TAB_INDEX);
+                        break;
+                    }
                 }
-            }
-        });
+            });
+        }
 
         attributeInfoPane = createAttributeInfoPane(contentTabFolder, dataObject);
         if (attributeInfoPane != null) {
-            TabItem attributeInfoItem = new TabItem(contentTabFolder, SWT.None, ATTR_TAB_INDEX);
+            TabItem attributeInfoItem = usesParentTabFolder
+                ? new TabItem(contentTabFolder, SWT.NONE)
+                : new TabItem(contentTabFolder, SWT.NONE, ATTR_TAB_INDEX);
             attributeInfoItem.setText("Object Attribute Info");
             attributeInfoItem.setControl(attributeInfoPane);
         }
 
         generalObjectInfoPane = createGeneralObjectInfoPane(contentTabFolder, dataObject);
         if (generalObjectInfoPane != null) {
-            TabItem generalInfoItem = new TabItem(contentTabFolder, SWT.None, GENERAL_TAB_INDEX);
+            TabItem generalInfoItem = usesParentTabFolder
+                ? new TabItem(contentTabFolder, SWT.NONE)
+                : new TabItem(contentTabFolder, SWT.NONE, GENERAL_TAB_INDEX);
             generalInfoItem.setText("General Object Info");
             generalInfoItem.setControl(generalObjectInfoPane);
         }
@@ -237,7 +250,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
         catch (UnsupportedOperationException ex) {
         }
 
-        if (parent instanceof ScrolledComposite)
+        if (!usesParentTabFolder && parent instanceof ScrolledComposite)
             ((ScrolledComposite)parent).setContent(contentTabFolder);
 
         /*
@@ -245,9 +258,11 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
          * composite, retrieve its value to determine which remembered
          * tab to select.
          */
-        Object lastTabObject = parent.getData("MetaDataView.LastTabIndex");
-        if (lastTabObject != null) {
-            contentTabFolder.setSelection((int)lastTabObject);
+        if (!usesParentTabFolder) {
+            Object lastTabObject = parent.getData("MetaDataView.LastTabIndex");
+            if (lastTabObject != null) {
+                contentTabFolder.setSelection((int)lastTabObject);
+            }
         }
     }
 

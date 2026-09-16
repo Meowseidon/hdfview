@@ -18,18 +18,23 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.Serializable;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
 import hdf.HDFVersions;
+import hdf.object.CompoundDS;
 import hdf.object.DataFormat;
+import hdf.object.Dataset;
 import hdf.object.FileFormat;
 import hdf.object.HObject;
+import hdf.object.ScalarDS;
 import hdf.view.DataView.DataView;
 import hdf.view.DataView.DataViewFactory;
 import hdf.view.DataView.DataViewFactoryProducer;
@@ -37,6 +42,7 @@ import hdf.view.DataView.DataViewManager;
 import hdf.view.HelpView.HelpView;
 import hdf.view.MetaDataView.MetaDataView;
 import hdf.view.TableView.TableView;
+import hdf.view.TableView.TableViewFactory;
 import hdf.view.TreeView.DefaultTreeView;
 import hdf.view.TreeView.TreeView;
 import hdf.view.ViewProperties.DataViewType;
@@ -89,6 +95,8 @@ import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Monitor;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.TabFolder;
+import org.eclipse.swt.widgets.TabItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
@@ -191,6 +199,21 @@ public class HDFView implements DataViewManager {
     /** GUI component: The area for quick general view. */
     private ScrolledComposite generalArea;
 
+    /** Long-lived tab host for the right side of the main window. */
+    private TabFolder rightTabFolder;
+
+    /** Stable ScrolledComposite content which owns rightTabFolder. */
+    private Composite rightTabContent;
+
+    /** The optional inline Data Content tab for the selected ordinary Dataset. */
+    private TabItem dataContentTab;
+
+    /** The one inline default TableView currently hosted by the main window. */
+    private TableView inlineTableView;
+
+    /** Object represented by the currently populated right-side tabs. */
+    private HObject displayedMetadataObject;
+
     /** GUI component: To add and display URLs. */
     private Combo urlBar;
 
@@ -215,13 +238,21 @@ public class HDFView implements DataViewManager {
     private final Runnable timer = new Runnable() {
         public void run()
         {
+            // The default Dataset TableView is hosted by the main window rather
+            // than represented by a top-level Shell.
+            if (inlineTableView != null && !inlineTableView.isViewDisposed()) {
+                HObject obj = inlineTableView.getDataObject();
+                if (obj != null && obj.getFileFormat() != null &&
+                    obj.getFileFormat().isThisType(FileFormat.getFileFormat(FileFormat.FILE_TYPE_HDF5))) {
+                    inlineTableView.refreshDataTable();
+                }
+            }
+
             // refresh each table displaying data
             Shell[] shellList = display.getShells();
             if (shellList != null) {
                 for (int i = 0; i < shellList.length; i++) {
-                    if (shellList[i].equals(mainWindow))
-                        showMetaData(treeView.getCurrentObject());
-                    else {
+                    if (!shellList[i].equals(mainWindow)) {
                         DataView view = (DataView)shellList[i].getData();
                         if ((view != null) && (view instanceof TableView)) {
                             HObject obj = view.getDataObject();
@@ -522,6 +553,7 @@ public class HDFView implements DataViewManager {
                 catch (Exception ex) {
                 }
 
+                disposeInlineDataView();
                 closeAllWindows();
 
                 // Close all open files
@@ -797,9 +829,11 @@ public class HDFView implements DataViewManager {
 
                 currentFile = null;
 
-                for (Control control : generalArea.getChildren())
-                    control.dispose();
-                generalArea.setContent(null);
+                /* Keep the right-side tab host alive for the next file. */
+                disposeInlineDataView();
+                clearRightTabs();
+                displayedMetadataObject = null;
+                layoutRightTabs();
 
                 urlBar.setText("");
             }
@@ -1391,6 +1425,17 @@ public class HDFView implements DataViewManager {
         generalArea.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
         generalArea.setMinHeight(contentArea.getSize().y - 2);
 
+        /*
+         * Keep the right-side tab host alive for the lifetime of the main
+         * window. Selection changes replace only the tab controls, which avoids
+         * the old dispose/setContent cycle and its visible blank state.
+         */
+        rightTabContent = new Composite(generalArea, SWT.NONE);
+        rightTabContent.setLayout(new FillLayout());
+        rightTabFolder = new TabFolder(rightTabContent, SWT.NONE);
+        generalArea.setContent(rightTabContent);
+        generalArea.setMinSize(rightTabContent.computeSize(SWT.DEFAULT, SWT.DEFAULT));
+
         // Create status area for displaying messages and metadata
         status = new Text(statusArea, SWT.V_SCROLL | SWT.MULTI | SWT.BORDER);
         status.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
@@ -1598,43 +1643,246 @@ public class HDFView implements DataViewManager {
      */
     public void showMetaData(final HObject obj)
     {
-        for (Control control : generalArea.getChildren())
-            control.dispose();
-        generalArea.setContent(null);
-
-        if (obj == null)
+        if (rightTabFolder == null || rightTabFolder.isDisposed())
             return;
 
-        DataViewFactory metaDataViewFactory = null;
+        /* A repeated notification for the same object does not rebuild the view. */
+        if (obj != null && sameObject(displayedMetadataObject, obj) && rightTabFolder.getItemCount() > 0) {
+            if (dataContentTab != null && !dataContentTab.isDisposed())
+                rightTabFolder.setSelection(dataContentTab);
+            return;
+        }
+
+        rightTabFolder.setRedraw(false);
         try {
-            metaDataViewFactory = DataViewFactoryProducer.getFactory(DataViewType.METADATA);
-        }
-        catch (Exception ex) {
-            log.debug("showMetaData(): error occurred while instantiating MetaDataView factory class", ex);
-            this.showError("Error occurred while instantiating MetaDataView factory class");
-            return;
-        }
+            disposeInlineDataView();
+            clearRightTabs();
+            displayedMetadataObject = obj;
 
-        if (metaDataViewFactory == null) {
-            log.debug("showMetaData(): MetaDataView factory is null");
-            return;
-        }
+            if (obj == null)
+                return;
 
-        MetaDataView theView;
-        try {
-            theView = metaDataViewFactory.getMetaDataView(generalArea, this, obj);
-
-            if (theView == null) {
-                log.debug("showMetaData(): error occurred while instantiating MetaDataView class");
-                this.showError("Error occurred while instantiating MetaDataView class");
+            DataViewFactory metaDataViewFactory = null;
+            try {
+                metaDataViewFactory = DataViewFactoryProducer.getFactory(DataViewType.METADATA);
+            }
+            catch (Exception ex) {
+                log.debug("showMetaData(): error occurred while instantiating MetaDataView factory class", ex);
+                this.showError("Error occurred while instantiating MetaDataView factory class");
                 return;
             }
+
+            if (metaDataViewFactory == null) {
+                log.debug("showMetaData(): MetaDataView factory is null");
+                return;
+            }
+
+            MetaDataView theView;
+            try {
+                /* The metadata factory appends its two panes to this shared host. */
+                theView = metaDataViewFactory.getMetaDataView(rightTabFolder, this, obj);
+
+                if (theView == null) {
+                    log.debug("showMetaData(): error occurred while instantiating MetaDataView class");
+                    this.showError("Error occurred while instantiating MetaDataView class");
+                    return;
+                }
+            }
+            catch (ClassNotFoundException ex) {
+                log.debug("showMetaData(): no suitable MetaDataView class found");
+                this.showError("Unable to find suitable MetaDataView class");
+                return;
+            }
+
+            /* Ordinary table datasets get a third sibling tab at index zero. */
+            if (isInlineTableDataset(obj))
+                createInlineDataContent(obj);
+
+            layoutRightTabs();
+
+            if (dataContentTab != null && !dataContentTab.isDisposed())
+                rightTabFolder.setSelection(dataContentTab);
+            else if (rightTabFolder.getItemCount() > 0)
+                rightTabFolder.setSelection(0);
         }
-        catch (ClassNotFoundException ex) {
-            log.debug("showMetaData(): no suitable MetaDataView class found");
-            this.showError("Unable to find suitable MetaDataView class");
+        finally {
+            rightTabFolder.setRedraw(true);
+            layoutRightTabs();
+        }
+    }
+
+    /**
+     * Show or focus the default table view for an ordinary Dataset in the main
+     * window. This is the entry point used by the default TreeView double-click
+     * path; advanced Open As paths continue to use their standalone views.
+     *
+     * @param obj the Dataset to display
+     *
+     * @return the embedded TableView, or null when the object is not a normal
+     *         table dataset or the view could not be created
+     */
+    public TableView showInlineDataContent(HObject obj)
+    {
+        if (!isInlineTableDataset(obj))
+            return null;
+
+        if (!sameObject(displayedMetadataObject, obj)) {
+            showMetaData(obj);
+            return inlineTableView;
+        }
+
+        if (inlineTableView == null || inlineTableView.isViewDisposed()) {
+            rightTabFolder.setRedraw(false);
+            try {
+                /* A Table popup's Close action disposes its root Composite first. */
+                if (inlineTableView != null || dataContentTab != null)
+                    disposeInlineDataView();
+                createInlineDataContent(obj);
+                layoutRightTabs();
+            }
+            finally {
+                rightTabFolder.setRedraw(true);
+                layoutRightTabs();
+            }
+        }
+
+        if (dataContentTab != null && !dataContentTab.isDisposed()) {
+            rightTabFolder.setSelection(dataContentTab);
+            rightTabFolder.setFocus();
+        }
+
+        return inlineTableView;
+    }
+
+    /** Return whether the object can use the built-in editable TableView. */
+    private boolean isInlineTableDataset(HObject obj)
+    {
+        if (!(obj instanceof Dataset))
+            return false;
+
+        Dataset dataset = (Dataset)obj;
+        if (dataset.isNULL() || (!(dataset instanceof ScalarDS) && !(dataset instanceof CompoundDS)))
+            return false;
+
+        if (dataset instanceof ScalarDS) {
+            try {
+                if (!dataset.isInited())
+                    dataset.init();
+                return !((ScalarDS)dataset).isImage();
+            }
+            catch (Exception ex) {
+                log.debug("isInlineTableDataset(): unable to inspect Dataset {}", dataset.getName(), ex);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Create the Data Content tab and mount the normal TableView into it. */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void createInlineDataContent(HObject obj)
+    {
+        if (inlineTableView != null && !inlineTableView.isViewDisposed())
             return;
+
+        Composite dataParent = new Composite(rightTabFolder, SWT.NONE);
+        dataContentTab    = new TabItem(rightTabFolder, SWT.NONE, 0);
+        dataContentTab.setText("Data Content");
+        dataContentTab.setControl(dataParent);
+
+        try {
+            DataViewFactory tableViewFactory = DataViewFactoryProducer.getFactory(DataViewType.TABLE);
+            if (!(tableViewFactory instanceof TableViewFactory)) {
+                log.debug("createInlineDataContent(): TableView factory does not support embedding");
+                showError("Unable to find an embeddable TableView factory");
+            }
+            else {
+                HashMap<ViewProperties.DATA_VIEW_KEY, Serializable> map = new HashMap<>(8);
+                map.put(ViewProperties.DATA_VIEW_KEY.OBJECT, obj);
+                map.put(ViewProperties.DATA_VIEW_KEY.VIEW_NAME, null);
+                map.put(ViewProperties.DATA_VIEW_KEY.CHAR, Boolean.FALSE);
+                map.put(ViewProperties.DATA_VIEW_KEY.TRANSPOSED, Boolean.FALSE);
+                map.put(ViewProperties.DATA_VIEW_KEY.INDEXBASE1, ViewProperties.isIndexBase1());
+                map.put(ViewProperties.DATA_VIEW_KEY.BITMASK, null);
+
+                inlineTableView = ((TableViewFactory)tableViewFactory).getTableView(this, map, dataParent);
+                if (inlineTableView == null || inlineTableView.isViewDisposed()) {
+                    log.debug("createInlineDataContent(): TableView factory returned no usable view");
+                    showError("Unable to create inline TableView");
+                }
+            }
         }
+        catch (Exception ex) {
+            log.debug("createInlineDataContent(): no suitable TableView class found", ex);
+            showError("Unable to find suitable TableView class for object '" + obj.getName() + "'");
+        }
+
+        if (inlineTableView == null || inlineTableView.isViewDisposed()) {
+            if (!dataParent.isDisposed())
+                dataParent.dispose();
+            if (!dataContentTab.isDisposed())
+                dataContentTab.dispose();
+            dataContentTab = null;
+            inlineTableView = null;
+        }
+    }
+
+    /** Dispose the current inline TableView without disposing the host window. */
+    private void disposeInlineDataView()
+    {
+        TableView view = inlineTableView;
+        inlineTableView = null;
+
+        if (view != null && !view.isViewDisposed())
+            view.disposeView();
+
+        if (dataContentTab != null && !dataContentTab.isDisposed()) {
+            Control control = dataContentTab.getControl();
+            if (control != null && !control.isDisposed())
+                control.dispose();
+            dataContentTab.dispose();
+        }
+        dataContentTab = null;
+    }
+
+    /** Remove the current tab controls while retaining the host TabFolder. */
+    private void clearRightTabs()
+    {
+        if (rightTabFolder == null || rightTabFolder.isDisposed())
+            return;
+
+        for (TabItem item : rightTabFolder.getItems()) {
+            Control control = item.getControl();
+            if (control != null && !control.isDisposed())
+                control.dispose();
+            item.dispose();
+        }
+        dataContentTab = null;
+    }
+
+    /** Keep the ScrolledComposite content size in sync with the persistent tabs. */
+    private void layoutRightTabs()
+    {
+        if (rightTabFolder == null || rightTabFolder.isDisposed())
+            return;
+
+        rightTabFolder.layout(true, true);
+        rightTabContent.layout(true, true);
+        generalArea.setMinSize(rightTabContent.computeSize(SWT.DEFAULT, SWT.DEFAULT));
+    }
+
+    /** Compare HDF objects without confusing objects from different files. */
+    private boolean sameObject(HObject first, HObject second)
+    {
+        if (first == second)
+            return true;
+        if (first == null || second == null)
+            return false;
+
+        FileFormat firstFile  = first.getFileFormat();
+        FileFormat secondFile = second.getFileFormat();
+        return first.equals(second) && firstFile != null && firstFile.equals(secondFile);
     }
 
     /**
@@ -1648,6 +1896,12 @@ public class HDFView implements DataViewManager {
             display.beep();
             Tools.showError(mainWindow, "Close", "Select a file to close");
             return;
+        }
+
+        if (inlineTableView != null) {
+            HObject inlineObject = inlineTableView.getDataObject();
+            if (inlineObject != null && theFile.equals(inlineObject.getFileFormat()))
+                disposeInlineDataView();
         }
 
         // Close all the data windows of this file
@@ -1689,9 +1943,10 @@ public class HDFView implements DataViewManager {
             // Intentional
         }
 
-        for (Control control : generalArea.getChildren())
-            control.dispose();
-        generalArea.setContent(null);
+        if (displayedMetadataObject != null && theFile.equals(displayedMetadataObject.getFileFormat())) {
+            clearRightTabs();
+            displayedMetadataObject = null;
+        }
 
         System.gc();
     }
@@ -1705,11 +1960,21 @@ public class HDFView implements DataViewManager {
     public void writeDataToFile(FileFormat theFile)
     {
         try {
+            if (inlineTableView != null && !inlineTableView.isViewDisposed()) {
+                HObject obj = inlineTableView.getDataObject();
+                if (obj != null && theFile.equals(obj.getFileFormat()))
+                    inlineTableView.updateValueInFile();
+            }
+
             Shell[] openShells = display.getShells();
 
             if (openShells != null) {
                 for (int i = 0; i < openShells.length; i++) {
-                    DataView theView = (DataView)openShells[i].getData();
+                    Object shellData = openShells[i].getData();
+                    if (!(shellData instanceof DataView))
+                        continue;
+
+                    DataView theView = (DataView)shellData;
 
                     if (theView instanceof TableView) {
                         TableView tableView = (TableView)theView;
@@ -1800,13 +2065,23 @@ public class HDFView implements DataViewManager {
     @Override
     public DataView getDataView(HObject dataObject)
     {
+        if (inlineTableView != null && !inlineTableView.isViewDisposed()) {
+            HObject inlineObject = inlineTableView.getDataObject();
+            if (inlineObject != null && sameObject(inlineObject, dataObject))
+                return inlineTableView;
+        }
+
         Shell[] openShells             = display.getShells();
         DataView view                  = null;
         HObject currentObj             = null;
         FileFormat currentDataViewFile = null;
 
         for (int i = 0; i < openShells.length; i++) {
-            view = (DataView)openShells[i].getData();
+            Object shellData = openShells[i].getData();
+            if (!(shellData instanceof DataView))
+                continue;
+
+            view = (DataView)shellData;
 
             if (view != null) {
                 currentObj = view.getDataObject();
