@@ -58,6 +58,13 @@ public interface TableView extends DataView {
     void updateValueInFile();
 
     /**
+     * Commit an editor which is still active before the TableView controls are
+     * disposed. The default is a no-op so existing TableView implementations
+     * remain source-compatible.
+     */
+    default void commitActiveCellEditor() {}
+
+    /**
      * refresh the data table.
      */
     void refreshDataTable();

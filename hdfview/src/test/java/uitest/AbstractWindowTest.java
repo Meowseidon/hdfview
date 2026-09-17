@@ -1046,6 +1046,17 @@ public abstract class AbstractWindowTest {
      */
     protected final void resetOpenFileCount() { open_files = 0; }
 
+    /**
+     * Resume the UI test harness after a test deliberately closes the main
+     * window. The application creates the next main window and waits at this
+     * barrier before returning to its event loop.
+     */
+    protected final void releaseUiBarrierAfterMainWindowExit()
+        throws InterruptedException, BrokenBarrierException
+    {
+        swtBarrier.await();
+    }
+
     protected static String constructWrongValueMessage(String methodName, String message, String expected,
                                                        String actual)
     {
