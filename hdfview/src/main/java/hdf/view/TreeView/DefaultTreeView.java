@@ -154,6 +154,9 @@ public class DefaultTreeView implements TreeView {
     /** A list of currently open files. */
     private final List<FileFormat> fileList = new ArrayList<>();
 
+    /** The effective access mode used for each currently open file. */
+    private final HashMap<String, Integer> fileAccessModes = new HashMap<>();
+
     /** A list of editing GUI components. */
     private List<MenuItem> editGUIs = new ArrayList<>();
 
@@ -2627,7 +2630,18 @@ public class DefaultTreeView implements TreeView {
                 fileFormat.setIndexOrder(fileFormat.getIndexOrder(ViewProperties.getIndexOrder()));
         }
 
-        return initFile(fileFormat);
+        FileFormat initializedFile = initFile(fileFormat);
+        if (initializedFile != null) {
+            int effectiveAccessMode = initializedFile.isReadOnly()
+                ? (((accessID & FileFormat.MULTIREAD) == FileFormat.MULTIREAD)
+                       ? FileFormat.READ | FileFormat.MULTIREAD
+                       : FileFormat.READ)
+                : FileFormat.WRITE;
+            fileAccessModes.put(initializedFile.getFilePath(), effectiveAccessMode);
+            ((HDFView)viewer).fileOpened(initializedFile);
+        }
+
+        return initializedFile;
     }
 
     /**
@@ -2684,25 +2698,120 @@ public class DefaultTreeView implements TreeView {
     @Override
     public FileFormat reopenFile(FileFormat fileFormat, int newFileAccessMode) throws Exception
     {
+        if (fileFormat == null)
+            throw new IllegalArgumentException(I18n.text("message.reopenNoFile"));
+
         String fileFormatName = fileFormat.getAbsolutePath();
+        int previousAccessMode = getRememberedAccessMode(fileFormat);
+        String selectedObjectName = null;
+        if (selectedFile != null && selectedFile.equals(fileFormat) && selectedObject != null)
+            selectedObjectName = selectedObject.getFullName();
 
         // Make sure to reload the file using the file's current indexing options
         tempIdxType  = fileFormat.getIndexType(null);
         tempIdxOrder = fileFormat.getIndexOrder(null);
 
-        closeFile(fileFormat);
         ((HDFView)viewer).showMetaData(null);
+        closeFile(fileFormat);
 
+        int requestedAccessMode = newFileAccessMode;
         if (newFileAccessMode < 0) {
             if (ViewProperties.isReadOnly())
-                return openFile(fileFormatName, FileFormat.READ);
+                requestedAccessMode = FileFormat.READ;
             else if (ViewProperties.isReadSWMR())
-                return openFile(fileFormatName, FileFormat.READ | FileFormat.MULTIREAD);
+                requestedAccessMode = FileFormat.READ | FileFormat.MULTIREAD;
             else
-                return openFile(fileFormatName, FileFormat.WRITE);
+                requestedAccessMode = FileFormat.WRITE;
         }
-        else
-            return openFile(fileFormatName, newFileAccessMode);
+
+        try {
+            FileFormat reopened = openFile(fileFormatName, requestedAccessMode);
+            if (reopened == null)
+                throw new java.io.IOException(I18n.text("message.reopenFileFailed", fileFormatName));
+
+            if (isWriteAccessRequested(requestedAccessMode) && reopened.isReadOnly()) {
+                closeFile(reopened);
+                ((HDFView)viewer).showMetaData(null);
+                throw new java.io.IOException(
+                    I18n.text("message.reopenReadWriteNotWritable", fileFormatName));
+            }
+
+            restoreSelection(reopened, selectedObjectName);
+            return reopened;
+        }
+        catch (Exception reopenFailure) {
+            /* Restore the old access mode so a failed upgrade does not leave an
+             * empty tree or a misleading access-mode status. */
+            try {
+                FileFormat restored = openFile(fileFormatName, previousAccessMode);
+                if (restored == null)
+                    throw new java.io.IOException(I18n.text("message.reopenFileFailed", fileFormatName));
+
+                restoreSelection(restored, selectedObjectName);
+            }
+            catch (Exception restoreFailure) {
+                reopenFailure.addSuppressed(restoreFailure);
+                ((HDFView)viewer).showMetaData(null);
+            }
+
+            throw reopenFailure;
+        }
+    }
+
+    /** Return the last effective access mode remembered for an open file. */
+    private int getRememberedAccessMode(FileFormat fileFormat)
+    {
+        Integer accessMode = fileAccessModes.get(fileFormat.getFilePath());
+        if (accessMode != null)
+            return accessMode.intValue();
+
+        return fileFormat.isReadOnly() ? FileFormat.READ : FileFormat.WRITE;
+    }
+
+    /** Return whether an access request requires a writable FileFormat. */
+    private boolean isWriteAccessRequested(int accessMode)
+    {
+        return accessMode == FileFormat.WRITE || accessMode == FileFormat.CREATE;
+    }
+
+    /** Restore the old Tree selection when its object is available after reopen. */
+    private void restoreSelection(FileFormat fileFormat, String selectedObjectName)
+    {
+        if (fileFormat == null || selectedObjectName == null)
+            return;
+
+        TreeItem fileRoot = findTreeItem(fileFormat.getRootObject());
+        if (fileRoot == null)
+            return;
+
+        TreeItem restoredItem = null;
+        Object rootData = fileRoot.getData();
+        if (rootData instanceof HObject && selectedObjectName.equals(((HObject)rootData).getFullName())) {
+            restoredItem = fileRoot;
+        }
+        else {
+            ArrayList<TreeItem> items = getItemsBreadthFirst(fileRoot);
+            if (items != null) {
+                for (TreeItem item : items) {
+                    Object data = item.getData();
+                    if (data instanceof HObject && selectedObjectName.equals(((HObject)data).getFullName())) {
+                        restoredItem = item;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (restoredItem == null)
+            return;
+
+        selectedItem   = restoredItem;
+        selectedObject = (HObject)restoredItem.getData();
+        selectedFile   = fileFormat;
+        tree.deselectAll();
+        tree.setSelection(restoredItem);
+        tree.showItem(restoredItem);
+        ((HDFView)viewer).showMetaData(selectedObject);
     }
 
     /**
@@ -2738,6 +2847,7 @@ public class DefaultTreeView implements TreeView {
                 }
 
                 fileList.remove(theFile);
+                fileAccessModes.remove(theFile.getFilePath());
                 if (theFile.equals(selectedFile)) {
                     selectedFile   = null;
                     selectedObject = null;
