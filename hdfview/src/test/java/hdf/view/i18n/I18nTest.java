@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 import hdf.view.ViewProperties;
 
@@ -58,6 +60,25 @@ class I18nTest {
         assertEquals(I18n.Language.SIMPLIFIED_CHINESE, I18n.Language.fromProperty("zh_CN"));
         assertEquals(I18n.Language.SIMPLIFIED_CHINESE, I18n.Language.fromProperty("zh"));
         assertEquals(I18n.Language.ENGLISH, I18n.Language.fromProperty("unsupported"));
+    }
+
+    @Test
+    void resourceBundlesHaveMatchingKeysAndDatatypeDescriptionsStayBilingual()
+    {
+        ResourceBundle english =
+            ResourceBundle.getBundle("hdf.view.i18n.messages", Locale.ENGLISH);
+        ResourceBundle chinese =
+            ResourceBundle.getBundle("hdf.view.i18n.messages", Locale.SIMPLIFIED_CHINESE);
+        assertEquals(english.keySet(), chinese.keySet());
+
+        I18n.setLanguage(I18n.Language.ENGLISH);
+        assertEquals("64-bit floating-point", I18n.datatypeDescription("64-bit floating-point"));
+
+        I18n.setLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+        assertEquals("64 位浮点数 (64-bit floating-point)",
+                     I18n.datatypeDescription("64-bit floating-point"));
+        assertEquals("数据集区域引用 (Dataset region reference)",
+                     I18n.datatypeDescription("Dataset region reference"));
     }
 
     @Test

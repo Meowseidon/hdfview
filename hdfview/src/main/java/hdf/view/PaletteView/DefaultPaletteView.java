@@ -27,6 +27,7 @@ import hdf.view.DataView.DataViewManager;
 import hdf.view.ImageView.ImageView;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.TableEditor;
@@ -89,7 +90,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
     private Image currentImage;
 
     private static final int[] lineColors    = {SWT.COLOR_RED, SWT.COLOR_GREEN, SWT.COLOR_BLUE};
-    private static final String[] lineLabels = {"Red", "Green", "Blue"};
+    private String[] lineLabels;
 
     private static final String PALETTE_GRAY         = "Gray";
     private static final String PALETTE_DEFAULT      = "Default";
@@ -170,11 +171,14 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("Image Palette for - " + dataset.getPath() + dataset.getName());
+        I18n.bind(shell, "dialog.palette.title", dataset.getPath() + dataset.getName());
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
         shell.setData(this);
+
+        lineLabels = new String[] {I18n.text("common.red"), I18n.text("common.green"),
+                                   I18n.text("common.blue")};
 
         chartP          = new ChartCanvas(shell, SWT.DOUBLE_BUFFERED | SWT.BORDER);
         GridData data   = new GridData(SWT.FILL, SWT.FILL, true, true);
@@ -194,19 +198,19 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         checkRed = new Button(rgbComposite, SWT.RADIO);
         checkRed.setFont(curFont);
-        checkRed.setText("Red");
+        I18n.bind(checkRed, "common.red");
         checkRed.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_RED));
         checkRed.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
 
         checkGreen = new Button(rgbComposite, SWT.RADIO);
         checkGreen.setFont(curFont);
-        checkGreen.setText("Green");
+        I18n.bind(checkGreen, "common.green");
         checkGreen.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_GREEN));
         checkGreen.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
 
         checkBlue = new Button(rgbComposite, SWT.RADIO);
         checkBlue.setFont(curFont);
-        checkBlue.setText("Blue");
+        I18n.bind(checkBlue, "common.blue");
         checkBlue.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_BLUE));
         checkBlue.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
 
@@ -231,26 +235,21 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
                     return;
 
                 byte[][] imagePalette = null;
-                Object item           = choicePalette.getItem(idx);
-
-                if (item.equals(PALETTE_DEFAULT))
-                    imagePalette = dataset.getPalette();
-                else if (item.equals(PALETTE_GRAY))
+                int fixedStart = (Integer)choicePalette.getData("fixedStart");
+                if (idx == fixedStart)
                     imagePalette = Tools.createGrayPalette();
-                else if (item.equals(PALETTE_REVERSE_GRAY))
-                    imagePalette = Tools.createReverseGrayPalette();
-                else if (item.equals(PALETTE_GRAY_WAVE))
+                else if (idx == fixedStart + 1)
                     imagePalette = Tools.createGrayWavePalette();
-                else if (item.equals(PALETTE_RAINBOW))
+                else if (idx == fixedStart + 2)
                     imagePalette = Tools.createRainbowPalette();
-                else if (item.equals(PALETTE_NATURE))
+                else if (idx == fixedStart + 3)
                     imagePalette = Tools.createNaturePalette();
-                else if (item.equals(PALETTE_WAVE))
+                else if (idx == fixedStart + 4)
                     imagePalette = Tools.createWavePalette();
-                else if (idx > 0 && idx <= numberOfPalettes)
+                else if (idx > 0 && idx < fixedStart)
                     imagePalette = dataset.readPalette(idx - 1);
                 else
-                    imagePalette = Tools.readPalette((String)item);
+                    imagePalette = Tools.readPalette(choicePalette.getItem(idx));
 
                 if (imagePalette == null)
                     return;
@@ -270,7 +269,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
             }
         });
 
-        choicePalette.add("Select palette");
+        choicePalette.add(I18n.text("common.selectPalette"));
 
         String paletteName = dataset.getPaletteName(0);
 
@@ -286,21 +285,36 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
             paletteName = dataset.getPaletteName(i);
             choicePalette.add(paletteName);
         }
-        choicePalette.add(PALETTE_GRAY);
-        choicePalette.add(PALETTE_GRAY_WAVE);
-        choicePalette.add(PALETTE_RAINBOW);
-        choicePalette.add(PALETTE_NATURE);
-        choicePalette.add(PALETTE_WAVE);
+        choicePalette.add(I18n.text("common.gray"));
+        choicePalette.add(I18n.text("common.grayWave"));
+        choicePalette.add(I18n.text("common.rainbow"));
+        choicePalette.add(I18n.text("common.nature"));
+        choicePalette.add(I18n.text("common.wave"));
+        int fixedStart = choicePalette.getItemCount() - 5;
         ArrayList<?> plist = (ArrayList<?>)ViewProperties.getPaletteList();
         int n              = plist.size();
         for (int i = 0; i < n; i++)
             choicePalette.add((String)plist.get(i));
 
+        choicePalette.setData("fixedStart", fixedStart);
+        String[] paletteItemKeys = new String[choicePalette.getItemCount()];
+        paletteItemKeys[0] = "common.selectPalette";
+        for (int i = 1; i < fixedStart; i++)
+            paletteItemKeys[i] = null;
+        paletteItemKeys[fixedStart] = "common.gray";
+        paletteItemKeys[fixedStart + 1] = "common.grayWave";
+        paletteItemKeys[fixedStart + 2] = "common.rainbow";
+        paletteItemKeys[fixedStart + 3] = "common.nature";
+        paletteItemKeys[fixedStart + 4] = "common.wave";
+        for (int i = fixedStart + 5; i < paletteItemKeys.length; i++)
+            paletteItemKeys[i] = null;
+        I18n.bindItems(choicePalette, paletteItemKeys);
+
         choicePalette.select(0);
 
         Button showValueButton = new Button(paletteComposite, SWT.PUSH);
         showValueButton.setFont(curFont);
-        showValueButton.setText("Show Values");
+        I18n.bind(showValueButton, "palette.showValues");
         showValueButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         showValueButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -320,7 +334,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         Button okButton = new Button(buttonComposite, SWT.PUSH);
         okButton.setFont(curFont);
-        okButton.setText("   &OK   ");
+        I18n.bind(okButton, "button.ok");
         okButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -338,7 +352,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         Button cancelButton = new Button(buttonComposite, SWT.PUSH);
         cancelButton.setFont(curFont);
-        cancelButton.setText(" &Cancel ");
+        I18n.bind(cancelButton, "button.cancel");
         cancelButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -350,7 +364,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         Button previewButton = new Button(buttonComposite, SWT.PUSH);
         previewButton.setFont(curFont);
-        previewButton.setText("&Preview");
+        I18n.bind(previewButton, "palette.preview");
         previewButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -658,7 +672,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
             tableShell = new Shell(parent, SWT.SHELL_TRIM);
             tableShell.setFont(curFont);
-            tableShell.setText("");
+            I18n.bind(tableShell, "palette.valueTable.title");
             tableShell.setImages(ViewProperties.getHdfIcons());
             tableShell.setLayout(new GridLayout(1, true));
 
@@ -670,7 +684,9 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
             data.heightHint = 200;
             content.setLayoutData(data);
 
-            String[] columnNames = {IDXNAME, "Red", "Green", "Blue", RGBNAME};
+            String[] columnNames = {I18n.text("palette.index"), I18n.text("common.red"),
+                                    I18n.text("common.green"), I18n.text("common.blue"),
+                                    I18n.text("palette.color")};
 
             valueTable = new Table(content, SWT.BORDER | SWT.FULL_SELECTION | SWT.V_SCROLL | SWT.NO_SCROLL);
             valueTable.setHeaderVisible(true);
@@ -706,9 +722,11 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
                 }
             });
 
+            String[] columnKeys = {"palette.index", "common.red", "common.green", "common.blue",
+                                   "palette.color"};
             for (int i = 0; i < columnNames.length; i++) {
                 TableColumn column = new TableColumn(valueTable, SWT.NONE);
-                column.setText(columnNames[i]);
+                I18n.bind(column, columnKeys[i]);
                 column.setMoveable(false);
                 column.pack();
             }
@@ -731,7 +749,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
             Button okButton = new Button(tableShell, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -776,7 +794,8 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
             }
 
             if (value < 0 || value > 255) {
-                Tools.showError(tableShell, "Update", "Value is out of range [0, 255]");
+                Tools.showError(tableShell, I18n.text("action.update"),
+                                I18n.text("palette.valueOutOfRange"));
                 return;
             }
 

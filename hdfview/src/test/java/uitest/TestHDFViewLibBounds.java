@@ -32,60 +32,60 @@ public class TestHDFViewLibBounds extends AbstractWindowTest {
             SWTBotTree filetree = bot.tree();
             checkFileTree(filetree, "testLibVersion()", 1, testFilename);
 
-            SWTBotTabItem tabItem = openMetadataTab(filetree, testFilename, "/", "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, testFilename, "/", "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Library version bounds: ").getText();
+            String val = bot.textWithLabel(ui("label.libraryVersionBounds")).getText();
             assertTrue(
                 val.equals("V18 and V200"),
                 constructWrongValueMessage("testLibVersion()", "wrong lib bounds", "V18 and V200", val));
 
             SWTBotTreeItem[] items = filetree.getAllItems();
             items[0].click();
-            items[0].contextMenu().contextMenu("Set Lib version bounds").click();
+            items[0].contextMenu().contextMenu(ui("tree.setLibVersionBounds")).click();
 
-            SWTBotShell libVersionShell = bot.shell("Set the library version bounds: ");
+            SWTBotShell libVersionShell = bot.shell(ui("dialog.libVersion.title"));
             libVersionShell.activate();
 
             libVersionShell.bot().comboBox(0).setSelection("V110");
 
-            libVersionShell.bot().button("   &OK   ").click();
+            libVersionShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(shellCloses(libVersionShell));
 
-            val = bot.textWithLabel("Library version bounds: ").getText();
+            val = bot.textWithLabel(ui("label.libraryVersionBounds")).getText();
             assertTrue(
                 val.equals("V110 and V200"),
                 constructWrongValueMessage("testLibVersion()", "wrong lib bounds", "V110 and V200", val));
 
-            items[0].contextMenu().contextMenu("Set Lib version bounds").click();
+            items[0].contextMenu().contextMenu(ui("tree.setLibVersionBounds")).click();
 
-            libVersionShell = bot.shell("Set the library version bounds: ");
+            libVersionShell = bot.shell(ui("dialog.libVersion.title"));
             libVersionShell.activate();
 
             libVersionShell.bot().comboBox(1).setSelection("V110");
 
-            libVersionShell.bot().button("   &OK   ").click();
+            libVersionShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(shellCloses(libVersionShell));
 
-            val = bot.textWithLabel("Library version bounds: ").getText();
+            val = bot.textWithLabel(ui("label.libraryVersionBounds")).getText();
             assertTrue(
                 val.equals("V110 and V110"),
                 constructWrongValueMessage("testLibVersion()", "wrong lib bounds", "V110 and V110", val));
 
-            items[0].contextMenu().contextMenu("Set Lib version bounds").click();
+            items[0].contextMenu().contextMenu(ui("tree.setLibVersionBounds")).click();
 
-            libVersionShell = bot.shell("Set the library version bounds: ");
+            libVersionShell = bot.shell(ui("dialog.libVersion.title"));
             libVersionShell.activate();
 
             libVersionShell.bot().comboBox(0).setSelection("Latest");
 
-            libVersionShell.bot().button("   &OK   ").click();
+            libVersionShell.bot().button(ui("button.ok")).click();
             SWTBotShell libVersionErrorShell = bot.shells()[2];
             libVersionErrorShell.activate();
-            libVersionErrorShell.bot().button("OK").click();
+            libVersionErrorShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(libVersionErrorShell));
 
-            libVersionShell.bot().button(" &Cancel ").click();
+            libVersionShell.bot().button(ui("button.cancel")).click();
             bot.waitUntil(shellCloses(libVersionShell));
         }
         catch (Exception ex) {

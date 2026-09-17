@@ -26,7 +26,9 @@ import hdf.object.HObject;
 import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TreeItem;
+import org.eclipse.swtbot.swt.finder.matchers.WithRegex;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.waits.DefaultCondition;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
@@ -103,6 +105,92 @@ public class TestHDFViewI18n extends AbstractWindowTest {
         }
     }
 
+    @Test
+    public void chineseCreateAndDeleteGroupAndDatasetUsesTheSameActions()
+    {
+        selectLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+        String filename    = "testi18nobjects.h5";
+        String groupName   = "test_i18n_group";
+        String datasetName = "test_i18n_dataset";
+        File hdfFile = createFile(filename);
+
+        try {
+            SWTBotTree tree = bot.tree();
+            SWTBotTreeItem fileItem = tree.getTreeItem(filename);
+
+            fileItem.click();
+            fileItem.contextMenu().contextMenu(I18n.text("tree.new"))
+                .menu(I18n.text("tree.new.group")).click();
+
+            SWTBotShell groupShell = bot.shell(I18n.text("dialog.newGroup.title"));
+            groupShell.activate();
+            bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
+            groupShell.bot().text(0).setText(groupName);
+            groupShell.bot().button(I18n.text("button.ok")).click();
+            bot.waitUntil(Conditions.shellCloses(groupShell));
+
+            fileItem = tree.getTreeItem(filename);
+            assertTrue(fileItem.getNode(0).getText().equals(groupName),
+                       "Chinese New Group must create the requested object");
+
+            SWTBotTreeItem groupItem = fileItem.getNode(0);
+            groupItem.click();
+            groupItem.contextMenu().contextMenu(I18n.text("tree.new"))
+                .menu(I18n.text("tree.new.dataset")).click();
+
+            SWTBotShell datasetShell = bot.shell(I18n.text("dialog.newDataset.title"));
+            datasetShell.activate();
+            bot.waitUntil(Conditions.shellIsActive(datasetShell.getText()));
+            datasetShell.bot().text(0).setText(datasetName);
+            datasetShell.bot().text(2).setText("2 x 2");
+            datasetShell.bot().button(I18n.text("button.ok")).click();
+            bot.waitUntil(Conditions.shellCloses(datasetShell));
+
+            fileItem = tree.getTreeItem(filename);
+            groupItem = fileItem.getNode(0);
+            groupItem.expand();
+            SWTBotTreeItem datasetItem = groupItem.getNode(0);
+            assertEquals(datasetName, datasetItem.getText(),
+                         "Chinese New Dataset must create the requested object");
+
+            datasetItem.click();
+            closeDataObject(new SWTBotShell(shell));
+            datasetItem.contextMenu().contextMenu(I18n.text("tree.delete")).click();
+            bot.waitUntil(Conditions.waitForShell(
+                WithRegex.withRegex(".*" + VERSION + " - " + I18n.text("action.delete"))));
+            SWTBotShell deleteDatasetShell = bot.shell(applicationDialogTitle("action.delete"));
+            deleteDatasetShell.activate();
+            bot.waitUntil(Conditions.shellIsActive(deleteDatasetShell.getText()));
+            deleteDatasetShell.bot().button(I18n.text("button.yes")).click();
+            bot.waitUntil(Conditions.shellCloses(deleteDatasetShell));
+            waitForVisibleRows(tree, 2);
+            assertEquals(groupName, tree.getTreeItem(filename).getNode(0).getText(),
+                         "Chinese Delete must remove the Dataset and keep its Group");
+
+            SWTBotTreeItem groupAfterDatasetDelete = tree.getTreeItem(filename).getNode(0);
+            groupAfterDatasetDelete.click();
+            groupAfterDatasetDelete.contextMenu().contextMenu(I18n.text("tree.delete")).click();
+            bot.waitUntil(Conditions.waitForShell(
+                WithRegex.withRegex(".*" + VERSION + " - " + I18n.text("action.delete"))));
+            SWTBotShell deleteGroupShell = bot.shell(applicationDialogTitle("action.delete"));
+            deleteGroupShell.activate();
+            bot.waitUntil(Conditions.shellIsActive(deleteGroupShell.getText()));
+            deleteGroupShell.bot().button(I18n.text("button.yes")).click();
+            bot.waitUntil(Conditions.shellCloses(deleteGroupShell));
+            waitForVisibleRows(tree, 1);
+            assertEquals(filename, tree.getTreeItem(filename).getText(),
+                         "Chinese Delete must remove the Group and keep the file open");
+        }
+        finally {
+            try {
+                closeFile(hdfFile, true);
+            }
+            finally {
+                selectLanguage(I18n.Language.ENGLISH);
+            }
+        }
+    }
+
     private void selectLanguage(I18n.Language language)
     {
         if (I18n.getLanguage() == language)
@@ -132,14 +220,32 @@ public class TestHDFViewI18n extends AbstractWindowTest {
         });
     }
 
+    private void waitForVisibleRows(final SWTBotTree tree, final int rows)
+    {
+        bot.waitUntil(new DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                return tree.visibleRowCount() == rows;
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for " + rows + " visible TreeView rows (actual "
+                    + tree.visibleRowCount() + ")";
+            }
+        });
+    }
+
     private void assertCoreEnglishUi()
     {
         assertEquals(I18n.Language.ENGLISH, I18n.getLanguage());
         assertEquals(I18n.text("menu.file"), bot.menu().menu(I18n.text("menu.file")).getText());
         assertEquals(I18n.text("menu.tools"), bot.menu().menu(I18n.text("menu.tools")).getText());
-        assertEquals("Data Content", bot.tabItem(I18n.text("tab.dataContent")).getText());
-        assertEquals("Object Attribute Info", bot.tabItem(I18n.text("tab.objectAttributeInfo")).getText());
-        assertEquals("General Object Info", bot.tabItem(I18n.text("tab.generalObjectInfo")).getText());
+        assertEquals(I18n.text("tab.dataContent"), bot.tabItem(I18n.text("tab.dataContent")).getText());
+        assertEquals(I18n.text("tab.objectAttributeInfo"), bot.tabItem(I18n.text("tab.objectAttributeInfo")).getText());
+        assertEquals(I18n.text("tab.generalObjectInfo"), bot.tabItem(I18n.text("tab.generalObjectInfo")).getText());
         assertEquals(I18n.text("button.recentFiles"), bot.button(I18n.text("button.recentFiles")).getText());
         assertEquals(I18n.text("button.clearText"), bot.button(I18n.text("button.clearText")).getText());
     }
@@ -149,9 +255,9 @@ public class TestHDFViewI18n extends AbstractWindowTest {
         assertEquals(I18n.Language.SIMPLIFIED_CHINESE, I18n.getLanguage());
         assertEquals(I18n.text("menu.file"), bot.menu().menu(I18n.text("menu.file")).getText());
         assertEquals(I18n.text("menu.tools"), bot.menu().menu(I18n.text("menu.tools")).getText());
-        assertEquals("数据内容", bot.tabItem(I18n.text("tab.dataContent")).getText());
-        assertEquals("对象属性信息", bot.tabItem(I18n.text("tab.objectAttributeInfo")).getText());
-        assertEquals("对象常规信息", bot.tabItem(I18n.text("tab.generalObjectInfo")).getText());
+        assertEquals(I18n.text("tab.dataContent"), bot.tabItem(I18n.text("tab.dataContent")).getText());
+        assertEquals(I18n.text("tab.objectAttributeInfo"), bot.tabItem(I18n.text("tab.objectAttributeInfo")).getText());
+        assertEquals(I18n.text("tab.generalObjectInfo"), bot.tabItem(I18n.text("tab.generalObjectInfo")).getText());
         assertEquals(I18n.text("button.recentFiles"), bot.button(I18n.text("button.recentFiles")).getText());
         assertEquals(I18n.text("button.clearText"), bot.button(I18n.text("button.clearText")).getText());
     }

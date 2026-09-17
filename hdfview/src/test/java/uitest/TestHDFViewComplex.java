@@ -119,8 +119,7 @@ public class TestHDFViewComplex extends AbstractWindowTest {
             // Test the single attribute value
             retriever.testTableLocation(0, 0, expectedValue);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -332,7 +331,7 @@ public class TestHDFViewComplex extends AbstractWindowTest {
             bot.sleep(100);
 
             // Get text from the cell display
-            String cellValue = bot.shells()[1].bot().text(0).getText();
+            String cellValue = tableShell.bot().text(0).getText();
 
             // Verify the cell displays as an array containing complex values
             assertTrue(cellValue.startsWith("["), "Array should start with '['");

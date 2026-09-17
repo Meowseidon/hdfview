@@ -82,7 +82,7 @@ public class NewDatatypeDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Datatype...");
+        I18n.bind(shell, "dialog.newDatatype.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, false));
 
@@ -93,7 +93,7 @@ public class NewDatatypeDialog extends NewDataObjectDialog {
 
         Label label = new Label(fieldComposite, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Datatype name: ");
+        I18n.bind(label, "label.datatypeName");
 
         nameField = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -110,7 +110,7 @@ public class NewDatatypeDialog extends NewDataObjectDialog {
 
         label = new Label(fieldComposite, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Parent Group: ");
+        I18n.bind(label, "label.parentGroup");
 
         parentChoice = new Combo(fieldComposite, SWT.DROP_DOWN | SWT.BORDER | SWT.READ_ONLY);
         parentChoice.setFont(curFont);
@@ -226,13 +226,15 @@ public class NewDatatypeDialog extends NewDataObjectDialog {
         name = nameField.getText().trim();
         if ((name == null) || (name.length() < 1)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Datatype name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.datatype")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Datatype name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.datatype")));
             return null;
         }
 
@@ -240,7 +242,7 @@ public class NewDatatypeDialog extends NewDataObjectDialog {
 
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Parent group is null.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentNull"));
             return null;
         }
 
@@ -257,7 +259,7 @@ public class NewDatatypeDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 

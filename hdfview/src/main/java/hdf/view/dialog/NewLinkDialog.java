@@ -143,7 +143,7 @@ public class NewLinkDialog extends Dialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Link...");
+        I18n.bind(shell, "dialog.newLink.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
@@ -154,7 +154,7 @@ public class NewLinkDialog extends Dialog {
 
         Label label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Link name: ");
+        I18n.bind(label, "label.linkName");
 
         nameField = new Text(content, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -164,7 +164,7 @@ public class NewLinkDialog extends Dialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Parent group: ");
+        I18n.bind(label, "label.parentGroup");
 
         parentChoice = new Combo(content, SWT.DROP_DOWN | SWT.BORDER | SWT.READ_ONLY);
         parentChoice.setFont(curFont);
@@ -183,38 +183,18 @@ public class NewLinkDialog extends Dialog {
 
         label = new Label(helpComposite, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Type of Link: ");
+        I18n.bind(label, "label.linkType");
 
         Button helpButton = new Button(helpComposite, SWT.PUSH);
         helpButton.setImage(ViewProperties.getHelpIcon());
-        helpButton.setToolTipText("Help on Links");
+        I18n.bindToolTip(helpButton, "dialog.help.links.title");
         helpButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         helpButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                final String msg =
-                    "The Type of Link specifies which type of link the user wants to create. \n"
-                    + "It could be hard, soft or external links. \n\n"
-                    + "Hard Link: \n"
-                    + "Hard Link creates a hard link to a pre-existing object in an HDF5 file. \n"
-                    + "The target object must already exist in the file.\n"
-                    + "The HDF5 library keeps a count of all hard links pointing to an object. \n\n"
-                    + "Soft Link: \n"
-                    + "Soft Link creates a new soft link to an object in an HDF5 file. \n"
-                    + "Soft links are only for use only if the target object is in the current file. \n"
-                    + "Unlike hard links, a soft link in an HDF5 file is allowed to dangle, \n"
-                    + "meaning that the target object need not exist at the time that the link is created.\n"
-                    + "The HDF5 library does not keep a count of soft links.  \n\n"
-                    + "External Link: \n"
-                    + "External Link creates a new soft link to an external object, which is an \n"
-                    + "object in a different HDF5 file from the location of the link. \n"
-                    + "External links are allowed to dangle like soft links. \n\n"
-                    + "Soft links and external links are also known as symbolic links as they use "
-                    +
-                    "a name to point to an object; hard links employ an object's address in the file.  \n\n\n";
-
-                Tools.showInformation(shell, "Help", msg);
+                Tools.showInformation(shell, I18n.text("dialog.help.links.title"),
+                                      I18n.text("dialog.help.links.text"));
             }
         });
 
@@ -224,7 +204,7 @@ public class NewLinkDialog extends Dialog {
 
         hardLink = new Button(typeComposite, SWT.RADIO);
         hardLink.setFont(curFont);
-        hardLink.setText("Hard Link");
+        I18n.bind(hardLink, "common.hardLink");
         hardLink.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         hardLink.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -246,7 +226,7 @@ public class NewLinkDialog extends Dialog {
 
         softLink = new Button(typeComposite, SWT.RADIO);
         softLink.setFont(curFont);
-        softLink.setText("Soft Link");
+        I18n.bind(softLink, "common.softLink");
         softLink.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         softLink.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -267,7 +247,7 @@ public class NewLinkDialog extends Dialog {
 
         externalLink = new Button(typeComposite, SWT.RADIO);
         externalLink.setFont(curFont);
-        externalLink.setText("External Link");
+        I18n.bind(externalLink, "common.externalLink");
         externalLink.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         externalLink.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -284,7 +264,7 @@ public class NewLinkDialog extends Dialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Target File: ");
+        I18n.bind(label, "label.targetFile");
 
         Composite fileComposite  = new Composite(content, SWT.NONE);
         GridLayout layout        = new GridLayout(2, false);
@@ -325,8 +305,8 @@ public class NewLinkDialog extends Dialog {
                     String currentFileName = fileFormat.getAbsolutePath();
                     if (currentFileName.equals(chosenFile.getAbsolutePath())) {
                         Tools.showError(
-                            shell, "Traverse",
-                            "Please select a file other than the current file for external links.");
+                            shell, I18n.text("action.traverse"),
+                            I18n.text("message.externalLinkOtherFile"));
                         targetFile.setText("");
                         return;
                     }
@@ -341,7 +321,7 @@ public class NewLinkDialog extends Dialog {
 
         targetFileButton = new Button(fileComposite, SWT.PUSH);
         targetFileButton.setFont(curFont);
-        targetFileButton.setText("Browse...");
+        I18n.bind(targetFileButton, "button.browse");
         targetFileButton.setEnabled(false);
         targetFileButton.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, false, false));
         targetFileButton.addSelectionListener(new SelectionAdapter() {
@@ -365,7 +345,7 @@ public class NewLinkDialog extends Dialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Target Object: ");
+        I18n.bind(label, "label.targetObject");
 
         targetObject = new CCombo(content, SWT.DROP_DOWN | SWT.BORDER);
         targetObject.setFont(curFont);
@@ -491,13 +471,15 @@ public class NewLinkDialog extends Dialog {
         name = nameField.getText().trim();
         if ((name == null) || (name.length() < 1)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Link name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.link")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Link name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.link")));
             return null;
         }
 
@@ -505,7 +487,7 @@ public class NewLinkDialog extends Dialog {
 
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Parent group is null.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentNull"));
             return null;
         }
 
@@ -514,13 +496,13 @@ public class NewLinkDialog extends Dialog {
 
             if (targetObj == null) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Target object is null.");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.targetObjectNull"));
                 return null;
             }
 
             if ((targetObj instanceof Group) && ((Group)targetObj).isRoot()) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Cannot make a link to the root group.");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.rootLinkNotAllowed"));
                 return null;
             }
 
@@ -529,7 +511,7 @@ public class NewLinkDialog extends Dialog {
             }
             catch (Exception ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", ex.getMessage());
+                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                 return null;
             }
         }
@@ -537,7 +519,7 @@ public class NewLinkDialog extends Dialog {
             String targetName = targetObject.getText();
             if (targetName.length() < 1) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Target object name is not specified.");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.targetNameMissing"));
                 return null;
             }
 
@@ -575,7 +557,7 @@ public class NewLinkDialog extends Dialog {
 
             if ((targetObj instanceof Group) && ((Group)targetObj).isRoot()) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Cannot make a link to the root group.");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.rootLinkNotAllowed"));
                 return null;
             }
 
@@ -588,7 +570,7 @@ public class NewLinkDialog extends Dialog {
             catch (Exception ex) {
                 ex.printStackTrace();
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", ex.getMessage());
+                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                 return null;
             }
         }
@@ -633,7 +615,8 @@ public class NewLinkDialog extends Dialog {
                 tObj        = targetObject.getText();
                 if (tObj.length() < 1) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Create", "Target object name not specified.");
+                    Tools.showError(shell, I18n.text("action.create"),
+                                    I18n.text("message.targetNameMissingShort"));
                     return null;
                 }
                 tFileObj = targetFileName + FileFormat.FILE_OBJ_SEP + tObj;
@@ -648,7 +631,7 @@ public class NewLinkDialog extends Dialog {
             catch (Exception ex) {
                 ex.printStackTrace();
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", ex.getMessage());
+                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                 return null;
             }
         }
@@ -663,7 +646,7 @@ public class NewLinkDialog extends Dialog {
 
         DefaultFileFilter filter = DefaultFileFilter.getFileFilter();
         fchooser.setFilterExtensions(new String[] {"*", filter.getExtensions()});
-        fchooser.setFilterNames(new String[] {"All Files", filter.getDescription()});
+        fchooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles"), filter.getDescription()});
         fchooser.setFilterIndex(1);
 
         if (fchooser.open() == null)
@@ -685,8 +668,7 @@ public class NewLinkDialog extends Dialog {
         // Check if the target File is not the current file.
         String currentFileName = fileFormat.getAbsolutePath();
         if (currentFileName.equals(chosenFile.getAbsolutePath())) {
-            Tools.showError(shell, "Open",
-                            "Please select a file other than the current file for external links.");
+            Tools.showError(shell, I18n.text("action.open"), I18n.text("message.externalLinkOtherFile"));
             targetFile.setText("");
             return null;
         }
@@ -818,7 +800,7 @@ public class NewLinkDialog extends Dialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Target", "Invalid File Format");
+            Tools.showError(shell, I18n.text("action.target"), I18n.text("message.invalidFileFormat"));
             targetFile.setText("");
             return;
         }

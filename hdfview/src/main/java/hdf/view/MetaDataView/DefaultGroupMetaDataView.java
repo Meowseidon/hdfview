@@ -24,6 +24,7 @@ import hdf.object.h5.H5Link;
 import hdf.object.nc2.NC2Group;
 import hdf.view.DataView.DataViewManager;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import hdf.hdf5lib.H5;
 import hdf.hdf5lib.HDF5Constants;
@@ -76,7 +77,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
         Label label;
 
         if (isH5) {
-            StringBuilder objCreationStr = new StringBuilder("Creation Order NOT Tracked");
+            String creationOrderKey = "meta.creationOrderNotTracked";
 
             long ocplID = -1;
             try {
@@ -99,10 +100,9 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
                     int creationOrder = H5.H5Pget_link_creation_order(ocplID);
                     log.trace("createGeneralObjectInfoPane(): creationOrder={}", creationOrder);
                     if ((creationOrder & HDF5Constants.H5P_CRT_ORDER_TRACKED) > 0) {
-                        objCreationStr.setLength(0);
-                        objCreationStr.append("Creation Order Tracked");
+                        creationOrderKey = "meta.creationOrderTracked";
                         if ((creationOrder & HDF5Constants.H5P_CRT_ORDER_INDEXED) > 0)
-                            objCreationStr.append(" and Indexed");
+                            creationOrderKey = "meta.creationOrderTrackedIndexed";
                     }
                 }
             }
@@ -113,24 +113,27 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
             /* Creation order section */
             label = new Label(generalObjectInfoPane, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Link Creation Order: ");
+            I18n.bind(label, "meta.linkCreationOrder");
 
             Text text = new Text(generalObjectInfoPane, SWT.SINGLE | SWT.BORDER);
             text.setEditable(false);
             text.setFont(curFont);
-            text.setText(objCreationStr.toString());
+            I18n.bind(text, creationOrderKey);
             text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         }
         if (isN3) {
-            StringBuilder objDimensionStr = new StringBuilder("No Dimensions");
+            StringBuilder objDimensionStr = new StringBuilder(I18n.text("meta.noDimensions"));
+            boolean hasDimensions             = false;
             int[] listDimSelector         = {0, 0, 1};
             try {
                 List ncDimensions = ((NC2Group)g).getMetadata(listDimSelector);
                 if (ncDimensions != null) {
                     int listCnt = ncDimensions.size();
                     log.trace("createGeneralObjectInfoPane(): ncDimensions={}", listCnt);
-                    if (listCnt > 0)
+                    if (listCnt > 0) {
+                        hasDimensions = true;
                         objDimensionStr.setLength(0);
+                    }
                     for (int i = 0; i < listCnt; i++) {
                         objDimensionStr.append(((NC2Group)g).netcdfDimensionString(i));
                         if (i < listCnt - 1)
@@ -145,7 +148,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
             /* Dimensions section */
             label = new Label(generalObjectInfoPane, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Dimensions: ");
+            I18n.bind(label, "meta.dimensions");
 
             ScrolledComposite dimensionScroller =
                 new ScrolledComposite(generalObjectInfoPane, SWT.V_SCROLL | SWT.BORDER);
@@ -156,19 +159,24 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
             Text text = new Text(dimensionScroller, SWT.MULTI | SWT.BORDER);
             text.setEditable(false);
             text.setFont(curFont);
-            text.setText(objDimensionStr.toString());
+            final boolean dimensionsAvailable = hasDimensions;
+            final String dimensionsText = objDimensionStr.toString();
+            I18n.bindDynamic(text, () -> dimensionsAvailable ? dimensionsText : I18n.text("meta.noDimensions"));
             text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
             dimensionScroller.setContent(text);
 
-            StringBuilder objEnumTypedefStr = new StringBuilder("No Enums");
+            StringBuilder objEnumTypedefStr = new StringBuilder(I18n.text("meta.noEnums"));
+            boolean hasEnums                = false;
             int[] listEnumSelector          = {0, 0, 0, 1};
             try {
                 List ncEnums = ((NC2Group)g).getMetadata(listEnumSelector);
                 if (ncEnums != null) {
                     int listCnt = ncEnums.size();
                     log.trace("createGeneralObjectInfoPane(): ncEnums={}", listCnt);
-                    if (listCnt > 0)
+                    if (listCnt > 0) {
+                        hasEnums = true;
                         objEnumTypedefStr.setLength(0);
+                    }
                     for (int i = 0; i < listCnt; i++) {
                         objEnumTypedefStr.append(((NC2Group)g).netcdfTypedefString(i));
                         if (i < listCnt - 1)
@@ -183,7 +191,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
             /* Dimensions section */
             label = new Label(generalObjectInfoPane, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Enums: ");
+            I18n.bind(label, "meta.enums");
 
             ScrolledComposite enumScroller =
                 new ScrolledComposite(generalObjectInfoPane, SWT.V_SCROLL | SWT.BORDER);
@@ -194,30 +202,29 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
             text = new Text(enumScroller, SWT.MULTI | SWT.BORDER);
             text.setEditable(false);
             text.setFont(curFont);
-            text.setText(objEnumTypedefStr.toString());
+            final boolean enumsAvailable = hasEnums;
+            final String enumsText = objEnumTypedefStr.toString();
+            I18n.bindDynamic(text, () -> enumsAvailable ? enumsText : I18n.text("meta.noEnums"));
             text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
             enumScroller.setContent(text);
         }
         org.eclipse.swt.widgets.Group groupInfoGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
         groupInfoGroup.setFont(curFont);
-        groupInfoGroup.setText("Group Members");
+        I18n.bind(groupInfoGroup, "meta.groupMembers");
         groupInfoGroup.setLayout(new GridLayout(1, true));
         groupInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1));
 
         if (g.getNumberOfMembersInFile() < ViewProperties.getMaxMembers()) {
             label = new Label(groupInfoGroup, SWT.RIGHT);
             label.setFont(curFont);
-            label.setText("Number of members: " + n);
+            I18n.bind(label, "meta.numberMembers", n);
         }
         else {
             label = new Label(groupInfoGroup, SWT.RIGHT);
             label.setFont(curFont);
-            label.setText("Number of members: " + n + " (in memory),"
-                          + "" + g.getNumberOfMembersInFile() + " (in file)");
+            I18n.bind(label, "meta.numberMembersInFile", n, g.getNumberOfMembersInFile());
         }
-
-        String[] columnNames = {"Name", "Type"};
 
         Table memberTable = new Table(groupInfoGroup, SWT.BORDER);
         memberTable.setLinesVisible(true);
@@ -225,31 +232,35 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
         memberTable.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
         memberTable.setFont(curFont);
 
-        for (int i = 0; i < columnNames.length; i++) {
+        for (int i = 0; i < 2; i++) {
             TableColumn column = new TableColumn(memberTable, SWT.NONE);
-            column.setText(columnNames[i]);
+            if (i == 0)
+                I18n.bind(column, "meta.name");
+            else
+                I18n.bind(column, "meta.type");
             column.setMoveable(false);
         }
 
         if (mlist != null && n > 0) {
             String[][] rowData = new String[n][2];
+            String[] typeKeys  = new String[n];
             for (int i = 0; i < n; i++) {
                 HObject theObj = (HObject)mlist.get(i);
                 rowData[i][0]  = theObj.getName();
+                typeKeys[i]     = "common.unknown";
                 if (theObj instanceof Group) {
-                    rowData[i][1] = "Group";
+                    typeKeys[i]  = "common.group";
                 }
                 else if (theObj instanceof Dataset) {
-                    rowData[i][1] = "Dataset";
+                    typeKeys[i]  = "common.dataset";
                 }
                 else if (theObj instanceof Datatype) {
-                    rowData[i][1] = "Datatype";
+                    typeKeys[i]  = "common.datatype";
                 }
                 else if (theObj instanceof H5Link) {
-                    rowData[i][1] = "Link";
+                    typeKeys[i]  = "common.link";
                 }
-                else
-                    rowData[i][1] = "Unknown";
+                rowData[i][1] = I18n.text(typeKeys[i]);
             }
 
             for (int i = 0; i < rowData.length; i++) {
@@ -257,6 +268,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
                 item.setFont(curFont);
                 item.setText(0, rowData[i][0]);
                 item.setText(1, rowData[i][1]);
+                I18n.bindTableCell(item, 1, typeKeys[i]);
             }
 
             // set cell height for large fonts
@@ -265,7 +277,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
             // table.setRowHeight(cellRowHeight);
         }
 
-        for (int i = 0; i < columnNames.length; i++) {
+        for (int i = 0; i < 2; i++) {
             memberTable.getColumn(i).pack();
         }
     }

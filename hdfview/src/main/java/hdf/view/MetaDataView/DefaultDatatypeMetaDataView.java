@@ -17,6 +17,7 @@ package hdf.view.MetaDataView;
 import hdf.object.Datatype;
 import hdf.object.HObject;
 import hdf.view.DataView.DataViewManager;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,13 +56,13 @@ public class DefaultDatatypeMetaDataView extends DefaultLinkMetaDataView impleme
         org.eclipse.swt.widgets.Group datatypeInfoGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
         datatypeInfoGroup.setFont(curFont);
-        datatypeInfoGroup.setText("Type");
+        I18n.bind(datatypeInfoGroup, "meta.datatypeType");
         datatypeInfoGroup.setLayout(new FillLayout());
         datatypeInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1));
 
         Text infoArea = new Text(datatypeInfoGroup, SWT.MULTI);
         infoArea.setFont(curFont);
-        infoArea.setText(((Datatype)dataObject).getDescription());
+        I18n.bindDatatypeDescription(infoArea, ((Datatype)dataObject).getDescription());
         infoArea.setEditable(false);
     }
 }

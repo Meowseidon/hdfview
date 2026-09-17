@@ -47,9 +47,9 @@ public class TestTreeViewExport extends AbstractWindowTest {
                        "createImportHDF5Dataset() filetree is missing file '" + filename + "'");
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Group").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            SWTBotShell groupShell = bot.shell("New Group...");
+            SWTBotShell groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -59,7 +59,7 @@ public class TestTreeViewExport extends AbstractWindowTest {
             assertTrue(val.equals(groupname), constructWrongValueMessage("createImportHDF5Dataset()",
                                                                          "wrong group name", groupname, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
 
             assertTrue(filetree.visibleRowCount() == 2,
@@ -72,9 +72,9 @@ public class TestTreeViewExport extends AbstractWindowTest {
 
             items[0].getNode(0).click();
 
-            items[0].getNode(0).contextMenu().contextMenu("New").menu("Dataset").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.dataset")).click();
 
-            SWTBotShell datasetShell = bot.shell("New Dataset...");
+            SWTBotShell datasetShell = bot.shell(ui("dialog.newDataset.title"));
             datasetShell.activate();
             bot.waitUntil(Conditions.shellIsActive(datasetShell.getText()));
 
@@ -94,11 +94,11 @@ public class TestTreeViewExport extends AbstractWindowTest {
                        constructWrongValueMessage("createImportHDF5Dataset()",
                                                   "wrong dataset dimension sizes", datasetdimsize, val));
 
-            datasetShell.bot().button("   &OK   ").click();
+            datasetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(datasetShell));
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Expand All").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.expandAll")).click();
 
             assertTrue(filetree.visibleRowCount() == 3,
                        constructWrongValueMessage("createImportHDF5Dataset()", "filetree wrong row count",
@@ -140,12 +140,12 @@ public class TestTreeViewExport extends AbstractWindowTest {
             dataTable.click(1, 1);
             tableShell.bot()
                 .menu()
-                .menu("Import/Export Data")
-                .menu("Import Data from")
-                .menu("Text File")
+                .menu(ui("table.importExport"))
+                .menu(ui("table.importDataFrom"))
+                .menu(ui("table.textFile"))
                 .click();
 
-            SWTBotShell importShell = bot.shell("Enter a file name");
+            SWTBotShell importShell = bot.shell(ui("dialog.enterFileName.title"));
             importShell.activate();
 
             SWTBotText text = importShell.bot().text();
@@ -155,7 +155,7 @@ public class TestTreeViewExport extends AbstractWindowTest {
             assertTrue(val.equals(importfilename), "importHDF5Dataset() wrong file name: expected '" +
                                                        importfilename + "' but was '" + val + "'");
 
-            importShell.bot().button("   &OK   ").click();
+            importShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(importShell));
 
             Matcher<Shell> classMatcher = widgetOfType(Shell.class);
@@ -169,12 +169,12 @@ public class TestTreeViewExport extends AbstractWindowTest {
             botShell.activate();
             bot.waitUntil(Conditions.shellIsActive(botShell.getText()));
 
-            botShell.bot().button("OK").click();
+            botShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(botShell));
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
+            tableMenu(tableShell).menu(ui("action.close")).click();
 
             regexMatcher = withRegex("Changes Detected");
             shellMatcher = allOf(classMatcher, regexMatcher);
@@ -185,7 +185,7 @@ public class TestTreeViewExport extends AbstractWindowTest {
             saveShell.activate();
             bot.waitUntil(Conditions.shellIsActive(saveShell.getText()));
 
-            saveShell.bot().button("Cancel").click();
+            saveShell.bot().button(ui("button.cancel")).click();
             bot.waitUntil(Conditions.shellCloses(saveShell));
         }
         catch (Exception ex) {
@@ -225,8 +225,8 @@ public class TestTreeViewExport extends AbstractWindowTest {
             items[0]
                 .getNode(3)
                 .contextMenu()
-                .contextMenu("Export Dataset")
-                .menu("Export Data to Text File")
+                .contextMenu(ui("tree.exportDataset"))
+                .menu(ui("tree.exportDataset.text"))
                 .click();
 
             Matcher<Shell> classMatcher = widgetOfType(Shell.class);
@@ -248,7 +248,7 @@ public class TestTreeViewExport extends AbstractWindowTest {
                        "saveHDF5DatasetText() wrong file name: expected '" + groupsetname + ".txt"
                            + "' but was '" + val + "'");
 
-            exportShell.bot().button("   &OK   ").click();
+            exportShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(exportShell));
 
             export_file = new File(workDir, groupsetname + ".txt");
@@ -295,7 +295,7 @@ public class TestTreeViewExport extends AbstractWindowTest {
             SWTBotTreeItem[] items = filetree.getAllItems();
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Expand All").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.expandAll")).click();
 
             assertTrue(filetree.visibleRowCount() == 10,
                        constructWrongValueMessage("saveHDF5DatasetBinary()", "filetree wrong row count", "10",
@@ -309,8 +309,8 @@ public class TestTreeViewExport extends AbstractWindowTest {
             items[0]
                 .getNode(3)
                 .contextMenu()
-                .contextMenu("Export Dataset")
-                .menu("Export Data as Little Endian")
+                .contextMenu(ui("tree.exportDataset"))
+                .menu(ui("tree.exportDataset.littleEndian"))
                 .click();
 
             Matcher<Shell> classMatcher = widgetOfType(Shell.class);
@@ -332,7 +332,7 @@ public class TestTreeViewExport extends AbstractWindowTest {
                        "saveHDF5DatasetText() wrong file name: expected '" + groupsetname + ".bin"
                            + "' but was '" + val + "'");
 
-            exportShell.bot().button("   &OK   ").click();
+            exportShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(exportShell));
 
             export_file = new File(workDir, "DU64BITS.bin");
@@ -877,17 +877,17 @@ public class TestTreeViewExport extends AbstractWindowTest {
 
         try {
             // switch to ViewProperties.DELIMITER_TAB
-            SWTBotMenu fileMenuItem = bot.menu().menu("Tools");
-            fileMenuItem.menu("User Options").click();
+            SWTBotMenu fileMenuItem = bot.menu().menu(ui("menu.tools"));
+            fileMenuItem.menu(ui("menu.tools.preferences")).click();
 
-            SWTBotShell botshell = bot.shell("Preferences");
+            SWTBotShell botshell = bot.shell(ui("dialog.userOptions.title"));
             botshell.activate();
-            bot.waitUntil(Conditions.shellIsActive("Preferences"));
+            bot.waitUntil(Conditions.shellIsActive(ui("dialog.userOptions.title")));
 
             SWTBotCombo combo = botshell.bot().comboBox(4);
             combo.setSelection("Tab");
 
-            botshell.bot().button("Apply and Close").click();
+            botshell.bot().button(ui("button.applyAndClose")).click();
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -1439,17 +1439,17 @@ public class TestTreeViewExport extends AbstractWindowTest {
 
         try {
             // switch to ViewProperties.DELIMITER_COMMA
-            SWTBotMenu fileMenuItem = bot.menu().menu("Tools");
-            fileMenuItem.menu("User Options").click();
+            SWTBotMenu fileMenuItem = bot.menu().menu(ui("menu.tools"));
+            fileMenuItem.menu(ui("menu.tools.preferences")).click();
 
-            SWTBotShell botshell = bot.shell("Preferences");
+            SWTBotShell botshell = bot.shell(ui("dialog.userOptions.title"));
             botshell.activate();
-            bot.waitUntil(Conditions.shellIsActive("Preferences"));
+            bot.waitUntil(Conditions.shellIsActive(ui("dialog.userOptions.title")));
 
             SWTBotCombo combo = botshell.bot().comboBox(4);
             combo.setSelection("Comma");
 
-            botshell.bot().button("Apply and Close").click();
+            botshell.bot().button(ui("button.applyAndClose")).click();
         }
         catch (Exception ex) {
             ex.printStackTrace();

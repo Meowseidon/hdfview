@@ -88,7 +88,7 @@ public class NewImageDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New HDF Image...");
+        I18n.bind(shell, "dialog.newImage.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
@@ -99,7 +99,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         Label label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Image name: ");
+        I18n.bind(label, "label.imageName");
 
         nameField = new Text(content, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -109,7 +109,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Parent Group: ");
+        I18n.bind(label, "label.parentGroup");
 
         parentChoice = new Combo(content, SWT.DROP_DOWN | SWT.READ_ONLY);
         parentChoice.setFont(curFont);
@@ -149,7 +149,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Height: ");
+        I18n.bind(label, "label.height");
 
         heightField = new Text(content, SWT.SINGLE | SWT.BORDER);
         heightField.setFont(curFont);
@@ -157,7 +157,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Width: ");
+        I18n.bind(label, "label.width");
 
         widthField = new Text(content, SWT.SINGLE | SWT.BORDER);
         widthField.setFont(curFont);
@@ -165,7 +165,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Image type: ");
+        I18n.bind(label, "label.imageType");
 
         Composite typeComposite = new Composite(content, SWT.BORDER);
         typeComposite.setLayout(new GridLayout(2, true));
@@ -173,7 +173,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         checkIndex = new Button(typeComposite, SWT.RADIO);
         checkIndex.setFont(curFont);
-        checkIndex.setText("Indexed colormap");
+        I18n.bind(checkIndex, "image.indexedColormap");
         checkIndex.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         checkIndex.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -188,7 +188,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         checkTrueColor = new Button(typeComposite, SWT.RADIO);
         checkTrueColor.setFont(curFont);
-        checkTrueColor.setText("24-bit truecolor");
+        I18n.bind(checkTrueColor, "image.trueColor24");
         checkTrueColor.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         checkTrueColor.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -201,7 +201,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Data layout: ");
+        I18n.bind(label, "label.dataLayout");
 
         Composite layoutComposite = new Composite(content, SWT.BORDER);
         layoutComposite.setLayout(new GridLayout(2, true));
@@ -209,12 +209,12 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         checkInterlacePixel = new Button(layoutComposite, SWT.RADIO);
         checkInterlacePixel.setFont(curFont);
-        checkInterlacePixel.setText("Pixel interlace");
+        I18n.bind(checkInterlacePixel, "image.pixelInterlace");
         checkInterlacePixel.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         checkInterlacePlane = new Button(layoutComposite, SWT.RADIO);
         checkInterlacePlane.setFont(curFont);
-        checkInterlacePlane.setText("Plane interlace");
+        I18n.bind(checkInterlacePlane, "image.planeInterlace");
         checkInterlacePlane.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         // Create Ok/Cancel button region
@@ -292,13 +292,15 @@ public class NewImageDialog extends NewDataObjectDialog {
         }
         if ((name == null) || (name.length() <= 0)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Image name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.image")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Image name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.image")));
             return null;
         }
 
@@ -306,7 +308,7 @@ public class NewImageDialog extends NewDataObjectDialog {
 
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Select a parent group.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentGroupRequired"));
             return null;
         }
 
@@ -318,7 +320,7 @@ public class NewImageDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 
@@ -374,7 +376,7 @@ public class NewImageDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 

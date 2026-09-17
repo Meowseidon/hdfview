@@ -134,7 +134,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Dataset...");
+        I18n.bind(shell, "dialog.newDataset.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
@@ -145,7 +145,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
         Label datasetNameLabel = new Label(fieldComposite, SWT.LEFT);
         datasetNameLabel.setFont(curFont);
-        datasetNameLabel.setText("Dataset name: ");
+        I18n.bind(datasetNameLabel, "label.datasetName");
 
         nameField = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -156,7 +156,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
         Label parentGroupLabel = new Label(fieldComposite, SWT.LEFT);
         parentGroupLabel.setFont(curFont);
-        parentGroupLabel.setText("Parent group: ");
+        I18n.bind(parentGroupLabel, "label.parentGroup");
 
         parentChoice = new Combo(fieldComposite, SWT.DROP_DOWN | SWT.BORDER | SWT.READ_ONLY);
         parentChoice.setFont(curFont);
@@ -203,17 +203,17 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             // Create Dataspace region
             org.eclipse.swt.widgets.Group dataspaceGroup = new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
             dataspaceGroup.setFont(curFont);
-            dataspaceGroup.setText("Dataspace");
+            I18n.bind(dataspaceGroup, "dialog.dataspace");
             dataspaceGroup.setLayout(new GridLayout(3, true));
             dataspaceGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
             Label label = new Label(dataspaceGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("No. of dimensions");
+            I18n.bind(label, "dialog.noDimensions");
 
             label = new Label(dataspaceGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Current size");
+            I18n.bind(label, "dialog.currentSize");
 
             // Dummy label
             label = new Label(dataspaceGroup, SWT.LEFT);
@@ -271,7 +271,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
             Button setMaxSizeButton = new Button(dataspaceGroup, SWT.PUSH);
             setMaxSizeButton.setFont(curFont);
-            setMaxSizeButton.setText("Set Max Size");
+            I18n.bind(setMaxSizeButton, "dialog.setMaxSize");
             setMaxSizeButton.setLayoutData(new GridData(SWT.END, SWT.FILL, false, false));
             setMaxSizeButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -280,12 +280,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
                     if (maxSize == null || maxSize.length() < 1)
                         maxSize = currentSizeField.getText();
 
-                    String msg = new InputDialog(shell, "Set Max Size",
-                                                 "Enter max dimension sizes. \n"
-                                                     + "Use \"unlimited\" for unlimited dimension size.\n\n"
-                                                     + "For example,\n"
-                                                     + "    200 x 100\n"
-                                                     + "    100 x unlimited\n\n",
+                    String msg = new InputDialog(shell, I18n.text("dialog.setMaxSize"),
+                                                 I18n.text("dialog.maxSizeInstructions"),
                                                  maxSize)
                                      .open();
 
@@ -302,17 +298,17 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             org.eclipse.swt.widgets.Group storagePropertiesGroup =
                 new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
             storagePropertiesGroup.setFont(curFont);
-            storagePropertiesGroup.setText("Storage Properties");
+            I18n.bind(storagePropertiesGroup, "dialog.storageProperties");
             storagePropertiesGroup.setLayout(new GridLayout(5, true));
             storagePropertiesGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
             label = new Label(storagePropertiesGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Storage layout: ");
+            I18n.bind(label, "label.storageLayout");
 
             checkContiguous = new Button(storagePropertiesGroup, SWT.RADIO);
             checkContiguous.setFont(curFont);
-            checkContiguous.setText("Contiguous");
+            I18n.bind(checkContiguous, "common.contiguous");
             checkContiguous.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
             checkContiguous.setSelection(true);
             checkContiguous.addSelectionListener(new SelectionAdapter() {
@@ -331,7 +327,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
             checkChunked = new Button(storagePropertiesGroup, SWT.RADIO);
             checkChunked.setFont(curFont);
-            checkChunked.setText("Chunked (size) ");
+            I18n.bind(checkChunked, "dialog.chunked");
             checkChunked.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
             checkChunked.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -359,11 +355,11 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
             label = new Label(storagePropertiesGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Compression: ");
+            I18n.bind(label, "label.compression");
 
             checkCompression = new Button(storagePropertiesGroup, SWT.CHECK);
             checkCompression.setFont(curFont);
-            checkCompression.setText("gzip (level) ");
+            I18n.bind(checkCompression, "dialog.gzipLevel");
             checkCompression.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
             checkCompression.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -420,7 +416,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             if (isH5) {
                 checkFillValue = new Button(storagePropertiesGroup, SWT.CHECK);
                 checkFillValue.setFont(curFont);
-                checkFillValue.setText("Fill Value");
+                I18n.bind(checkFillValue, "dialog.fillValue");
                 checkFillValue.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
                 checkFillValue.setSelection(false);
                 checkFillValue.addSelectionListener(new SelectionAdapter() {
@@ -498,7 +494,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         if (dataView == null) {
             Button helpButton = new Button(buttonComposite, SWT.PUSH);
             helpButton.setFont(curFont);
-            helpButton.setText(" &Help ");
+            I18n.bind(helpButton, "button.help");
             helpButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             helpButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -546,7 +542,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
         if (stMax.countTokens() != stDim.countTokens()) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Check", "Wrong number of values in the max dimension size " + maxSize);
+            Tools.showError(shell, I18n.text("action.check"), I18n.text("message.maxDimensionCount", maxSize));
             maxSize = null;
             return;
         }
@@ -569,7 +565,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
                 }
                 catch (NumberFormatException ex) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Check", "Invalid max dimension size: " + maxSize);
+                    Tools.showError(shell, I18n.text("action.check"),
+                                    I18n.text("message.maxDimensionInvalid", maxSize));
                     maxSize = null;
                     return;
                 }
@@ -581,13 +578,15 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             }
             catch (NumberFormatException ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Check", "Invalid dimension size: " + dimStr);
+                Tools.showError(shell, I18n.text("action.check"),
+                                I18n.text("message.invalidDimension", dimStr));
                 return;
             }
 
             if (max != -1 && max < dim) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Check", "Invalid max dimension size: " + maxSize);
+                Tools.showError(shell, I18n.text("action.check"),
+                                I18n.text("message.maxDimensionInvalid", maxSize));
                 maxSize = null;
                 return;
             }
@@ -601,7 +600,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         if (isH5) {
             if (isChunkNeeded && !checkChunked.getSelection()) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Check", "Chunking is required for the max dimensions of " + maxSize);
+                Tools.showError(shell, I18n.text("action.check"),
+                                I18n.text("message.chunkRequired", maxSize));
                 checkChunked.setSelection(true);
             }
         }
@@ -610,7 +610,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
                 if (maxdims[i] <= 0) {
                     maxSize = currentSizeField.getText();
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Check", "Only dim[0] can be unlimited." + maxSize);
+                    Tools.showError(shell, I18n.text("action.check"),
+                                    I18n.text("message.onlyFirstUnlimited", maxSize));
                     return;
                 }
             }
@@ -630,13 +631,15 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         name = nameField.getText().trim();
         if ((name == null) || (name.length() < 1)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Dataset name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.dataset")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Dataset name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.dataset")));
             return null;
         }
 
@@ -644,7 +647,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Parent group is null.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentNull"));
             return null;
         }
 
@@ -652,8 +655,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         StringTokenizer st = new StringTokenizer(currentSizeField.getText(), "x");
         if (st.countTokens() < rank) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create",
-                            "Number of values in the current dimension size is less than " + rank);
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.currentDimensionCount", rank));
             return null;
         }
 
@@ -667,13 +670,15 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             }
             catch (NumberFormatException ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Invalid dimension size: " + currentSizeField.getText());
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.invalidDimension", currentSizeField.getText()));
                 return null;
             }
 
             if (l <= 0) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Dimension size must be greater than zero.");
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.dimensionPositive"));
                 return null;
             }
 
@@ -685,8 +690,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             st = new StringTokenizer(maxSizeStr, "x");
             if (st.countTokens() < rank) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create",
-                                "Number of values in the max dimension size is less than " + rank);
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.maxDimensionCount", rank));
                 return null;
             }
 
@@ -704,14 +709,16 @@ public class NewDatasetDialog extends NewDataObjectDialog {
                     }
                     catch (NumberFormatException ex) {
                         shell.getDisplay().beep();
-                        Tools.showError(shell, "Create", "Invalid max dimension size: " + maxSize);
+                        Tools.showError(shell, I18n.text("action.create"),
+                                        I18n.text("message.maxDimensionInvalid", maxSize));
                         return null;
                     }
                 }
 
                 if (l < -1) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Create", "Dimension size cannot be less than -1.");
+                    Tools.showError(shell, I18n.text("action.create"),
+                                    I18n.text("message.maxDimensionLess"));
                     return null;
                 }
                 else if (l == 0) {
@@ -727,7 +734,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             st = new StringTokenizer(chunkSizeField.getText(), "x");
             if (st.countTokens() < rank) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Number of values in the chunk size is less than " + rank);
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.chunkCount", rank));
                 return null;
             }
 
@@ -740,14 +747,14 @@ public class NewDatasetDialog extends NewDataObjectDialog {
                 }
                 catch (NumberFormatException ex) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Create",
-                                    "Invalid chunk dimension size: " + chunkSizeField.getText());
+                    Tools.showError(shell, I18n.text("action.create"),
+                                    I18n.text("message.chunkInvalid", chunkSizeField.getText()));
                     return null;
                 }
 
                 if (l < 1) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Create", "Chunk size cannot be less than 1.");
+                    Tools.showError(shell, I18n.text("action.create"), I18n.text("message.chunkPositive"));
                     return null;
                 }
 
@@ -763,10 +770,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
             if (tchunksize >= tdimsize) {
                 shell.getDisplay().beep();
-                if (!Tools.showConfirm(shell, "Create",
-                                       "Chunk size is equal/greater than the current size. "
-                                           + "\nAre you sure you want to set chunk size to " +
-                                           chunkSizeField.getText() + "?")) {
+                if (!Tools.showConfirm(shell, I18n.text("action.create"),
+                                       I18n.text("message.chunkTooLargeConfirm", chunkSizeField.getText()))) {
                     return null;
                 }
             }
@@ -774,10 +779,8 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             if (tchunksize == 1) {
                 shell.getDisplay().beep();
                 if (!Tools.showConfirm(
-                        shell, "Create",
-                        "Chunk size is one, which may cause large memory overhead for large dataset."
-                            + "\nAre you sure you want to set chunk size to " + chunkSizeField.getText() +
-                            "?")) {
+                        shell, I18n.text("action.create"),
+                        I18n.text("message.chunkOneConfirm", chunkSizeField.getText()))) {
                     return null;
                 }
             }
@@ -806,7 +809,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 
@@ -823,20 +826,22 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         name = nameField.getText();
         if (name == null || name.length() == 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Dataset name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.dataset")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Dataset name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.dataset")));
             return null;
         }
 
         pgroup = groupList.get(parentChoice.getSelectionIndex());
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Parent group is null.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentNull"));
             return null;
         }
 
@@ -862,7 +867,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 
@@ -878,20 +883,22 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         name = nameField.getText();
         if (name == null || name.length() == 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Dataset name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.dataset")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Dataset name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.dataset")));
             return null;
         }
 
         pgroup = groupList.get(parentChoice.getSelectionIndex());
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Parent group is null.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentNull"));
             return null;
         }
 
@@ -944,7 +951,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 
@@ -953,67 +960,6 @@ public class NewDatasetDialog extends NewDataObjectDialog {
 
     private class HelpDialog extends Dialog {
         private Shell helpShell;
-
-        private static final String HELP_INFORMATION = """
-                How to Create a New Dataset
-
-                The following instructions explain how to create a new dataset.
-                This dialog allows the creation of a dataset (an HDF4 SDS or an
-                HDF5 dataset). The dataset can be a 1 to 32 dimension array of
-                numbers, characters, or strings.
-
-                To create a dataset, it is necessary to define its name, parent
-                group, datatype, and dataspace (i.e., the dimensions).
-                Optionally, the storage properties can be specified.
-
-                The dataset will be created and filled with zeros. Data can be
-                added with the hdfedit tool, or by a program.
-
-                1) Dataset name and path
-                The name of the new dataset must follow the HDF5 name rules
-                (similar to the Unix name rules). The name may contain almost
-                any characters, but it must not contain the path separator, '/'.
-
-                The dataset must be a member of some Group. The 'Parent group'
-                selection lists all the Groups in the file.
-
-                2) Datatype
-                The datatype specifies the type of the data elements of the
-                array. This Java-based tool supports the datatypes: integer,
-                float, character, string, reference, enum, variable-length
-                integer, variable-length float, and variable-length string.
-
-                The size specifies the size of a single data point in bits, such
-                as 32-bit integer or 64-bit float. The size of a float is either
-                32-bit or 64-bit.
-
-                For HDF5, there are three byte order choices: NATIVE, LITTLE
-                ENDIAN and BIG ENDIAN. "NATIVE" byte order means that the byte
-                order is determined by the machine. The byte order cannot be
-                specified for HDF4.
-
-                3) Dataspace
-                The dataspace specifies the number of dimensions (rank), current
-                dimension size and maximum dimension size. The dimension size is
-                separated by "x". For example, a 3D dataset might show the
-                dimensions as: 20 x 30 x 5.
-
-                The current size must be greater than zero, and the maximum size
-                must be at least as large as the current size. A maximum size of
-                zero means the maximum size will be set to the current size.
-                Setting the maximum size to -1 will make the dimension
-                "unlimited".
-
-                4) Storage layout and data compression
-                There are two options for storage layout: contiguous or chunked.
-                The default storage layout is contiguous. If chunked layout is
-                selected, the chunk size must be specified.
-
-                The dataset may be compressed with GZIP. The compression level
-                ranges from zero (no compression) to 9 (highest compression). In
-                HDF5, if compression is selected then the dataset must be
-                chunked.
-                """;
 
         HelpDialog(Shell parent)
         {
@@ -1026,7 +972,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             helpShell =
                 new Shell(parent, SWT.TITLE | SWT.CLOSE | SWT.RESIZE | SWT.BORDER | SWT.APPLICATION_MODAL);
             helpShell.setFont(curFont);
-            helpShell.setText("Create New Dataset");
+            I18n.bind(helpShell, "dialog.createNewDataset.title");
             helpShell.setImages(ViewProperties.getHdfIcons());
             helpShell.setLayout(new GridLayout(1, true));
 
@@ -1034,7 +980,7 @@ public class NewDatasetDialog extends NewDataObjectDialog {
             StyledText helpText =
                 new StyledText(helpShell, SWT.MULTI | SWT.READ_ONLY | SWT.WRAP | SWT.V_SCROLL | SWT.BORDER);
             helpText.setFont(curFont);
-            helpText.setText(HELP_INFORMATION);
+            I18n.bind(helpText, "dialog.help.newDataset.text");
             helpText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
             Button okButton = new Button(helpShell, SWT.PUSH);

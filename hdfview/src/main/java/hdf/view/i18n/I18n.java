@@ -15,22 +15,34 @@
 package hdf.view.i18n;
 
 import java.text.MessageFormat;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.function.Supplier;
 
 import hdf.view.ViewProperties;
 
+import org.eclipse.swt.custom.CCombo;
+import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.List;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swt.widgets.ToolItem;
@@ -61,6 +73,42 @@ public final class I18n {
     /** Widget data key containing optional tooltip MessageFormat arguments. */
     private static final String TOOLTIP_ARGS = I18n.class.getName() + ".tooltip.args";
 
+    /** Widget data key containing a Text placeholder resource key. */
+    private static final String MESSAGE_KEY = I18n.class.getName() + ".message";
+
+    /** Widget data key containing resource keys for Combo/List items. */
+    private static final String ITEM_KEYS = I18n.class.getName() + ".itemKeys";
+
+    /** Widget data key containing optional MessageFormat arguments for Combo/List items. */
+    private static final String ITEM_ARGS = I18n.class.getName() + ".itemArgs";
+
+    /** Widget data key containing a raw datatype description. */
+    private static final String DATATYPE_DESCRIPTION = I18n.class.getName() + ".datatypeDescription";
+
+    /** Widget data key containing raw datatype descriptions for table cells. */
+    private static final String DATATYPE_DESCRIPTION_CELLS = I18n.class.getName() + ".datatypeDescriptionCells";
+
+    /** Widget data key containing a language-sensitive dynamic text supplier. */
+    private static final String DYNAMIC_TEXT = I18n.class.getName() + ".dynamicText";
+
+    /** Widget data key containing resource-backed values for table cells. */
+    private static final String TABLE_CELL_BINDINGS = I18n.class.getName() + ".tableCellBindings";
+
+    private static final Pattern BIT_INTEGER_PATTERN =
+        Pattern.compile("^(\\d+)-bit (unsigned )?integer$");
+    private static final Pattern NATIVE_INTEGER_PATTERN =
+        Pattern.compile("^native (unsigned )?integer$");
+    private static final Pattern BIT_FLOAT_PATTERN = Pattern.compile("^(\\d+)-bit floating-point$");
+    private static final Pattern BIT_CHARACTER_PATTERN =
+        Pattern.compile("^(\\d+)-bit (unsigned )?character$");
+    private static final Pattern BITFIELD_PATTERN = Pattern.compile("^(\\d+)-bit bitfield$");
+    private static final Pattern OPAQUE_BYTE_PATTERN = Pattern.compile("^(\\d+)-byte [Oo]paque$");
+    private static final Pattern OPAQUE_BIT_PATTERN = Pattern.compile("^(\\d+)-bit [Oo]paque$");
+    private static final Pattern BIT_ENUM_PATTERN = Pattern.compile("^(\\d+)-bit enum$");
+    private static final Pattern ARRAY_PATTERN = Pattern.compile("^Array(?: (\\[[^]]*\\]))?(?: of (.*))?$");
+    private static final Pattern VLEN_PATTERN = Pattern.compile("^Variable-length(?: of (.*))?$");
+    private static final Pattern COMPLEX_PATTERN = Pattern.compile("^(?:native )?Complex(?: of (.*))?$");
+
     /** Do not let the host JVM's default locale replace the requested UI language. */
     private static final ResourceBundle.Control NO_DEFAULT_LOCALE_CONTROL =
         new ResourceBundle.Control() {
@@ -72,6 +120,17 @@ public final class I18n {
         };
 
     private static final Object[] NO_ARGS = new Object[0];
+
+    private static final class CellBinding {
+        private final String key;
+        private final Object[] args;
+
+        private CellBinding(String key, Object[] args)
+        {
+            this.key  = key;
+            this.args = args;
+        }
+    }
 
     private static Language currentLanguage = Language.ENGLISH;
     private static ResourceBundle bundle = loadBundle(currentLanguage);
@@ -214,6 +273,290 @@ public final class I18n {
     }
 
     /**
+     * Bind a Text placeholder to a resource key without replacing the current
+     * editable value.
+     *
+     * @param widget the SWT Text control
+     * @param key the placeholder resource key
+     */
+    public static void bindMessage(Text widget, String key)
+    {
+        if (widget == null || widget.isDisposed())
+            return;
+
+        widget.setData(MESSAGE_KEY, key);
+        apply(widget);
+    }
+
+    /**
+     * Bind a read-only text or label whose value contains localized fragments
+     * and runtime data. The supplier is evaluated again during every language
+     * refresh, so values such as "Unlimited" do not remain in the old
+     * language after a switch.
+     *
+     * @param widget the Text, Label, or Shell control
+     * @param supplier supplies the complete display value
+     */
+    public static void bindDynamic(Widget widget, Supplier<String> supplier)
+    {
+        if (widget == null || widget.isDisposed() || supplier == null)
+            return;
+
+        widget.setData(DYNAMIC_TEXT, supplier);
+        apply(widget);
+    }
+
+    /**
+     * Bind a dynamically supplied datatype description. The raw description is
+     * retained so an already-open metadata control can be translated again
+     * after a runtime language switch.
+     *
+     * @param widget the read-only Text control
+     * @param description the description supplied by the HDF object library
+     */
+    public static void bindDatatypeDescription(Text widget, String description)
+    {
+        if (widget == null || widget.isDisposed())
+            return;
+
+        widget.setData(DATATYPE_DESCRIPTION, description);
+        apply(widget);
+    }
+
+    /**
+     * Bind one table cell containing a datatype description. Table rows are
+     * not SWT composites, so their raw values are kept explicitly for refresh.
+     *
+     * @param widget the table item
+     * @param column the zero-based table column
+     * @param description the description supplied by the HDF object library
+     */
+    public static void bindDatatypeDescription(TableItem widget, int column, String description)
+    {
+        if (widget == null || widget.isDisposed() || column < 0)
+            return;
+
+        @SuppressWarnings("unchecked")
+        Map<Integer, String> descriptions = (Map<Integer, String>)widget.getData(DATATYPE_DESCRIPTION_CELLS);
+        if (descriptions == null) {
+            descriptions = new HashMap<>();
+            widget.setData(DATATYPE_DESCRIPTION_CELLS, descriptions);
+        }
+        descriptions.put(column, description);
+        apply(widget);
+    }
+
+    /**
+     * Bind a resource-backed value in a table cell so it follows language
+     * changes without rebuilding the table.
+     *
+     * @param widget the table item
+     * @param column the zero-based table column
+     * @param key the resource key
+     * @param args optional MessageFormat arguments
+     */
+    public static void bindTableCell(TableItem widget, int column, String key, Object... args)
+    {
+        if (widget == null || widget.isDisposed() || column < 0 || key == null)
+            return;
+
+        @SuppressWarnings("unchecked")
+        Map<Integer, CellBinding> bindings = (Map<Integer, CellBinding>)widget.getData(TABLE_CELL_BINDINGS);
+        if (bindings == null) {
+            bindings = new HashMap<>();
+            widget.setData(TABLE_CELL_BINDINGS, bindings);
+        }
+        bindings.put(column, new CellBinding(key, args == null ? NO_ARGS : args.clone()));
+        apply(widget);
+    }
+
+    /**
+     * Translate the short datatype descriptions produced by the HDF object
+     * library. English remains byte-for-byte unchanged; Chinese uses a
+     * resource-backed Chinese description followed by the original technical
+     * wording so it remains searchable in HDF documentation.
+     *
+     * @param description an object-library datatype description
+     * @return the description in the current UI language
+     */
+    public static synchronized String datatypeDescription(String description)
+    {
+        if (description == null || description.length() == 0)
+            return text("common.unknown");
+        if (currentLanguage == Language.ENGLISH)
+            return description;
+
+        String value = description.trim();
+        String core = value;
+        String namedPath = null;
+        int namedSeparator = value.indexOf("->");
+        if (namedSeparator >= 0) {
+            core      = value.substring(0, namedSeparator).trim();
+            namedPath = value.substring(namedSeparator + 2).trim();
+        }
+
+        String localized = localizeDatatypeCore(core);
+        if (localized == null)
+            localized = text("datatype.description.technical", value);
+        else if (namedPath != null && namedPath.length() > 0)
+            localized += text("datatype.description.named", namedPath);
+
+        return text("datatype.description.bilingual", localized, value);
+    }
+
+    /** Return the Chinese core of a known object-library description. */
+    private static String localizeDatatypeCore(String description)
+    {
+        Matcher matcher = BIT_INTEGER_PATTERN.matcher(description);
+        if (matcher.matches()) {
+            String key = matcher.group(2) == null
+                ? "datatype.description.bitInteger"
+                : "datatype.description.bitUnsignedInteger";
+            return text(key, matcher.group(1));
+        }
+
+        matcher = NATIVE_INTEGER_PATTERN.matcher(description);
+        if (matcher.matches()) {
+            return text(matcher.group(1) == null
+                            ? "datatype.description.nativeInteger"
+                            : "datatype.description.nativeUnsignedInteger");
+        }
+
+        matcher = BIT_FLOAT_PATTERN.matcher(description);
+        if (matcher.matches())
+            return text("datatype.description.bitFloat", matcher.group(1));
+        if ("native floating-point".equals(description))
+            return text("datatype.description.nativeFloat");
+
+        matcher = BIT_CHARACTER_PATTERN.matcher(description);
+        if (matcher.matches()) {
+            String key = matcher.group(2) == null
+                ? "datatype.description.bitCharacter"
+                : "datatype.description.bitUnsignedCharacter";
+            return text(key, matcher.group(1));
+        }
+
+        if (description.startsWith("String, length = ")) {
+            String length = description.substring("String, length = ".length());
+            int comma = length.indexOf(",");
+            if (comma >= 0)
+                length = length.substring(0, comma).trim();
+            if ("variable".equalsIgnoreCase(length))
+                length = text("datatype.description.variable");
+            return text("datatype.description.string", length);
+        }
+        if ("String".equals(description))
+            return text("datatype.description.stringType");
+
+        if ("native bitfield".equals(description))
+            return text("datatype.description.nativeBitfield");
+        matcher = BITFIELD_PATTERN.matcher(description);
+        if (matcher.matches())
+            return text("datatype.description.bitBitfield", matcher.group(1));
+
+        if ("native Opaque".equals(description) || "native opaque".equals(description))
+            return text("datatype.description.nativeOpaque");
+        matcher = OPAQUE_BYTE_PATTERN.matcher(description);
+        if (matcher.matches())
+            return text("datatype.description.byteOpaque", matcher.group(1));
+        matcher = OPAQUE_BIT_PATTERN.matcher(description);
+        if (matcher.matches())
+            return text("datatype.description.bitOpaque", matcher.group(1));
+
+        if ("Reference".equals(description))
+            return text("datatype.description.reference");
+        if ("Dataset region reference".equals(description))
+            return text("datatype.description.datasetRegionReference");
+        if ("Object reference".equals(description))
+            return text("datatype.description.objectReference");
+
+        if ("native enum".equals(description))
+            return text("datatype.description.nativeEnum");
+        matcher = BIT_ENUM_PATTERN.matcher(description);
+        if (matcher.matches())
+            return text("datatype.description.bitEnum", matcher.group(1));
+
+        matcher = VLEN_PATTERN.matcher(description);
+        if (matcher.matches()) {
+            String localized = text("datatype.description.variableLength");
+            if (matcher.group(1) != null)
+                localized += text("datatype.description.of", localizeNestedDatatype(matcher.group(1)));
+            return localized;
+        }
+
+        matcher = ARRAY_PATTERN.matcher(description);
+        if (matcher.matches()) {
+            String localized = text("datatype.description.array", matcher.group(1) == null ? "" : matcher.group(1));
+            if (matcher.group(2) != null)
+                localized += text("datatype.description.of", localizeNestedDatatype(matcher.group(2)));
+            return localized;
+        }
+
+        matcher = COMPLEX_PATTERN.matcher(description);
+        if (matcher.matches()) {
+            String localized = text("datatype.description.complex");
+            if (matcher.group(1) != null)
+                localized += text("datatype.description.of", localizeNestedDatatype(matcher.group(1)));
+            return localized;
+        }
+
+        if (description.startsWith("Compound"))
+            return text("datatype.description.compound");
+        if ("Unknown".equals(description) || "Unknown data type.".equals(description))
+            return text("datatype.description.unknown");
+
+        return null;
+    }
+
+    /** Nested descriptions do not repeat the complete English parenthesis. */
+    private static String localizeNestedDatatype(String description)
+    {
+        String localized = localizeDatatypeCore(description.trim());
+        return localized == null ? description : localized;
+    }
+
+    /**
+     * Bind the items of a Combo, CCombo, or List to resource keys.
+     *
+     * <p>The selected index is preserved when a language refresh replaces the
+     * visible item labels. Callers must use the selected index or another stable
+     * model value for behavior; translated labels are presentation only.</p>
+     *
+     * @param widget the SWT item-list widget
+     * @param keys resource keys in item order
+     */
+    public static void bindItems(Widget widget, String... keys)
+    {
+        bindItems(widget, keys, null);
+    }
+
+    /**
+     * Bind Combo/List items to resource keys with per-item arguments. A null key
+     * deliberately keeps a provider- or data-supplied item unchanged.
+     *
+     * @param widget the Combo, CCombo, or List
+     * @param keys resource keys in item order
+     * @param args optional MessageFormat arguments in item order
+     */
+    public static void bindItems(Widget widget, String[] keys, Object[][] args)
+    {
+        if (widget == null || widget.isDisposed())
+            return;
+
+        widget.setData(ITEM_KEYS, keys == null ? new String[0] : keys.clone());
+        if (args == null) {
+            widget.setData(ITEM_ARGS, null);
+        }
+        else {
+            Object[][] copy = new Object[args.length][];
+            for (int i = 0; i < args.length; i++)
+                copy[i] = args[i] == null ? NO_ARGS : args[i].clone();
+            widget.setData(ITEM_ARGS, copy);
+        }
+        apply(widget);
+    }
+
+    /**
      * Return the stable resource key attached to a widget.
      *
      * @param widget an SWT widget
@@ -264,6 +607,13 @@ public final class I18n {
 
         if (widget instanceof ToolBar) {
             for (ToolItem item : ((ToolBar)widget).getItems())
+                refresh(item);
+        }
+
+        if (widget instanceof Table) {
+            for (TableColumn column : ((Table)widget).getColumns())
+                refresh(column);
+            for (TableItem item : ((Table)widget).getItems())
                 refresh(item);
         }
 
@@ -321,11 +671,101 @@ public final class I18n {
                 ((Shell)widget).setText(value);
             else if (widget instanceof Text)
                 ((Text)widget).setText(value);
+            else if (widget instanceof StyledText)
+                ((StyledText)widget).setText(value);
+            else if (widget instanceof TableColumn)
+                ((TableColumn)widget).setText(value);
         }
 
+        Object rawDatatypeDescription = widget.getData(DATATYPE_DESCRIPTION);
+        if (rawDatatypeDescription instanceof String && widget instanceof Text)
+            ((Text)widget).setText(datatypeDescription((String)rawDatatypeDescription));
+
+        Object dynamicText = widget.getData(DYNAMIC_TEXT);
+        if (dynamicText instanceof Supplier &&
+            (widget instanceof Text || widget instanceof Label || widget instanceof Shell)) {
+            try {
+                String value = ((Supplier<?>)dynamicText).get().toString();
+                if (widget instanceof Text)
+                    ((Text)widget).setText(value);
+                else if (widget instanceof Label)
+                    ((Label)widget).setText(value);
+                else
+                    ((Shell)widget).setText(value);
+            }
+            catch (RuntimeException ex) {
+                // Leave a runtime data value untouched when its provider fails.
+            }
+        }
+
+        Object rawDatatypeCells = widget.getData(DATATYPE_DESCRIPTION_CELLS);
+        if (rawDatatypeCells instanceof Map && widget instanceof TableItem) {
+            @SuppressWarnings("unchecked")
+            Map<Integer, String> descriptions = (Map<Integer, String>)rawDatatypeCells;
+            for (Map.Entry<Integer, String> entry : descriptions.entrySet())
+                ((TableItem)widget).setText(entry.getKey(), datatypeDescription(entry.getValue()));
+        }
+
+        Object rawCellBindings = widget.getData(TABLE_CELL_BINDINGS);
+        if (rawCellBindings instanceof Map && widget instanceof TableItem) {
+            @SuppressWarnings("unchecked")
+            Map<Integer, CellBinding> bindings = (Map<Integer, CellBinding>)rawCellBindings;
+            for (Map.Entry<Integer, CellBinding> entry : bindings.entrySet()) {
+                CellBinding binding = entry.getValue();
+                ((TableItem)widget).setText(entry.getKey(), text(binding.key, binding.args));
+            }
+        }
+
+        String messageKey = getDataString(widget, MESSAGE_KEY);
+        if (messageKey != null && widget instanceof Text)
+            ((Text)widget).setMessage(text(messageKey));
+
         String tooltipKey = getDataString(widget, TOOLTIP_KEY);
-        if (tooltipKey != null && widget instanceof ToolItem)
-            ((ToolItem)widget).setToolTipText(text(tooltipKey, getDataArgs(widget, TOOLTIP_ARGS)));
+        if (tooltipKey != null) {
+            String tooltip = text(tooltipKey, getDataArgs(widget, TOOLTIP_ARGS));
+            if (widget instanceof ToolItem)
+                ((ToolItem)widget).setToolTipText(tooltip);
+            else if (widget instanceof Control)
+                ((Control)widget).setToolTipText(tooltip);
+        }
+
+        String[] itemKeys = getDataStringArray(widget, ITEM_KEYS);
+        if (itemKeys != null) {
+            Object[][] itemArgs = getDataObjectArray(widget, ITEM_ARGS);
+            String[] values = new String[itemKeys.length];
+            for (int i = 0; i < itemKeys.length; i++) {
+                if (itemKeys[i] == null)
+                    values[i] = getExistingItem(widget, i);
+                else {
+                    Object[] args = itemArgs != null && i < itemArgs.length && itemArgs[i] != null
+                        ? itemArgs[i]
+                        : NO_ARGS;
+                    values[i] = text(itemKeys[i], args);
+                }
+            }
+
+            if (widget instanceof Combo) {
+                Combo combo = (Combo)widget;
+                int selection = combo.getSelectionIndex();
+                combo.setItems(values);
+                if (selection >= 0 && selection < values.length)
+                    combo.select(selection);
+            }
+            else if (widget instanceof CCombo) {
+                CCombo combo = (CCombo)widget;
+                int selection = combo.getSelectionIndex();
+                combo.setItems(values);
+                if (selection >= 0 && selection < values.length)
+                    combo.select(selection);
+            }
+            else if (widget instanceof List) {
+                List list = (List)widget;
+                int[] selection = list.getSelectionIndices();
+                list.setItems(values);
+                if (selection.length > 0)
+                    list.select(selection);
+            }
+        }
     }
 
     private static String getDataString(Widget widget, String key)
@@ -338,6 +778,36 @@ public final class I18n {
     {
         Object value = widget.getData(key);
         return value instanceof Object[] ? (Object[])value : NO_ARGS;
+    }
+
+    private static String[] getDataStringArray(Widget widget, String key)
+    {
+        Object value = widget.getData(key);
+        return value instanceof String[] ? (String[])value : null;
+    }
+
+    private static Object[][] getDataObjectArray(Widget widget, String key)
+    {
+        Object value = widget.getData(key);
+        return value instanceof Object[][] ? (Object[][])value : null;
+    }
+
+    /** Keep provider- or data-supplied item labels unchanged in a mixed list. */
+    private static String getExistingItem(Widget widget, int index)
+    {
+        if (widget instanceof Combo) {
+            String[] items = ((Combo)widget).getItems();
+            return index < items.length ? items[index] : "";
+        }
+        if (widget instanceof CCombo) {
+            String[] items = ((CCombo)widget).getItems();
+            return index < items.length ? items[index] : "";
+        }
+        if (widget instanceof List) {
+            String[] items = ((List)widget).getItems();
+            return index < items.length ? items[index] : "";
+        }
+        return "";
     }
 
     private static ResourceBundle loadBundle(Language language)

@@ -16,9 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
-import org.eclipse.swtbot.swt.finder.matchers.WithRegex;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTabItem;
@@ -87,8 +85,7 @@ public class TestHDFViewRefs extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -132,19 +129,19 @@ public class TestHDFViewRefs extends AbstractWindowTest {
             checkFileTree(filetree, "openTDataRegionReference()", 3, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(val.equals(datasetName),
                        constructWrongValueMessage("openTDataRegionReference()", "wrong name", datasetName,
                                                   val)); // Test dataset name
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 0).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 0).getText();
             assertTrue(val.equals("1"), constructWrongValueMessage("openTDataRegionReference()", "wrong rank",
                                                                    "1", val)); // Test rank
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 3).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 3).getText();
             assertTrue(val.equals("Dataset region reference"),
                        constructWrongValueMessage("openTDataRegionReference()", "wrong data type",
                                                   "Dataset region reference", val)); // Test data type
@@ -180,14 +177,12 @@ public class TestHDFViewRefs extends AbstractWindowTest {
         }
         finally {
             if (tableShellData != null && tableShellData.isOpen()) {
-                tableShellData.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShellData));
+                closeDataObject(tableShellData);
             }
             if (tableShell != null && tableShell.isOpen()) {
                 tableShell.activate();
                 bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -220,19 +215,19 @@ public class TestHDFViewRefs extends AbstractWindowTest {
             checkFileTree(filetree, "openTAttributeReference()", 3, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(val.equals(datasetName),
                        constructWrongValueMessage("openTAttributeReference()", "wrong name", datasetName,
                                                   val)); // Test dataset name
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 0).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 0).getText();
             assertTrue(val.equals("1"), constructWrongValueMessage("openTAttributeReference()", "wrong rank",
                                                                    "1", val)); // Test rank
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 3).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 3).getText();
             assertTrue(val.equals("Reference"),
                        constructWrongValueMessage("openTAttributeReference()", "wrong data type", "Reference",
                                                   val)); // Test data type
@@ -248,21 +243,12 @@ public class TestHDFViewRefs extends AbstractWindowTest {
 
             // Open attribute 'Attr1' Table
             dataTable.doubleclick(1, 1);
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(attributeName + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
-                tableAttrShell = bot.shells()[1];
-                tableAttrShell.activate();
-                bot.waitUntil(Conditions.shellIsActive(tableAttrShell.getText()));
+                tableAttrShell = openStandaloneDataObject(attributeName);
 
                 SWTBotNatTable attributeTable = getNatTable(tableAttrShell);
 
@@ -281,8 +267,7 @@ public class TestHDFViewRefs extends AbstractWindowTest {
             }
             finally {
                 if (tableAttrShell != null && tableAttrShell.isOpen()) {
-                    tableAttrShell.bot().menu().menu("Table").menu("Close").click();
-                    bot.waitUntil(Conditions.shellCloses(tableAttrShell));
+                    closeDataObject(tableAttrShell);
                 }
             }
         }
@@ -296,8 +281,7 @@ public class TestHDFViewRefs extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -330,19 +314,19 @@ public class TestHDFViewRefs extends AbstractWindowTest {
             checkFileTree(filetree, "openTObjectReference()", 3, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(val.equals(datasetName),
                        constructWrongValueMessage("openTObjectReference()", "wrong name", datasetName,
                                                   val)); // Test dataset name
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 0).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 0).getText();
             assertTrue(val.equals("1"), constructWrongValueMessage("openTObjectReference()", "wrong rank",
                                                                    "1", val)); // Test rank
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 3).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 3).getText();
             assertTrue(val.equals("Reference"),
                        constructWrongValueMessage("openTObjectReference()", "wrong data type", "Reference",
                                                   val)); // Test data type
@@ -358,20 +342,12 @@ public class TestHDFViewRefs extends AbstractWindowTest {
 
             // Open object 'Dataset1' Table
             dataTable.doubleclick(1, 1);
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(objectName + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
-                tableObjShell = bot.shells()[1];
-                tableObjShell.activate();
-                bot.waitUntil(Conditions.shellIsActive(tableObjShell.getText()));
+                tableObjShell = openStandaloneDataObject(objectName);
 
                 SWTBotNatTable objectTable = getNatTable(tableObjShell);
 
@@ -390,8 +366,7 @@ public class TestHDFViewRefs extends AbstractWindowTest {
             }
             finally {
                 if (tableObjShell != null && tableObjShell.isOpen()) {
-                    tableObjShell.bot().menu().menu("Table").menu("Close").click();
-                    bot.waitUntil(Conditions.shellCloses(tableObjShell));
+                    closeDataObject(tableObjShell);
                 }
             }
         }
@@ -405,8 +380,7 @@ public class TestHDFViewRefs extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {

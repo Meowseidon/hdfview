@@ -25,6 +25,7 @@ import hdf.object.h5.H5CompoundAttr;
 import hdf.object.h5.H5Datatype;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -131,7 +132,7 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Compound Attribute...");
+        I18n.bind(shell, "dialog.newCompoundAttribute.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, false));
 
@@ -144,7 +145,7 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
 
         Label attributeNameLabel = new Label(fieldComposite, SWT.LEFT);
         attributeNameLabel.setFont(curFont);
-        attributeNameLabel.setText("Attribute name: ");
+        I18n.bind(attributeNameLabel, "label.attributeName");
 
         nameField = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -153,17 +154,17 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
         // Create Dataspace region
         org.eclipse.swt.widgets.Group dataspaceGroup = new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
         dataspaceGroup.setFont(curFont);
-        dataspaceGroup.setText("Dataspace");
+        I18n.bind(dataspaceGroup, "dialog.dataspace");
         dataspaceGroup.setLayout(new GridLayout(3, true));
         dataspaceGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         Label label = new Label(dataspaceGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("No. of dimensions");
+        I18n.bind(label, "dialog.noDimensions");
 
         label = new Label(dataspaceGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Current size");
+        I18n.bind(label, "dialog.currentSize");
 
         // Dummy label
         label = new Label(dataspaceGroup, SWT.LEFT);
@@ -206,11 +207,11 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
         propertiesGroup.setLayout(new GridLayout(2, false));
         propertiesGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
         propertiesGroup.setFont(curFont);
-        propertiesGroup.setText("Compound Datatype Properties");
+        I18n.bind(propertiesGroup, "dialog.compoundDatatypeProperties");
 
         label = new Label(propertiesGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Number of Members:");
+        I18n.bind(label, "dialog.numberMembers");
 
         nFieldBox = new Combo(propertiesGroup, SWT.DROP_DOWN);
         nFieldBox.setFont(curFont);
@@ -243,16 +244,14 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
 
         editors = new TableEditor[nFieldBox.getItemCount()][3];
 
-        String[] colNames = {"Name", "Datatype", "Array size / String length / Enum names"};
-
         TableColumn column = new TableColumn(table, SWT.NONE);
-        column.setText(colNames[0]);
+        I18n.bind(column, "meta.name");
 
         column = new TableColumn(table, SWT.NONE);
-        column.setText(colNames[1]);
+        I18n.bind(column, "meta.datatype");
 
         column = new TableColumn(table, SWT.NONE);
-        column.setText(colNames[2]);
+        I18n.bind(column, "dialog.memberSizeColumn");
 
         for (int i = 0; i < 2; i++) {
             TableEditor[] editor = addMemberTableItem(table);
@@ -305,7 +304,7 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
 
         Button okButton = new Button(buttonComposite, SWT.PUSH);
         okButton.setFont(curFont);
-        okButton.setText("   &OK   ");
+        I18n.bind(okButton, "button.ok");
         okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
         okButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -319,7 +318,7 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
 
         Button cancelButton = new Button(buttonComposite, SWT.PUSH);
         cancelButton.setFont(curFont);
-        cancelButton.setText(" &Cancel ");
+        I18n.bind(cancelButton, "button.cancel");
         cancelButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
         cancelButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -376,7 +375,8 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
 
         if ((attrName == null) || (attrName.length() < 1)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Attribute name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.attribute")));
             return false;
         }
 
@@ -392,7 +392,7 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
         for (int i = 0; i < n; i++) {
             String name = (String)table.getItem(i).getData("MemberName");
             if ((name == null) || (name.length() <= 0)) {
-                throw new IllegalArgumentException("Member name is empty");
+                throw new IllegalArgumentException(I18n.text("message.validation.memberNameEmpty"));
             }
             mNames[i] = name;
             log.trace("createCompoundAttribute member[{}] name = {}", i, mNames[i]);
@@ -458,7 +458,8 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
                         fileFormat.createDatatype(Datatype.CLASS_ENUM, 4, Datatype.NATIVE, Datatype.NATIVE);
                     if ((orderStr == null) || (orderStr.length() < 1) || orderStr.endsWith("...")) {
                         shell.getDisplay().beep();
-                        Tools.showError(shell, "Create", "Invalid member values: " + orderStr);
+                        Tools.showError(shell, I18n.text("action.create"),
+                                        I18n.text("message.invalidMemberValues", orderStr));
                         return false;
                     }
                     else {
@@ -478,12 +479,12 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
                         fileFormat.createDatatype(Datatype.CLASS_FLOAT, 16, Datatype.NATIVE, Datatype.NATIVE);
                 }
                 else {
-                    throw new IllegalArgumentException("Invalid data type.");
+                    throw new IllegalArgumentException(I18n.text("message.validation.dataTypeInvalid"));
                 }
                 mDatatypes[i] = type;
             }
             catch (Exception ex) {
-                Tools.showError(shell, "Create", ex.getMessage());
+                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                 log.debug("createAttribute(): ", ex);
                 return false;
             }
@@ -494,8 +495,8 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
         StringTokenizer st = new StringTokenizer(currentSizeField.getText(), "x");
         if (st.countTokens() < rank) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create",
-                            "Number of values in the current dimension size is less than " + rank);
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.currentDimensionCount", rank));
             return false;
         }
 
@@ -510,13 +511,15 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
             }
             catch (NumberFormatException ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Invalid dimension size: " + currentSizeField.getText());
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.invalidDimension", currentSizeField.getText()));
                 return false;
             }
 
             if (l <= 0) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Dimension size must be greater than zero.");
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.dimensionPositive"));
                 return false;
             }
 
@@ -537,7 +540,7 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
             attr.writeAttribute();
         }
         catch (Exception ex) {
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             log.debug("createAttribute(): ", ex);
             return false;
         }
@@ -621,7 +624,13 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
 
         final CCombo typeCombo = new CCombo(atable, SWT.DROP_DOWN | SWT.READ_ONLY);
         typeCombo.setFont(curFont);
-        typeCombo.setItems(DATATYPE_NAMES);
+        I18n.bindItems(typeCombo,
+                       "compoundDatatype.byte", "compoundDatatype.short", "compoundDatatype.int",
+                       "compoundDatatype.unsignedByte", "compoundDatatype.unsignedShort",
+                       "compoundDatatype.unsignedInt", "compoundDatatype.long", "compoundDatatype.float",
+                       "compoundDatatype.double", "compoundDatatype.string", "compoundDatatype.enum",
+                       "compoundDatatype.unsignedLong", "compoundDatatype.float16",
+                       "compoundDatatype.longDouble");
 
         editor[1].grabHorizontal      = true;
         editor[1].grabVertical        = true;
@@ -634,7 +643,8 @@ public class NewCompoundAttributeDialog extends NewDataObjectDialog {
             public void widgetSelected(SelectionEvent e)
             {
                 CCombo combo = (CCombo)e.widget;
-                item.setData("MemberType", combo.getItem(combo.getSelectionIndex()));
+                int selectionIndex = combo.getSelectionIndex();
+                item.setData("MemberType", selectionIndex >= 0 ? DATATYPE_NAMES[selectionIndex] : "");
             }
         });
 

@@ -81,7 +81,7 @@ public class TestHDFViewFloat16 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Data Display").menu("Show Scientific Notation").click();
+            tableShell.bot().menu().menu(ui("table.dataDisplay")).menu(ui("table.scientificNotation")).click();
             retriever.testAllTableLocations(expectedDataSci);
         }
         catch (Exception ex) {
@@ -175,11 +175,10 @@ public class TestHDFViewFloat16 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Data Display").menu("Show Scientific Notation").click();
+            tableShell.bot().menu().menu(ui("table.dataDisplay")).menu(ui("table.scientificNotation")).click();
             retriever.testAllTableLocations(expectedDataSci);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -259,7 +258,7 @@ public class TestHDFViewFloat16 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Data Display").menu("Show Scientific Notation").click();
+            tableShell.bot().menu().menu(ui("table.dataDisplay")).menu(ui("table.scientificNotation")).click();
             retriever.testAllTableLocations(expectedDataSci);
         }
         catch (Exception ex) {
@@ -353,11 +352,10 @@ public class TestHDFViewFloat16 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Data Display").menu("Show Scientific Notation").click();
+            tableShell.bot().menu().menu(ui("table.dataDisplay")).menu(ui("table.scientificNotation")).click();
             retriever.testAllTableLocations(expectedDataSci);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -437,7 +435,7 @@ public class TestHDFViewFloat16 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Data Display").menu("Show Scientific Notation").click();
+            tableShell.bot().menu().menu(ui("table.dataDisplay")).menu(ui("table.scientificNotation")).click();
             retriever.testAllTableLocations(expectedDataSci);
         }
         catch (Exception ex) {
@@ -516,7 +514,7 @@ public class TestHDFViewFloat16 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(expectedData);
 
-            tableShell.bot().menu().menu("Data Display").menu("Show Scientific Notation").click();
+            tableShell.bot().menu().menu(ui("table.dataDisplay")).menu(ui("table.scientificNotation")).click();
             retriever.testAllTableLocations(expectedDataSci);
         }
         catch (Exception ex) {

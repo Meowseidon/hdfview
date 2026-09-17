@@ -23,6 +23,7 @@ import hdf.object.HObject;
 import hdf.object.ScalarDS;
 import hdf.view.DataView.DataViewManager;
 import hdf.view.Tools;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +67,6 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
 
         super.addObjectSpecificContent();
 
-        String labelInfo;
         Label label;
         Text text;
 
@@ -78,101 +78,65 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
         org.eclipse.swt.widgets.Group datasetInfoGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
         datasetInfoGroup.setFont(curFont);
-        datasetInfoGroup.setText("Dataset Dataspace and Datatype");
+        I18n.bind(datasetInfoGroup, "meta.datasetDataspaceDatatype");
         datasetInfoGroup.setLayout(new GridLayout(2, false));
         datasetInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
 
         /* Dataset Rank section */
         label = new Label(datasetInfoGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("No. of Dimension(s): ");
+        I18n.bind(label, "label.noDimensions");
 
         text = new Text(datasetInfoGroup, SWT.SINGLE | SWT.BORDER);
         text.setEditable(false);
         text.setFont(curFont);
-        if (d.isNULL()) {
-            labelInfo = "NULL";
-        }
-        else if (d.isScalar()) {
-            labelInfo = "Scalar";
-        }
-        else {
-            labelInfo = "" + d.getRank();
-        }
-        text.setText(labelInfo);
+        if (d.isNULL())
+            I18n.bind(text, "common.nullUpper");
+        else if (d.isScalar())
+            I18n.bind(text, "common.scalar");
+        else
+            I18n.bind(text, "meta.rank", d.getRank());
         text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         if (!d.isScalar() && !d.isNULL()) {
             /* Dataset dimension size section */
             label = new Label(datasetInfoGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Dimension Size(s): ");
+            I18n.bind(label, "label.dimensionSize");
 
-            // Set Dimension Size
-            String dimStr    = null;
-            String maxDimStr = null;
-            long[] dims      = d.getDims();
-            long[] maxDims   = d.getMaxDims();
-            if (dims != null) {
-                String[] dimNames   = d.getDimNames();
-                boolean hasDimNames = ((dimNames != null) && (dimNames.length == dims.length));
-                StringBuilder sb    = new StringBuilder();
-                StringBuilder sb2   = new StringBuilder();
-
-                sb.append(dims[0]);
-                if (hasDimNames) {
-                    sb.append(" (").append(dimNames[0]).append(")");
-                }
-
-                if (maxDims[0] < 0)
-                    sb2.append("Unlimited");
-                else
-                    sb2.append(maxDims[0]);
-
-                for (int i = 1; i < dims.length; i++) {
-                    sb.append(" x ");
-                    sb.append(dims[i]);
-                    if (hasDimNames) {
-                        sb.append(" (").append(dimNames[i]).append(")");
-                    }
-
-                    sb2.append(" x ");
-                    if (maxDims[i] < 0)
-                        sb2.append("Unlimited");
-                    else
-                        sb2.append(maxDims[i]);
-                }
-                dimStr    = sb.toString();
-                maxDimStr = sb2.toString();
-            }
+            // Set Dimension Size. Keep the raw dimensions so localized markers
+            // can be regenerated when the user changes language.
+            final long[] dims      = d.getDims();
+            final long[] maxDims   = d.getMaxDims();
+            final String[] dimNames = d.getDimNames();
 
             text = new Text(datasetInfoGroup, SWT.SINGLE | SWT.BORDER);
             text.setEditable(false);
             text.setFont(curFont);
-            text.setText((dimStr == null) ? "null" : dimStr);
+            I18n.bindDynamic(text, () -> formatDimensions(dims, maxDims, dimNames, false));
             text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
             label = new Label(datasetInfoGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Max Dimension Size(s): ");
+            I18n.bind(label, "label.maxDimensionSize");
 
             text = new Text(datasetInfoGroup, SWT.SINGLE | SWT.BORDER);
             text.setEditable(false);
             text.setFont(curFont);
-            text.setText((maxDimStr == null) ? "null" : maxDimStr);
+            I18n.bindDynamic(text, () -> formatDimensions(dims, maxDims, dimNames, true));
             text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         }
 
         /* Dataset datatype section */
         label = new Label(datasetInfoGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Data Type: ");
+        I18n.bind(label, "label.dataType");
 
         Datatype t  = d.getDatatype();
-        String type = (t == null) ? "null" : t.getDescription();
-        if (d instanceof CompoundDS) {
+        String type = (t == null) ? null : t.getDescription();
+        if (d instanceof CompoundDS && type != null) {
             if (isH4) {
-                type = "Vdata";
+                type = I18n.text("common.vdata");
             }
             else {
                 /*
@@ -191,7 +155,12 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
         text = new Text(datasetInfoGroup, SWT.SINGLE | SWT.BORDER);
         text.setEditable(false);
         text.setFont(curFont);
-        text.setText(type);
+        if (isH4 && d instanceof CompoundDS)
+            I18n.bind(text, "common.vdata");
+        else if (type == null)
+            I18n.bind(text, "common.null");
+        else
+            I18n.bindDatatypeDescription(text, type);
         text.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         /* Add a dummy label to take up some vertical space between sections */
@@ -206,65 +175,65 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
         org.eclipse.swt.widgets.Group datasetLayoutGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
         datasetLayoutGroup.setFont(curFont);
-        datasetLayoutGroup.setText("Miscellaneous Dataset Information");
+        I18n.bind(datasetLayoutGroup, "meta.miscDatasetInfo");
         datasetLayoutGroup.setLayout(new GridLayout(2, false));
         datasetLayoutGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1));
 
         /* Dataset Storage Layout section */
         label = new Label(datasetLayoutGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Storage Layout: ");
+        I18n.bind(label, "label.storageLayout");
 
         label = new Label(datasetLayoutGroup, SWT.RIGHT);
         label.setFont(curFont);
-        labelInfo = d.getStorageLayout();
-        if (labelInfo == null)
-            labelInfo = "UNKNOWN";
-        label.setText(labelInfo);
+        final String storageLayout = d.getStorageLayout();
+        I18n.bindDynamic(label, () -> storageLayout == null
+                                         ? I18n.text("common.unknown").toUpperCase()
+                                         : storageLayout);
 
         /* Dataset Compression section */
         label = new Label(datasetLayoutGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Compression: ");
+        I18n.bind(label, "label.compression");
 
         label = new Label(datasetLayoutGroup, SWT.RIGHT);
         label.setFont(curFont);
-        labelInfo = d.getCompression();
-        if (labelInfo == null)
-            labelInfo = "UNKNOWN";
-        label.setText(labelInfo);
+        final String compression = d.getCompression();
+        I18n.bindDynamic(label, () -> compression == null
+                                         ? I18n.text("common.unknown").toUpperCase()
+                                         : compression);
 
         /* Dataset filters section */
         label = new Label(datasetLayoutGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Filters: ");
+        I18n.bind(label, "label.filters");
 
         label = new Label(datasetLayoutGroup, SWT.RIGHT);
         label.setFont(curFont);
-        labelInfo = d.getFilters();
-        if (labelInfo == null)
-            labelInfo = "UNKNOWN";
-        label.setText(labelInfo);
+        final String filters = d.getFilters();
+        I18n.bindDynamic(label, () -> filters == null
+                                         ? I18n.text("common.unknown").toUpperCase()
+                                         : filters);
 
         /* Dataset extra storage information section */
         label = new Label(datasetLayoutGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Storage: ");
+        I18n.bind(label, "label.storage");
 
         label = new Label(datasetLayoutGroup, SWT.RIGHT);
         label.setFont(curFont);
-        labelInfo = d.getStorage();
-        if (labelInfo == null)
-            labelInfo = "UNKNOWN";
-        label.setText(labelInfo);
+        final String storage = d.getStorage();
+        I18n.bindDynamic(label, () -> storage == null
+                                         ? I18n.text("common.unknown").toUpperCase()
+                                         : storage);
 
         /* Dataset fill value info section */
         label = new Label(datasetLayoutGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Fill value: ");
+        I18n.bind(label, "label.fillValue");
 
         Object fillValue     = null;
-        String fillValueInfo = "NONE";
+        String fillValueInfo = I18n.text("common.none");
         if (d instanceof ScalarDS)
             fillValue = ((ScalarDS)d).getFillValue();
         if (fillValue != null) {
@@ -282,12 +251,13 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
 
         label = new Label(datasetLayoutGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText(fillValueInfo);
+        final Object storedFillValue = fillValue;
+        I18n.bindDynamic(label, () -> formatFillValue(storedFillValue));
 
         /* Button to open Data Option dialog */
         Button showDataOptionButton = new Button(datasetInfoGroup, SWT.PUSH);
         showDataOptionButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, true, false, 2, 1));
-        showDataOptionButton.setText("Show Data with Options");
+        I18n.bind(showDataOptionButton, "meta.showDataWithOptions");
         showDataOptionButton.setEnabled(!d.isNULL());
         showDataOptionButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -299,7 +269,7 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
                 }
                 catch (Exception ex) {
                     display.beep();
-                    Tools.showError(display.getShells()[0], "Select", ex.getMessage());
+                    Tools.showError(display.getShells()[0], I18n.text("action.select"), ex.getMessage());
                 }
             }
         });
@@ -324,7 +294,7 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
             org.eclipse.swt.widgets.Group compoundMembersGroup =
                 new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
             compoundMembersGroup.setFont(curFont);
-            compoundMembersGroup.setText("Compound Dataset Members");
+            I18n.bind(compoundMembersGroup, "meta.compoundDatasetMembers");
             compoundMembersGroup.setLayout(new FillLayout(SWT.VERTICAL));
             compoundMembersGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1));
 
@@ -333,11 +303,15 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
             memberTable.setHeaderVisible(true);
             memberTable.setFont(curFont);
 
-            String[] columnNames = {"Name", "Type", "Array Size"};
-
-            for (int i = 0; i < columnNames.length; i++) {
+            final int columnCount = 3;
+            for (int i = 0; i < columnCount; i++) {
                 TableColumn column = new TableColumn(memberTable, SWT.NONE);
-                column.setText(columnNames[i]);
+                if (i == 0)
+                    I18n.bind(column, "meta.name");
+                else if (i == 1)
+                    I18n.bind(column, "meta.type");
+                else
+                    I18n.bind(column, "meta.arraySize");
                 column.setMoveable(false);
             }
 
@@ -370,7 +344,7 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
                         }
                         rowData[i][2] = mStr;
                     }
-                    rowData[i][1] = (types[i] == null) ? "null" : types[i].getDescription();
+                    rowData[i][1] = (types[i] == null) ? I18n.text("common.null") : types[i].getDescription();
                 }
 
                 for (int i = 0; i < rowData.length; i++) {
@@ -379,9 +353,11 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
                     item.setText(0, rowData[i][0]);
                     item.setText(1, rowData[i][1]);
                     item.setText(2, rowData[i][2]);
+                    if (types[i] != null)
+                        I18n.bindDatatypeDescription(item, 1, rowData[i][1]);
                 }
 
-                for (int i = 0; i < columnNames.length; i++) {
+                for (int i = 0; i < columnCount; i++) {
                     memberTable.getColumn(i).pack();
                 }
 
@@ -394,5 +370,48 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
             // Prevent conflict from equal vertical grabbing
             datasetLayoutGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
         }
+    }
+
+    /** Format dataset dimensions while resolving the unlimited marker at refresh time. */
+    private String formatDimensions(long[] dims, long[] maxDims, String[] dimNames, boolean maximum)
+    {
+        if (dims == null || (maximum && maxDims == null))
+            return I18n.text("common.null");
+
+        boolean hasDimNames = !maximum && dimNames != null && dimNames.length == dims.length;
+        long[] values       = maximum ? maxDims : dims;
+        StringBuilder value = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0)
+                value.append(" x ");
+
+            if (maximum && values[i] < 0)
+                value.append(I18n.text("common.unlimited"));
+            else
+                value.append(values[i]);
+
+            if (hasDimNames)
+                value.append(" (").append(dimNames[i]).append(")");
+        }
+        return value.toString();
+    }
+
+    /** Format a fill value while keeping the localized empty-value marker live. */
+    private String formatFillValue(Object fillValue)
+    {
+        if (fillValue == null)
+            return I18n.text("common.none");
+
+        if (!fillValue.getClass().isArray())
+            return fillValue.toString();
+
+        int length = Array.getLength(fillValue);
+        if (length == 0)
+            return "";
+
+        StringBuilder value = new StringBuilder(String.valueOf(Array.get(fillValue, 0)));
+        for (int i = 1; i < length; i++)
+            value.append(", ").append(Array.get(fillValue, i));
+        return value.toString();
     }
 }

@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import hdf.HDFVersions;
+import hdf.object.Attribute;
 import hdf.object.CompoundDS;
 import hdf.object.DataFormat;
 import hdf.object.Dataset;
@@ -179,15 +180,6 @@ public class HDFView implements DataViewManager {
     private static final String HDFVIEW_USERSGUIDE_URL =
         "https://support.hdfgroup.org/documentation/hdfview/HDFView+3.x+User%27s+Guide";
     private static final String JAVA_COMPILER = "jdk " + JAVA_VERSION;
-    private static final String JAVA_VER_INFO =
-        "Compiled at " + JAVA_COMPILER + "\nRunning at " + System.getProperty("java.version");
-
-    private static final String ABOUT_HDFVIEW = "HDF Viewer, "
-                                                + "Version " + ViewProperties.VERSION + "\n"
-                                                + "For " + System.getProperty("os.name") + "\n\n"
-                                                + "Copyright " + '\u00a9' + " 2006 The HDF Group.\n"
-                                                + "All rights reserved.";
-
     /** GUI component: The toolbar for open, close, help and hdf4 and hdf5 library information. */
     private ToolBar toolBar;
 
@@ -691,7 +683,9 @@ public class HDFView implements DataViewManager {
                 }
                 else {
                     // Prepend test file directory to filename
-                    filename = currentDir.concat(new InputDialog(mainWindow, "Enter a file name", "").open());
+                    filename = currentDir.concat(new InputDialog(mainWindow,
+                                                                  I18n.text("dialog.enterFileName.title"),
+                                                                  "").open());
                 }
 
                 if (filename == null)
@@ -708,7 +702,7 @@ public class HDFView implements DataViewManager {
                     currentDir = theFile.getParent();
                 }
                 catch (Exception ex) {
-                    Tools.showError(mainWindow, "New", ex.getMessage());
+                    Tools.showError(mainWindow, I18n.text("action.create"), ex.getMessage());
                     return;
                 }
 
@@ -729,7 +723,7 @@ public class HDFView implements DataViewManager {
                 }
                 catch (Exception ex) {
                     display.beep();
-                    Tools.showError(mainWindow, "New", ex.getMessage() + "\n" + filename);
+                    Tools.showError(mainWindow, I18n.text("action.create"), ex.getMessage() + "\n" + filename);
                 }
             }
         });
@@ -761,7 +755,9 @@ public class HDFView implements DataViewManager {
                 }
                 else {
                     // Prepend test file directory to filename
-                    filename = currentDir.concat(new InputDialog(mainWindow, "Enter a file name", "").open());
+                    filename = currentDir.concat(new InputDialog(mainWindow,
+                                                                  I18n.text("dialog.enterFileName.title"),
+                                                                  "").open());
                 }
 
                 if (filename == null)
@@ -778,7 +774,7 @@ public class HDFView implements DataViewManager {
                     currentDir = theFile.getParent();
                 }
                 catch (Exception ex) {
-                    Tools.showError(mainWindow, "New", ex.getMessage());
+                    Tools.showError(mainWindow, I18n.text("action.create"), ex.getMessage());
                     return;
                 }
 
@@ -799,7 +795,7 @@ public class HDFView implements DataViewManager {
                 }
                 catch (Exception ex) {
                     display.beep();
-                    Tools.showError(mainWindow, "New", ex.getMessage() + "\n" + filename);
+                    Tools.showError(mainWindow, I18n.text("action.create"), ex.getMessage() + "\n" + filename);
                 }
             }
         });
@@ -894,7 +890,7 @@ public class HDFView implements DataViewManager {
                 }
                 catch (Exception ex) {
                     display.beep();
-                    Tools.showError(mainWindow, "Save", ex.getMessage());
+                    Tools.showError(mainWindow, I18n.text("action.save"), ex.getMessage());
                 }
             }
         });
@@ -1207,10 +1203,13 @@ public class HDFView implements DataViewManager {
         }
         catch (Exception ex) {
             log.warn("Unable to persist HDFView language preference", ex);
-            showError("Unable to save language preference: " + ex.getMessage());
+            showError(I18n.text("status.errorSavingLanguage", ex.getMessage()));
         }
 
         I18n.refreshDisplay(display);
+        if (userOptionDialog != null && userOptionDialog.getShell() != null &&
+            !userOptionDialog.getShell().isDisposed())
+            userOptionDialog.refreshLanguage();
 
         if (englishLanguageItem != null && !englishLanguageItem.isDisposed())
             englishLanguageItem.setSelection(language == I18n.Language.ENGLISH);
@@ -1342,7 +1341,7 @@ public class HDFView implements DataViewManager {
                     org.eclipse.swt.program.Program.launch(ugPath);
                 }
                 catch (Exception ex) {
-                    Tools.showError(shell, "Help", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.help"), ex.getMessage());
                 }
             }
         });
@@ -1565,8 +1564,8 @@ public class HDFView implements DataViewManager {
             }
         });
 
-        showStatus("HDFView root - " + rootDir);
-        showStatus("User property file - " + ViewProperties.getPropertyFile());
+        showStatus(I18n.text("status.root", rootDir));
+        showStatus(I18n.text("status.userProperty", ViewProperties.getPropertyFile()));
 
         content.setWeights(new int[] {9, 1});
         contentArea.setWeights(new int[] {1, 3});
@@ -1577,7 +1576,7 @@ public class HDFView implements DataViewManager {
         }
         catch (Exception ex) {
             log.debug("createContentArea(): error occurred while instantiating TreeView factory class", ex);
-            this.showError("Error occurred while instantiating TreeView factory class");
+            this.showError(I18n.text("message.treeViewFactoryFailed"));
             return;
         }
 
@@ -1591,13 +1590,13 @@ public class HDFView implements DataViewManager {
 
             if (treeView == null) {
                 log.debug("createContentArea(): error occurred while instantiating TreeView class");
-                this.showError("Error occurred while instantiating TreeView class");
+                this.showError(I18n.text("message.treeViewClassFailed"));
                 return;
             }
         }
         catch (ClassNotFoundException ex) {
             log.debug("createContentArea(): no suitable TreeView class found");
-            this.showError("Unable to find suitable TreeView class");
+            this.showError(I18n.text("message.treeViewUnavailable"));
             return;
         }
 
@@ -1663,7 +1662,7 @@ public class HDFView implements DataViewManager {
     @Override
     public final void executeTimer(boolean toggleTimer)
     {
-        showStatus("toggleTimer: " + toggleTimer);
+        showStatus(I18n.text("status.timerToggled", toggleTimer));
         viewerState = toggleTimer;
         if (viewerState)
             display.timerExec(ViewProperties.getTimerRefresh(), timer);
@@ -1705,7 +1704,7 @@ public class HDFView implements DataViewManager {
         status.append(" *** ");
         status.append(errMsg);
         if (log.isDebugEnabled())
-            status.append(" - see log for more info");
+            status.append(I18n.text("status.seeLogForDetails"));
         status.append(" *** ");
         status.append("\n");
     }
@@ -1742,7 +1741,7 @@ public class HDFView implements DataViewManager {
             }
             catch (Exception ex) {
                 log.debug("showMetaData(): error occurred while instantiating MetaDataView factory class", ex);
-                this.showError("Error occurred while instantiating MetaDataView factory class");
+                this.showError(I18n.text("message.metadataViewFactoryFailed"));
                 return;
             }
 
@@ -1758,13 +1757,13 @@ public class HDFView implements DataViewManager {
 
                 if (theView == null) {
                     log.debug("showMetaData(): error occurred while instantiating MetaDataView class");
-                    this.showError("Error occurred while instantiating MetaDataView class");
+                    this.showError(I18n.text("message.metadataViewClassFailed"));
                     return;
                 }
             }
             catch (ClassNotFoundException ex) {
                 log.debug("showMetaData(): no suitable MetaDataView class found");
-                this.showError("Unable to find suitable MetaDataView class");
+                this.showError(I18n.text("message.metadataViewUnavailable"));
                 return;
             }
 
@@ -1831,7 +1830,9 @@ public class HDFView implements DataViewManager {
     /** Return whether the object can use the built-in editable TableView. */
     private boolean isInlineTableDataset(HObject obj)
     {
-        if (!(obj instanceof Dataset))
+        /* Attributes use Dataset implementations for their storage, but retain
+         * the historical standalone editor workflow. */
+        if (obj instanceof Attribute || !(obj instanceof Dataset))
             return false;
 
         Dataset dataset = (Dataset)obj;
@@ -1869,7 +1870,7 @@ public class HDFView implements DataViewManager {
             DataViewFactory tableViewFactory = DataViewFactoryProducer.getFactory(DataViewType.TABLE);
             if (!(tableViewFactory instanceof TableViewFactory)) {
                 log.debug("createInlineDataContent(): TableView factory does not support embedding");
-                showError("Unable to find an embeddable TableView factory");
+                showError(I18n.text("message.inlineTableFactoryUnavailable"));
             }
             else {
                 HashMap<ViewProperties.DATA_VIEW_KEY, Serializable> map = new HashMap<>(8);
@@ -1883,13 +1884,13 @@ public class HDFView implements DataViewManager {
                 inlineTableView = ((TableViewFactory)tableViewFactory).getTableView(this, map, dataParent);
                 if (inlineTableView == null || inlineTableView.isViewDisposed()) {
                     log.debug("createInlineDataContent(): TableView factory returned no usable view");
-                    showError("Unable to create inline TableView");
+                    showError(I18n.text("message.inlineTableCreationFailed"));
                 }
             }
         }
         catch (Exception ex) {
             log.debug("createInlineDataContent(): no suitable TableView class found", ex);
-            showError("Unable to find suitable TableView class for object '" + obj.getName() + "'");
+            showError(I18n.text("message.inlineTableUnavailable", obj.getName()));
         }
 
         if (inlineTableView == null || inlineTableView.isViewDisposed()) {
@@ -1918,6 +1919,38 @@ public class HDFView implements DataViewManager {
             dataContentTab.dispose();
         }
         dataContentTab = null;
+    }
+
+    /**
+     * Clear the embedded Data Content tab after its TableView close action has
+     * disposed the TableView-owned controls.
+     *
+     * <p>This is intentionally separate from {@link #disposeInlineDataView()}:
+     * the latter owns the normal Dataset-switch path and disposes the view
+     * itself, while this callback handles a user closing the embedded view from
+     * its Table menu.</p>
+     *
+     * @param view the embedded TableView that was closed
+     */
+    public void inlineTableViewClosed(TableView view)
+    {
+        if (inlineTableView != view)
+            return;
+
+        inlineTableView = null;
+        if (dataContentTab != null && !dataContentTab.isDisposed()) {
+            Control control = dataContentTab.getControl();
+            if (control != null && !control.isDisposed())
+                control.dispose();
+            dataContentTab.dispose();
+        }
+        dataContentTab = null;
+
+        if (rightTabFolder != null && !rightTabFolder.isDisposed()) {
+            layoutRightTabs();
+            if (rightTabFolder.getItemCount() > 0)
+                rightTabFolder.setSelection(0);
+        }
     }
 
     /** Remove the current tab controls while retaining the host TabFolder. */
@@ -1968,7 +2001,7 @@ public class HDFView implements DataViewManager {
     {
         if (theFile == null) {
             display.beep();
-            Tools.showError(mainWindow, "Close", "Select a file to close");
+            Tools.showError(mainWindow, I18n.text("action.close"), I18n.text("message.noFileToClose"));
             return;
         }
 
@@ -2061,7 +2094,7 @@ public class HDFView implements DataViewManager {
         }
         catch (Exception ex) {
             display.beep();
-            Tools.showError(mainWindow, "Save", ex.getMessage());
+            Tools.showError(mainWindow, I18n.text("action.save"), ex.getMessage());
         }
     }
 
@@ -2092,21 +2125,22 @@ public class HDFView implements DataViewManager {
 
         MenuItem item = new MenuItem(windowMenu, SWT.PUSH);
         item.setText(fullPath);
+        item.setData(dataView);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
+                Object selectedView = ((MenuItem)e.widget).getData();
+                if (!(selectedView instanceof DataView))
+                    return;
+
                 Shell[] sList = display.getShells();
 
                 for (int i = 0; i < sList.length; i++) {
                     DataView view = (DataView)sList[i].getData();
 
-                    if (view != null) {
-                        HObject obj = view.getDataObject();
-
-                        if (obj.getFullName().equals(((MenuItem)e.widget).getText()))
-                            showWindow(sList[i]);
-                    }
+                    if (view != null && view.equals(selectedView))
+                        showWindow(sList[i]);
                 }
             }
         });
@@ -2126,7 +2160,7 @@ public class HDFView implements DataViewManager {
 
         MenuItem[] items = windowMenu.getItems();
         for (int i = 0; i < items.length; i++) {
-            if (items[i].getText().equals(obj.getFullName()))
+            if (items[i].getData() == dataView)
                 items[i].dispose();
         }
 
@@ -2393,7 +2427,8 @@ public class HDFView implements DataViewManager {
         if (filename != null) {
             File file = new File(filename);
             if (!file.exists()) {
-                Tools.showError(mainWindow, "Open", "File " + filename + " does not exist.");
+                Tools.showError(mainWindow, I18n.text("action.open"),
+                                I18n.text("message.fileDoesNotExist", filename));
                 return;
             }
 
@@ -2414,7 +2449,8 @@ public class HDFView implements DataViewManager {
                     catch (Exception ex2) {
                         display.beep();
                         urlBar.deselectAll();
-                        Tools.showError(mainWindow, "Open", "Failed to open file " + filename + "\n" + ex2);
+                        Tools.showError(mainWindow, I18n.text("action.open"),
+                                        I18n.text("message.openFileFailedWithDetails", filename, ex2));
                         currentFile = null;
                     }
                 }
@@ -2435,18 +2471,18 @@ public class HDFView implements DataViewManager {
             if (!isTesting) {
                 log.trace("openLocalFile filename is null");
                 FileDialog fChooser = new FileDialog(mainWindow, SWT.OPEN | SWT.MULTI);
-                String modeStr      = "Read/Write";
+                String modeStr      = I18n.text("fileChooser.mode.readWrite");
                 boolean isSWMRFile  = (FileFormat.MULTIREAD == (accessMode & FileFormat.MULTIREAD));
                 if (isSWMRFile)
-                    modeStr = "SWMR Read-only";
+                    modeStr = I18n.text("fileChooser.mode.swmrReadOnly");
                 else if (accessMode == FileFormat.READ)
-                    modeStr = "Read-only";
-                fChooser.setText(mainWindow.getText() + " - Open File " + modeStr);
+                    modeStr = I18n.text("fileChooser.mode.readOnly");
+                fChooser.setText(I18n.text("fileChooser.openTitle", mainWindow.getText(), modeStr));
                 fChooser.setFilterPath(currentDir);
 
                 DefaultFileFilter filter = DefaultFileFilter.getFileFilter();
                 fChooser.setFilterExtensions(new String[] {"*", filter.getExtensions()});
-                fChooser.setFilterNames(new String[] {"All Files", filter.getDescription()});
+                fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles"), filter.getDescription()});
                 fChooser.setFilterIndex(1);
 
                 fChooser.open();
@@ -2462,8 +2498,8 @@ public class HDFView implements DataViewManager {
                         new File(fChooser.getFilterPath() + File.separator + selectedFilenames[i]);
 
                     if (!chosenFiles[i].exists()) {
-                        Tools.showError(mainWindow, "Open",
-                                        "File " + chosenFiles[i].getName() + " does not exist.");
+                        Tools.showError(mainWindow, I18n.text("action.open"),
+                                        I18n.text("message.fileDoesNotExist", chosenFiles[i].getName()));
                         continue;
                     }
 
@@ -2495,8 +2531,9 @@ public class HDFView implements DataViewManager {
                         catch (Exception ex2) {
                             display.beep();
                             urlBar.deselectAll();
-                            Tools.showError(mainWindow, "Open",
-                                            "Failed to open file " + selectedFilenames[i] + "\n" + ex2);
+                            Tools.showError(mainWindow, I18n.text("action.open"),
+                                            I18n.text("message.openFileFailedWithDetails",
+                                                      selectedFilenames[i], ex2));
                             currentFile = null;
                         }
                     }
@@ -2507,12 +2544,15 @@ public class HDFView implements DataViewManager {
             else {
                 // Prepend test file directory to filename
                 String fName =
-                    currentDir + File.separator + new InputDialog(mainWindow, "Enter a file name", "").open();
+                    currentDir + File.separator + new InputDialog(mainWindow,
+                                                                  I18n.text("dialog.enterFileName.title"),
+                                                                  "").open();
 
                 File chosenFile = new File(fName);
 
                 if (!chosenFile.exists()) {
-                    Tools.showError(mainWindow, "Open", "File " + chosenFile.getName() + " does not exist.");
+                    Tools.showError(mainWindow, I18n.text("action.open"),
+                                    I18n.text("message.fileDoesNotExist", chosenFile.getName()));
                     return;
                 }
 
@@ -2544,7 +2584,8 @@ public class HDFView implements DataViewManager {
                     catch (Exception ex2) {
                         display.beep();
                         urlBar.deselectAll();
-                        Tools.showError(mainWindow, "Open", "Failed to open file " + chosenFile + "\n" + ex2);
+                        Tools.showError(mainWindow, I18n.text("action.open"),
+                                        I18n.text("message.openFileFailedWithDetails", chosenFile, ex2));
                         currentFile = null;
                     }
                 }
@@ -2601,7 +2642,7 @@ public class HDFView implements DataViewManager {
         catch (Exception ex) {
             url = null;
             display.beep();
-            Tools.showError(mainWindow, "Open", ex.getMessage());
+            Tools.showError(mainWindow, I18n.text("action.open"), ex.getMessage());
             return null;
         }
 
@@ -2620,7 +2661,7 @@ public class HDFView implements DataViewManager {
         }
         catch (Exception ex) {
             display.beep();
-            Tools.showError(mainWindow, "Open", ex.getMessage());
+            Tools.showError(mainWindow, I18n.text("action.open"), ex.getMessage());
             // Want to call setCursor always
             localFile = null;
         }
@@ -2668,18 +2709,13 @@ public class HDFView implements DataViewManager {
 
     private void registerFileFormat()
     {
-        String msg = "Register a new file format by \nKEY:FILE_FORMAT:FILE_EXTENSION\n"
-                     + "where, KEY: the unique identifier for the file format"
-                     + "\n           FILE_FORMAT: the full class name of the file format"
-                     + "\n           FILE_EXTENSION: the file extension for the file format"
-                     + "\n\nFor example, "
-                     + "\n\t to add NetCDF, \"NetCDF:hdf.object.nc2.NC2File:nc\""
-                     + "\n\t to add FITS, \"FITS:hdf.object.fits.FitsFile:fits\"\n\n";
+        String msg = I18n.text("hdfview.register.instructions");
 
         // TODO(HDFView) [2025-12]: Add custom HDFLarge branded icon to file format registration dialog.
         // Currently uses default system dialog icon. Could improve branding with HDF-themed icon.
         // Low priority - cosmetic enhancement. Related: InputDialog.java:43 for small icon support.
-        InputDialog dialog = new InputDialog(mainWindow, "Register a file format", msg, SWT.ICON_INFORMATION);
+        InputDialog dialog = new InputDialog(mainWindow, I18n.text("dialog.register.title"), msg,
+                                             SWT.ICON_INFORMATION);
 
         String str = dialog.open();
 
@@ -2690,9 +2726,8 @@ public class HDFView implements DataViewManager {
         int idx2 = str.lastIndexOf(':');
 
         if ((idx1 < 0) || (idx2 <= idx1)) {
-            Tools.showError(mainWindow, "Register File Format",
-                            "Failed to register " + str +
-                                "\n\nMust in the form of KEY:FILE_FORMAT:FILE_EXTENSION");
+            Tools.showError(mainWindow, I18n.text("dialog.register.title"),
+                            I18n.text("hdfview.register.invalidFormat", str));
             return;
         }
 
@@ -2707,14 +2742,15 @@ public class HDFView implements DataViewManager {
         while (localEnum.hasMoreElements()) {
             theKey = (String)localEnum.nextElement();
             if (theKey.endsWith(key)) {
-                Tools.showError(mainWindow, "Register File Format", "Invalid key: " + key + " is taken.");
+                Tools.showError(mainWindow, I18n.text("dialog.register.title"),
+                                I18n.text("hdfview.register.keyTaken", key));
                 return;
             }
 
             theClassName = FileFormat.getFileFormat(theKey).getClass().getName();
             if (theClassName.endsWith(className)) {
-                Tools.showError(mainWindow, "Register File Format",
-                                "The file format has already been registered: " + className);
+                Tools.showError(mainWindow, I18n.text("dialog.register.title"),
+                                I18n.text("hdfview.register.alreadyRegistered", className));
                 return;
             }
         }
@@ -2743,7 +2779,8 @@ public class HDFView implements DataViewManager {
                 FileFormat.addFileFormat(key, (FileFormat)theObject);
         }
         catch (Exception ex) {
-            Tools.showError(mainWindow, "Register File Format", "Failed to register " + str + "\n\n" + ex);
+            Tools.showError(mainWindow, I18n.text("dialog.register.title"),
+                            I18n.text("hdfview.register.failed", str) + "\n\n" + ex);
             return;
         }
 
@@ -2779,9 +2816,9 @@ public class HDFView implements DataViewManager {
             super(parent, SWT.APPLICATION_MODAL | SWT.DIALOG_TRIM);
 
             if (libType.equals(FileFormat.FILE_TYPE_HDF4))
-                setMessage("HDF " + HDF4_VERSION);
+                setMessage(I18n.text("hdfview.libraryVersion", "HDF", HDF4_VERSION));
             else if (libType.equals(FileFormat.FILE_TYPE_HDF5))
-                setMessage("HDF5 " + HDF5_VERSION);
+                setMessage(I18n.text("hdfview.libraryVersion", "HDF5", HDF5_VERSION));
         }
 
         public void setMessage(String message) { this.message = message; }
@@ -2872,7 +2909,8 @@ public class HDFView implements DataViewManager {
             Label versionLabel = new Label(dialog, SWT.CENTER);
             versionLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, true, false));
             versionLabel.setFont(currentFont);
-            versionLabel.setText(JAVA_VER_INFO);
+            versionLabel.setText(I18n.text("hdfview.javaVersionInfo", JAVA_COMPILER,
+                                           System.getProperty("java.version")));
 
             Composite buttonComposite = new Composite(dialog, SWT.NONE);
             buttonComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
@@ -2934,7 +2972,9 @@ public class HDFView implements DataViewManager {
 
             Enumeration<?> formatKeys = FileFormat.getFileFormatKeys();
 
-            StringBuilder formats = new StringBuilder("\nSupported File Formats: \n");
+            StringBuilder formats = new StringBuilder("\n")
+                .append(I18n.text("hdfview.supportedFormats"))
+                .append("\n");
             while (formatKeys.hasMoreElements())
                 formats.append("    ").append(formatKeys.nextElement()).append("\n");
             formats.append("\n");
@@ -3005,7 +3045,8 @@ public class HDFView implements DataViewManager {
             Label aboutLabel = new Label(dialog, SWT.LEFT);
             aboutLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, true, false));
             aboutLabel.setFont(currentFont);
-            aboutLabel.setText(ABOUT_HDFVIEW);
+            aboutLabel.setText(I18n.text("hdfview.about", ViewProperties.VERSION,
+                                        System.getProperty("os.name")));
 
             Composite buttonComposite = new Composite(dialog, SWT.NONE);
             buttonComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
@@ -3249,7 +3290,9 @@ public class HDFView implements DataViewManager {
             }
             else if ("-java.version".equalsIgnoreCase(args[i])) {
                 /* Set icon to ViewProperties.getLargeHdfIcon() */
-                Tools.showInformation(mainWindow, "Java Version", JAVA_VER_INFO);
+                Tools.showInformation(mainWindow, I18n.text("dialog.javaVersion.title"),
+                                      I18n.text("hdfview.javaVersionInfo", JAVA_COMPILER,
+                                                System.getProperty("java.version")));
                 System.exit(0);
             }
         }

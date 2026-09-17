@@ -63,7 +63,7 @@ public class MathConversionDialog extends Dialog {
 
     private char NT;
 
-    private String[] functionDescription;
+    private String[] functionDescriptionKeys;
 
     private boolean isConverted;
 
@@ -97,28 +97,11 @@ public class MathConversionDialog extends Dialog {
             NT = cName.charAt(cIndex + 1);
         }
 
-        String[] tmpStrs = {"The filter by lower and upper bounds. x=a if x<a; x=b if x>b."
-                                + "\ne.g.\n x=5, [0, 127]=5\n x=-5, [0, 127]=0\n x=255, [0, 127]=127.",
-                            "The absolute value of a number, the number without its sign."
-                                + "\ne.g.\n abs(5)=5\n abs(-5)=5.",
-                            "Linear function."
-                                + "\ne.g.\n a=5, b=2, x=2.5, a+b*x=10.",
-                            "The result of a number raised to power of a."
-                                + "\ne.g.\n x=2.5, a=10, pow(x, a)=9536.743\n x=25, a=0.5, pow(x, a)=5.",
-                            "The exponential number e (i.e., 2.718...) raised to the power of x."
-                                + "\ne.g.\n exp(5.0)=148.41316\n exp(5.5)=244.69193",
-                            "The natural logarithm (base e) of x."
-                                + "\ne.g.\n ln(20.085541)=3\n ln(10)=2.302585",
-                            "The logarithm of x to the base of a, \"a\" must be an integer > 0."
-                                + "\ne.g.\n log(10, 2)=3.321928\n log(2, 10)=0.30103",
-                            "The trigonometric sine of angle x in radians."
-                                + "\ne.g.\n sin(0.523599)=0.5\n sin(1.047198)=0.866025",
-                            "The trigonometric cosine of angle x in radians."
-                                + "\ne.g.\n cos(0.523599)=0.866025\n cos(1.047198)=0.5",
-                            "The trigonometric tangent of angle x in radians."
-                                + "\ne.g.\n tan(0.785398)=1\n tan(1.047198)=1.732051"};
-
-        functionDescription = tmpStrs;
+        functionDescriptionKeys = new String[] {"math.description.0", "math.description.1",
+                                                "math.description.2", "math.description.3",
+                                                "math.description.4", "math.description.5",
+                                                "math.description.6", "math.description.7",
+                                                "math.description.8", "math.description.9"};
     }
 
     /**
@@ -129,23 +112,22 @@ public class MathConversionDialog extends Dialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("Convert Data...");
+        I18n.bind(shell, "dialog.convertData.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
         // Create content region
         org.eclipse.swt.widgets.Group contentGroup = new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
         contentGroup.setFont(curFont);
-        contentGroup.setText("Converting Data With A Mathematic Function");
+        I18n.bind(contentGroup, "dialog.convertData.group");
         contentGroup.setLayout(new GridLayout(2, false));
         contentGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
-        String[] functionNames = {"[a, b]", "abs (x)",    "a + b * x", "pow (x, a)", "exp (x)",
-                                  "ln (x)", "log (a, x)", "sin (x)",   "cos (x)",    "tan (x)"};
-
         functionList = new List(contentGroup, SWT.SINGLE | SWT.BORDER);
         functionList.setFont(curFont);
-        functionList.setItems(functionNames);
+        I18n.bindItems(functionList, "math.function.clip", "math.function.absolute", "math.function.linear",
+                       "math.function.power", "math.function.exponential", "math.function.naturalLog",
+                       "math.function.log", "math.function.sin", "math.function.cos", "math.function.tan");
         GridData functionListData     = new GridData(SWT.FILL, SWT.FILL, true, false);
         functionListData.minimumWidth = 350;
         functionList.setLayoutData(functionListData);
@@ -154,7 +136,7 @@ public class MathConversionDialog extends Dialog {
             public void widgetSelected(SelectionEvent e)
             {
                 int index = functionList.getSelectionIndex();
-                infoArea.setText(functionDescription[index]);
+                I18n.bind(infoArea, functionDescriptionKeys[index]);
 
                 if ((index == 0) || (index == 2)) {
                     aField.setEnabled(true);
@@ -177,7 +159,7 @@ public class MathConversionDialog extends Dialog {
 
         Label label = new Label(fieldComposite, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("a = ");
+        I18n.bind(label, "math.parameterA");
 
         aField                  = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         GridData aFieldData     = new GridData(SWT.FILL, SWT.FILL, true, false);
@@ -189,7 +171,7 @@ public class MathConversionDialog extends Dialog {
 
         label = new Label(fieldComposite, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("b = ");
+        I18n.bind(label, "math.parameterB");
 
         bField = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         bField.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
@@ -284,14 +266,15 @@ public class MathConversionDialog extends Dialog {
                 a = Integer.parseInt(aField.getText().trim());
                 if (a <= 0) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Convert", "a must be an integer greater than zero.");
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.parameterPositive"));
                     return false;
                 }
             }
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Convert", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.convert"), ex.getMessage());
             return false;
         }
 
@@ -306,7 +289,8 @@ public class MathConversionDialog extends Dialog {
                 x     = bdata[i];
                 value = y(index, x, a, b);
                 if ((value > Byte.MAX_VALUE) || (value < Byte.MIN_VALUE)) {
-                    Tools.showError(shell, "Convert", "Invalid byte value: " + (long)value);
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.invalidValue", "byte", (long)value));
                     return false;
                 }
 
@@ -319,7 +303,8 @@ public class MathConversionDialog extends Dialog {
                 x     = sdata[i];
                 value = y(index, x, a, b);
                 if ((value > Short.MAX_VALUE) || (value < Short.MIN_VALUE)) {
-                    Tools.showError(shell, "Convert", "Invalid short value: " + (long)value);
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.invalidValue", "short", (long)value));
                     return false;
                 }
 
@@ -332,7 +317,8 @@ public class MathConversionDialog extends Dialog {
                 x     = idata[i];
                 value = y(index, x, a, b);
                 if ((value > Integer.MAX_VALUE) || (value < Integer.MIN_VALUE)) {
-                    Tools.showError(shell, "Convert", "Invalid int value: " + (long)value);
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.invalidValue", "int", (long)value));
                     return false;
                 }
 
@@ -345,7 +331,8 @@ public class MathConversionDialog extends Dialog {
                 x     = ldata[i];
                 value = y(index, x, a, b);
                 if ((value > Long.MAX_VALUE) || (value < Long.MIN_VALUE)) {
-                    Tools.showError(shell, "Convert", "Invalid long value: " + (long)value);
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.invalidValue", "long", (long)value));
                     return false;
                 }
 
@@ -358,7 +345,8 @@ public class MathConversionDialog extends Dialog {
                 x     = fdata[i];
                 value = y(index, x, a, b);
                 if ((value > Float.MAX_VALUE) || (value < -Float.MAX_VALUE) || (value == Float.NaN)) {
-                    Tools.showError(shell, "Convert", "Invalid float value: " + value);
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.invalidValue", "float", value));
                     return false;
                 }
 
@@ -371,7 +359,8 @@ public class MathConversionDialog extends Dialog {
                 x     = ddata[i];
                 value = y(index, x, a, b);
                 if ((value > Double.MAX_VALUE) || (value < -Double.MAX_VALUE) || (value == Double.NaN)) {
-                    Tools.showError(shell, "Convert", "Invalid double value: " + value);
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.invalidValue", "double", value));
                     return false;
                 }
 

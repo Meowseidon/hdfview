@@ -13,10 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
 import org.eclipse.swtbot.swt.finder.matchers.WidgetOfType;
-import org.eclipse.swtbot.swt.finder.matchers.WithRegex;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTabItem;
@@ -45,9 +43,9 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                        "createNewHDF5VLDatatype() filetree is missing file '" + filename + "'");
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Datatype").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.datatype")).click();
 
-            SWTBotShell dtShell = bot.shell("New Datatype...");
+            SWTBotShell dtShell = bot.shell(ui("dialog.newDatatype.title"));
             dtShell.activate();
             bot.waitUntil(Conditions.shellIsActive(dtShell.getText()));
 
@@ -56,7 +54,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
             dtShell.bot().comboBox(2).setSelection("VLEN_INTEGER");
             dtShell.bot().comboBox(3).setSelection("16");
 
-            dtShell.bot().button("   &OK   ").click();
+            dtShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(dtShell));
 
             items = filetree.getAllItems();
@@ -79,8 +77,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -110,9 +107,9 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                        "createNewHDF5VLDataset() filetree is missing file '" + filename + "'");
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Dataset").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.dataset")).click();
 
-            SWTBotShell dsShell = bot.shell("New Dataset...");
+            SWTBotShell dsShell = bot.shell(ui("dialog.newDataset.title"));
             dsShell.activate();
             bot.waitUntil(Conditions.shellIsActive(dsShell.getText()));
 
@@ -121,7 +118,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
             dsShell.bot().comboBox(2).setSelection("VLEN_FLOAT");
             dsShell.bot().comboBox(3).setSelection("32");
 
-            dsShell.bot().button("   &OK   ").click();
+            dsShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(dsShell));
 
             items = filetree.getAllItems();
@@ -135,13 +132,8 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                        "createNewHDF5VLDataset() filetree is missing dataset '" + dsname + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(dsname + ".*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dsname);
 
             SWTBotNatTable table =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -171,19 +163,13 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                 }
             });
 
-            tableShell.bot().menu().menu("Table").menu("Save Changes to File").click();
+            tableMenu(tableShell).menu(ui("table.saveChanges")).click();
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dsname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -195,8 +181,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                 updateval.equals(expected2),
                 constructWrongValueMessage("createNewHDF5VLDataset()", "wrong data", expected2, updateval));
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -208,8 +193,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -243,9 +227,9 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
             SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
-            bot.button("Add Attribute").click();
+            bot.button(ui("meta.addAttribute")).click();
 
-            SWTBotShell daShell = bot.shell("New Attribute...");
+            SWTBotShell daShell = bot.shell(ui("dialog.newAttribute.title"));
             daShell.activate();
             bot.waitUntil(Conditions.shellIsActive(daShell.getText()));
 
@@ -253,7 +237,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
 
             daShell.bot().comboBox(1).setSelection("VLEN_INTEGER");
 
-            daShell.bot().button("   &OK   ").click();
+            daShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(daShell));
 
             items = filetree.getAllItems();
@@ -296,10 +280,9 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                 }
             });
 
-            tableShell.bot().menu().menu("Table").menu("Save Changes to File").click();
+            tableMenu(tableShell).menu(ui("table.saveChanges")).click();
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             items[0].click();
 
@@ -317,8 +300,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
                 updateval.equals(expected2),
                 constructWrongValueMessage("createNewHDF5VLDataset()", "wrong data", expected2, updateval));
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -330,8 +312,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {

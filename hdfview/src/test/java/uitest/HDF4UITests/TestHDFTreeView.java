@@ -36,10 +36,10 @@ public class TestHDFTreeView extends AbstractWindowTest {
             checkFileTree(filetree, "testVGLongname()", 2, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, groupname, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, groupname, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(constructWrongValueMessage("testVSLongname()", "wrong name", groupname, val),
                        val.equals(groupname)); // Test group name
 
@@ -86,18 +86,18 @@ public class TestHDFTreeView extends AbstractWindowTest {
             checkFileTree(filetree, "testVSLongname()", 3, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(constructWrongValueMessage("testVSLongname()", "wrong name", datasetName, val),
                        val.equals(datasetName)); // Test dataset name
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 0).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 0).getText();
             assertTrue(constructWrongValueMessage("testVSLongname()", "wrong rank", "1", val),
                        val.equals("1")); // Test rank
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 3).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 3).getText();
             assertTrue(constructWrongValueMessage("testVSLongname()", "wrong data type", "Vdata", val),
                        val.equals("Vdata")); // Test data type
         }

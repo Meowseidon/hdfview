@@ -25,6 +25,7 @@ import hdf.object.HObject;
 import hdf.object.h5.H5Datatype;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,20 +150,20 @@ public class NewDataObjectDialog extends Dialog {
         // Create Datatype region
         org.eclipse.swt.widgets.Group datatypeGroup = new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
         datatypeGroup.setFont(curFont);
-        datatypeGroup.setText("Datatype");
+        I18n.bind(datatypeGroup, "datatype.group");
         datatypeGroup.setLayout(new GridLayout(4, true));
         datatypeGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         useCommittedType = new Button(datatypeGroup, SWT.CHECK);
         useCommittedType.setFont(curFont);
-        useCommittedType.setText("Use Committed Datatype");
+        I18n.bind(useCommittedType, "datatype.useCommitted");
         useCommittedType.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
         useCommittedType.setEnabled(isH5);
 
         if (isH5) {
             label = new Label(datatypeGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Committed Datatype: ");
+            I18n.bind(label, "label.committedDatatype");
 
             namedChoice = new Combo(datatypeGroup, SWT.DROP_DOWN | SWT.BORDER | SWT.READ_ONLY);
             namedChoice.setFont(curFont);
@@ -198,19 +199,19 @@ public class NewDataObjectDialog extends Dialog {
 
         label = new Label(datatypeGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Datatype Class");
+        I18n.bind(label, "datatype.class");
 
         label = new Label(datatypeGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Size (bits)");
+        I18n.bind(label, "datatype.sizeBits");
 
         label = new Label(datatypeGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Byte Ordering");
+        I18n.bind(label, "datatype.byteOrdering");
 
         checkUnsigned = new Button(datatypeGroup, SWT.CHECK);
         checkUnsigned.setFont(curFont);
-        checkUnsigned.setText("Unsigned");
+        I18n.bind(checkUnsigned, "datatype.unsigned");
         checkUnsigned.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
 
         classChoice = new Combo(datatypeGroup, SWT.DROP_DOWN | SWT.READ_ONLY);
@@ -259,7 +260,7 @@ public class NewDataObjectDialog extends Dialog {
                     endianChoice.setEnabled(false);
                     checkUnsigned.setEnabled(false);
                     lengthField.setEnabled(true);
-                    lengthField.setText("String length");
+                    lengthField.setText(I18n.text("datatype.stringLength"));
                 }
                 else if (idx == 4) { // REFERENCE
                     sizeChoice.setEnabled(false);
@@ -271,7 +272,7 @@ public class NewDataObjectDialog extends Dialog {
                     sizeChoice.setEnabled(true);
                     checkUnsigned.setEnabled(true);
                     lengthField.setEnabled(true);
-                    lengthField.setText("0=R,1=G,#=TXT,...");
+                    lengthField.setText(I18n.text("datatype.enumMembers"));
                 }
                 else if (idx == 8) {
                     sizeChoice.setEnabled(false);
@@ -282,17 +283,26 @@ public class NewDataObjectDialog extends Dialog {
             }
         });
 
-        classChoice.add("INTEGER");
-        classChoice.add("FLOAT");
-        classChoice.add("CHAR");
+        classChoice.add("");
+        classChoice.add("");
+        classChoice.add("");
 
         if (isH5) {
-            classChoice.add("STRING");
-            classChoice.add("REFERENCE");
-            classChoice.add("ENUM");
-            classChoice.add("VLEN_INTEGER");
-            classChoice.add("VLEN_FLOAT");
-            classChoice.add("VLEN_STRING");
+            classChoice.add("");
+            classChoice.add("");
+            classChoice.add("");
+            classChoice.add("");
+            classChoice.add("");
+            classChoice.add("");
+        }
+
+        if (isH5) {
+            I18n.bindItems(classChoice, "datatype.integer", "datatype.float", "datatype.char",
+                           "datatype.string", "datatype.reference", "datatype.enum",
+                           "datatype.vlenInteger", "datatype.vlenFloat", "datatype.vlenString");
+        }
+        else {
+            I18n.bindItems(classChoice, "datatype.integer", "datatype.float", "datatype.char");
         }
 
         sizeChoice = new Combo(datatypeGroup, SWT.DROP_DOWN | SWT.READ_ONLY);
@@ -308,36 +318,41 @@ public class NewDataObjectDialog extends Dialog {
             }
         });
 
+        sizeChoice.add("");
+        sizeChoice.add("");
+        sizeChoice.add("");
+        sizeChoice.add("");
+        sizeChoice.add("");
+
         if (isH5) {
-            sizeChoice.add("NATIVE");
+            I18n.bindItems(sizeChoice, "datatype.native", "datatype.size8", "datatype.size16",
+                           "datatype.size32", "datatype.size64");
         }
         else {
-            sizeChoice.add("DEFAULT");
+            I18n.bindItems(sizeChoice, "datatype.default", "datatype.size8", "datatype.size16",
+                           "datatype.size32", "datatype.size64");
         }
-
-        sizeChoice.add("8");
-        sizeChoice.add("16");
-        sizeChoice.add("32");
-        sizeChoice.add("64");
 
         endianChoice = new Combo(datatypeGroup, SWT.DROP_DOWN | SWT.READ_ONLY);
         endianChoice.setFont(curFont);
         endianChoice.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         endianChoice.setEnabled(isH5);
 
+        endianChoice.add("");
         if (isH5) {
-            endianChoice.add("NATIVE");
-            endianChoice.add("LITTLE ENDIAN");
-            endianChoice.add("BIG ENDIAN");
+            endianChoice.add("");
+            endianChoice.add("");
         }
-        else {
-            endianChoice.add("DEFAULT");
-        }
+
+        if (isH5)
+            I18n.bindItems(endianChoice, "datatype.native", "datatype.littleEndian", "datatype.bigEndian");
+        else
+            I18n.bindItems(endianChoice, "datatype.default");
 
         lengthField = new Text(datatypeGroup, SWT.SINGLE | SWT.BORDER);
         lengthField.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         lengthField.setFont(curFont);
-        lengthField.setText("String Length");
+        I18n.bindMessage(lengthField, "datatype.stringLength");
         lengthField.setEnabled(false);
 
         classChoice.select(0);
@@ -434,7 +449,8 @@ public class NewDataObjectDialog extends Dialog {
 
                     if (stringLength <= 0) {
                         shell.getDisplay().beep();
-                        Tools.showError(shell, "Create", "Invalid string length: " + lengthField.getText());
+                        Tools.showError(shell, I18n.text("action.create"),
+                                        I18n.text("message.invalidStringLength", lengthField.getText()));
                         return null;
                     }
                     tsize = stringLength;
@@ -483,7 +499,7 @@ public class NewDataObjectDialog extends Dialog {
 
             if ((tsize == 8) && !isH5 && (tclass == Datatype.CLASS_INTEGER)) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "HDF4 does not support 64-bit integer.");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.hdf4No64Bit"));
                 return null;
             }
 
@@ -511,7 +527,8 @@ public class NewDataObjectDialog extends Dialog {
                     strEnumMap = lengthField.getText();
                     if ((strEnumMap == null) || (strEnumMap.length() < 1) || strEnumMap.endsWith("...")) {
                         shell.getDisplay().beep();
-                        Tools.showError(shell, "Create", "Invalid member values: " + lengthField.getText());
+                        Tools.showError(shell, I18n.text("action.create"),
+                                        I18n.text("message.invalidMemberValues", lengthField.getText()));
                         return null;
                     }
                     log.trace("CLASS_ENUM enumStr={}", strEnumMap);
@@ -529,7 +546,7 @@ public class NewDataObjectDialog extends Dialog {
             }
             catch (Exception ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", ex.getMessage());
+                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                 return null;
             }
         }

@@ -17,6 +17,7 @@ package hdf.view.dialog;
 import java.util.ArrayList;
 
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +61,7 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
     /**
      * Configuration page for user-implementable modules.
      */
-    public UserOptionsViewModulesPage() { super("View Modules Settings"); }
+    public UserOptionsViewModulesPage() { super(I18n.text("options.modules")); }
 
     /**
      * Performs special processing when this page's Defaults button has been pressed.
@@ -152,7 +153,7 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
         treeViewGroup.setLayout(new FillLayout());
         treeViewGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         treeViewGroup.setFont(curFont);
-        treeViewGroup.setText("TreeView Provider");
+        I18n.bind(treeViewGroup, "options.treeProvider");
 
         choiceTreeView = new Combo(treeViewGroup, SWT.SINGLE | SWT.READ_ONLY);
         choiceTreeView.setFont(curFont);
@@ -162,7 +163,7 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
         metadataViewGroup.setLayout(new FillLayout());
         metadataViewGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         metadataViewGroup.setFont(curFont);
-        metadataViewGroup.setText("MetaDataView Provider");
+        I18n.bind(metadataViewGroup, "options.metadataProvider");
 
         choiceMetaDataView = new Combo(metadataViewGroup, SWT.SINGLE | SWT.READ_ONLY);
         choiceMetaDataView.setFont(curFont);
@@ -171,7 +172,7 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
         tableViewGroup.setLayout(new FillLayout());
         tableViewGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         tableViewGroup.setFont(curFont);
-        tableViewGroup.setText("TableView Provider");
+        I18n.bind(tableViewGroup, "options.tableProvider");
 
         choiceTableView = new Combo(tableViewGroup, SWT.SINGLE | SWT.READ_ONLY);
         choiceTableView.setFont(curFont);
@@ -180,7 +181,7 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
         imageViewGroup.setLayout(new FillLayout());
         imageViewGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         imageViewGroup.setFont(curFont);
-        imageViewGroup.setText("ImageView Provider");
+        I18n.bind(imageViewGroup, "options.imageProvider");
 
         choiceImageView = new Combo(imageViewGroup, SWT.SINGLE | SWT.READ_ONLY);
         choiceImageView.setFont(curFont);
@@ -190,7 +191,7 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
         paletteViewGroup.setLayout(new FillLayout());
         paletteViewGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         paletteViewGroup.setFont(curFont);
-        paletteViewGroup.setText("PaletteView Provider");
+        I18n.bind(paletteViewGroup, "options.paletteProvider");
 
         choicePaletteView = new Combo(paletteViewGroup, SWT.SINGLE | SWT.READ_ONLY);
         choicePaletteView.setFont(curFont);

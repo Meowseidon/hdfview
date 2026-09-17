@@ -11,10 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
 import org.eclipse.swtbot.swt.finder.matchers.WidgetOfType;
-import org.eclipse.swtbot.swt.finder.matchers.WithRegex;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTree;
@@ -43,9 +41,9 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
                        "createNewHDF5Dataset() filetree is missing file '" + filename + "'");
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Group").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            SWTBotShell groupShell = bot.shell("New Group...");
+            SWTBotShell groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -55,7 +53,7 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
             assertTrue(val.equals(groupname), constructWrongValueMessage("createNewHDF5Dataset()",
                                                                          "wrong group name", groupname, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
 
             assertTrue(filetree.visibleRowCount() == 2,
@@ -68,9 +66,9 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
 
             items[0].getNode(0).click();
 
-            items[0].getNode(0).contextMenu().contextMenu("New").menu("Dataset").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.dataset")).click();
 
-            SWTBotShell datasetShell = bot.shell("New Dataset...");
+            SWTBotShell datasetShell = bot.shell(ui("dialog.newDataset.title"));
             datasetShell.activate();
             bot.waitUntil(Conditions.shellIsActive(datasetShell.getText()));
 
@@ -87,11 +85,11 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
                        constructWrongValueMessage("createNewHDF5Dataset()", "wrong dataset dimension sizes",
                                                   datasetdimsize, val));
 
-            datasetShell.bot().button("   &OK   ").click();
+            datasetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(datasetShell));
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Expand All").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.expandAll")).click();
 
             assertTrue(filetree.visibleRowCount() == 3,
                        constructWrongValueMessage("createNewHDF5Dataset()", "filetree wrong row count", "3",
@@ -104,13 +102,8 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
                        "createNewHDF5Dataset() filetree is missing dataset '" + datasetname + "'");
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             final SWTBotNatTable table =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -138,19 +131,13 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Save Changes to File").click();
+            tableMenu(tableShell).menu(ui("table.saveChanges")).click();
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -165,8 +152,7 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -178,8 +164,7 @@ public class TestTreeViewNewMenu extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {

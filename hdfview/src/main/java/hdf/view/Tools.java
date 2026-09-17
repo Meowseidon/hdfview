@@ -56,6 +56,7 @@ import hdf.object.FileFormat;
 import hdf.object.Group;
 import hdf.object.ScalarDS;
 import hdf.view.ViewProperties.BITMASK_OP;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,18 +161,18 @@ public final class Tools {
         File imgFile = null;
 
         if (imgFileName == null)
-            throw new NullPointerException("The source image file is null.");
+            throw new NullPointerException(I18n.text("message.sourceImageNull"));
 
         imgFile = new File(imgFileName);
         if (!imgFile.exists())
-            throw new NullPointerException("The source image file does not exist.");
+            throw new NullPointerException(I18n.text("message.sourceImageMissing"));
         if (hFileName == null)
-            throw new NullPointerException("The target HDF file is null.");
+            throw new NullPointerException(I18n.text("message.targetHdfNull"));
 
         if (!fromType.equals(FILE_TYPE_IMAGE))
-            throw new UnsupportedOperationException("Unsupported image type.");
+            throw new UnsupportedOperationException(I18n.text("message.unsupportedImageType"));
         else if (!(toType.equals(FileFormat.FILE_TYPE_HDF4) || toType.equals(FileFormat.FILE_TYPE_HDF5)))
-            throw new UnsupportedOperationException("Unsupported destination file type.");
+            throw new UnsupportedOperationException(I18n.text("message.unsupportedDestinationType"));
 
         BufferedImage image = null;
         try {
@@ -184,7 +185,7 @@ public final class Tools {
         }
 
         if (image == null)
-            throw new UnsupportedOperationException("Failed to read image: " + imgFileName);
+            throw new UnsupportedOperationException(I18n.text("message.readImageFailed", imgFileName));
 
         long h      = image.getHeight();
         long w      = image.getWidth();
@@ -258,7 +259,7 @@ public final class Tools {
     public static void saveImageAs(BufferedImage image, File file, String type) throws IOException
     {
         if (image == null)
-            throw new NullPointerException("The source image is null.");
+            throw new NullPointerException(I18n.text("message.sourceImageNull"));
 
         ImageIO.write(image, type, file);
     }
@@ -2896,7 +2897,7 @@ public final class Tools {
                 if (runtime.exec(new String[] {"which", browsers[count]}).waitFor() == 0)
                     browser = browsers[count];
             if (browser == null)
-                throw new Exception("Could not find web browser");
+                throw new Exception(I18n.text("message.browserNotFound"));
             else
                 runtime.exec(new String[] {browser, url});
         }
@@ -2926,7 +2927,7 @@ public final class Tools {
 
         fname = fname.trim();
         if ((fname == null) || (fname.length() == 0))
-            throw new Exception("Invalid file name.");
+            throw new Exception(I18n.text("message.invalidFileName"));
 
         String extensions   = FileFormat.getFileExtensions();
         boolean noExtension = true;
@@ -2952,7 +2953,7 @@ public final class Tools {
         }
 
         if (f.exists() && f.isDirectory())
-            throw new Exception("File is a directory.");
+            throw new Exception(I18n.text("message.fileIsDirectory"));
         log.trace("createNewFile: {} not a directory", filename);
 
         File pfile = f.getParentFile();
@@ -2961,7 +2962,7 @@ public final class Tools {
             f     = new File(fname);
         }
         else if (!pfile.exists()) {
-            throw new Exception("File path does not exist at\n" + pfile.getPath());
+            throw new Exception(I18n.text("message.filePathMissing", pfile.getPath()));
         }
 
         // check if the file is in use
@@ -2972,15 +2973,18 @@ public final class Tools {
             while (iterator.hasNext()) {
                 theFile = iterator.next();
                 if (theFile.getFilePath().equals(fname))
-                    throw new Exception("Unable to create the new file. \nThe file is being used.");
+                    throw new Exception(I18n.text("message.fileInUse"));
             }
         }
 
         if (f.exists()) {
             log.trace("createNewFile: {} file exists", filename);
 
-            if (!MessageDialog.openConfirm(display.getShells()[0], "Create New File",
-                                           "File exists. Do you want to replace it?"))
+            MessageDialog replaceDialog = new MessageDialog(
+                display.getShells()[0], I18n.text("message.createNewFile.title"), null,
+                I18n.text("message.createNewFile.replace"), MessageDialog.CONFIRM,
+                new String[] {I18n.text("button.yes"), I18n.text("button.no")}, 0);
+            if (replaceDialog.open() != 0)
                 return null;
         }
 
@@ -3071,8 +3075,11 @@ public final class Tools {
                 dlgTitlePrefix += " - ";
         }
 
-        MessageDialog.openError(parent, dlgTitlePrefix + dlgTitleSuffix,
-                                (errorMsg == null) ? "UNKNOWN" : errorMsg);
+        MessageDialog dialog = new MessageDialog(
+            parent, dlgTitlePrefix + dlgTitleSuffix, null,
+            (errorMsg == null) ? I18n.text("common.unknown") : errorMsg,
+            MessageDialog.ERROR, new String[] {I18n.text("button.ok")}, 0);
+        dialog.open();
     }
 
     /**
@@ -3095,8 +3102,11 @@ public final class Tools {
                 dlgTitlePrefix += " - ";
         }
 
-        MessageDialog.openInformation(parent, dlgTitlePrefix + dlgTitleSuffix,
-                                      (infoMsg == null) ? "UNKNOWN" : infoMsg);
+        MessageDialog dialog = new MessageDialog(
+            parent, dlgTitlePrefix + dlgTitleSuffix, null,
+            (infoMsg == null) ? I18n.text("common.unknown") : infoMsg,
+            MessageDialog.INFORMATION, new String[] {I18n.text("button.ok")}, 0);
+        dialog.open();
     }
 
     /**
@@ -3121,8 +3131,12 @@ public final class Tools {
                 dlgTitlePrefix += " - ";
         }
 
-        return MessageDialog.openConfirm(parent, dlgTitlePrefix + dlgTitleSuffix,
-                                         (confMsg == null) ? "UNKNOWN" : confMsg);
+        MessageDialog dialog = new MessageDialog(
+            parent, dlgTitlePrefix + dlgTitleSuffix, null,
+            (confMsg == null) ? I18n.text("common.unknown") : confMsg,
+            MessageDialog.CONFIRM,
+            new String[] {I18n.text("button.yes"), I18n.text("button.no")}, 0);
+        return dialog.open() == 0;
     }
 
     /**
@@ -3145,7 +3159,10 @@ public final class Tools {
                 dlgTitlePrefix += " - ";
         }
 
-        MessageDialog.openWarning(parent, dlgTitlePrefix + dlgTitleSuffix,
-                                  (warnMsg == null) ? "UNKNOWN" : warnMsg);
+        MessageDialog dialog = new MessageDialog(
+            parent, dlgTitlePrefix + dlgTitleSuffix, null,
+            (warnMsg == null) ? I18n.text("common.unknown") : warnMsg,
+            MessageDialog.WARNING, new String[] {I18n.text("button.ok")}, 0);
+        dialog.open();
     }
 }

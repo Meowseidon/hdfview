@@ -24,6 +24,7 @@ import hdf.object.h5.H5Datatype;
 import hdf.object.h5.H5ScalarAttr;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyledText;
@@ -89,7 +90,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Attribute...");
+        I18n.bind(shell, "dialog.newAttribute.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
@@ -100,7 +101,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
 
         Label attributeNameLabel = new Label(fieldComposite, SWT.LEFT);
         attributeNameLabel.setFont(curFont);
-        attributeNameLabel.setText("Attribute name: ");
+        I18n.bind(attributeNameLabel, "label.attributeName");
 
         nameField = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -111,7 +112,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
 
         Label parentObjectLabel = new Label(fieldComposite, SWT.LEFT);
         parentObjectLabel.setFont(curFont);
-        parentObjectLabel.setText("Parent Object: ");
+        I18n.bind(parentObjectLabel, "label.parentObject");
 
         // Create Datatype region
         createDatatypeWidget();
@@ -119,17 +120,17 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
         // Create Dataspace region
         org.eclipse.swt.widgets.Group dataspaceGroup = new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
         dataspaceGroup.setFont(curFont);
-        dataspaceGroup.setText("Dataspace");
+        I18n.bind(dataspaceGroup, "dialog.dataspace");
         dataspaceGroup.setLayout(new GridLayout(3, true));
         dataspaceGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         Label label = new Label(dataspaceGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("No. of dimensions");
+        I18n.bind(label, "dialog.noDimensions");
 
         label = new Label(dataspaceGroup, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Current size");
+        I18n.bind(label, "dialog.currentSize");
 
         // Dummy label
         label = new Label(dataspaceGroup, SWT.LEFT);
@@ -174,7 +175,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
 
         Button okButton = new Button(buttonComposite, SWT.PUSH);
         okButton.setFont(curFont);
-        okButton.setText("   &OK   ");
+        I18n.bind(okButton, "button.ok");
         okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
         okButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -188,7 +189,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
 
         Button cancelButton = new Button(buttonComposite, SWT.PUSH);
         cancelButton.setFont(curFont);
-        cancelButton.setText(" &Cancel ");
+        I18n.bind(cancelButton, "button.cancel");
         cancelButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, false, false));
         cancelButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -201,7 +202,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
 
         Button helpButton = new Button(buttonComposite, SWT.PUSH);
         helpButton.setFont(curFont);
-        helpButton.setText(" &Help ");
+        I18n.bind(helpButton, "button.help");
         helpButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
         helpButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -254,7 +255,8 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
             }
             catch (NumberFormatException ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Check", "Invalid dimension size: " + dimStr);
+                Tools.showError(shell, I18n.text("action.check"),
+                                I18n.text("message.invalidDimension", dimStr));
                 return;
             }
         } //  (int i = 0; i < rank; i++)
@@ -274,7 +276,8 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
 
         if ((attrName == null) || (attrName.length() < 1)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Attribute name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.attribute")));
             return false;
         }
 
@@ -282,8 +285,8 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
         StringTokenizer st = new StringTokenizer(currentSizeField.getText(), "x");
         if (st.countTokens() < rank) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create",
-                            "Number of values in the current dimension size is less than " + rank);
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.currentDimensionCount", rank));
             return false;
         }
 
@@ -298,13 +301,15 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
             }
             catch (NumberFormatException ex) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Invalid dimension size: " + currentSizeField.getText());
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.invalidDimension", currentSizeField.getText()));
                 return false;
             }
 
             if (l <= 0) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Dimension size must be greater than zero.");
+                Tools.showError(shell, I18n.text("action.create"),
+                                I18n.text("message.dimensionPositive"));
                 return false;
             }
 
@@ -328,7 +333,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
             attr.writeAttribute();
         }
         catch (Exception ex) {
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             log.debug("createAttribute(): ", ex);
             return false;
         }
@@ -403,7 +408,7 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
             helpShell =
                 new Shell(parent, SWT.TITLE | SWT.CLOSE | SWT.RESIZE | SWT.BORDER | SWT.APPLICATION_MODAL);
             helpShell.setFont(curFont);
-            helpShell.setText("Create New Attribute");
+            I18n.bind(helpShell, "dialog.createNewAttribute.title");
             helpShell.setImages(ViewProperties.getHdfIcons());
             helpShell.setLayout(new GridLayout(1, true));
 
@@ -411,12 +416,12 @@ public class NewScalarAttributeDialog extends NewDataObjectDialog {
             StyledText helpText = new StyledText(
                 helpShell, SWT.MULTI | SWT.READ_ONLY | SWT.WRAP | SWT.V_SCROLL | SWT.BORDER);
             helpText.setFont(curFont);
-            helpText.setText(HELP_INFORMATION);
+            I18n.bind(helpText, "dialog.help.newAttribute.text");
             helpText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
             Button okButton = new Button(helpShell, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override

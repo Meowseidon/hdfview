@@ -14,6 +14,8 @@
 
 package hdf.view.dialog;
 
+import hdf.view.i18n.I18n;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,12 +79,12 @@ public abstract class UserOptionsDefaultPage extends PreferencePage {
             /* Apply and default button are shown */
 
             /* Customize apply button (text + image) */
-            applyButton.setText("apply changes");
+            I18n.bind(applyButton, "button.applyChanges");
             // applyButton.setImage(SWTHelper.loadImage("save.gif"));
             this.setButtonLayoutData(applyButton);
 
             /* Customize defaults button (text + image) */
-            defaultsButton.setText("restore defaults");
+            I18n.bind(defaultsButton, "button.restoreDefaults");
             // defaultsButton.setImage(SWTHelper.loadImage("clear.gif"));
             this.setButtonLayoutData(defaultsButton);
         }
