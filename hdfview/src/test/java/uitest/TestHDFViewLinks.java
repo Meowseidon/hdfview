@@ -7,6 +7,8 @@ import static org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory.widget
 
 import java.io.File;
 
+import hdf.view.i18n.I18n;
+
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -499,7 +501,7 @@ public class TestHDFViewLinks extends AbstractWindowTest {
             // Change link target to existing object
             items[0].getNode(2).click();
 
-            SWTBotTabItem tabItem = bot.tabItem("General Object Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             tabItem.activate();
 
             val = bot.textWithLabel("Link To Target: ").getText();
@@ -759,7 +761,7 @@ public class TestHDFViewLinks extends AbstractWindowTest {
             // Change link target to existing object
             items[0].getNode(0).click();
 
-            SWTBotTabItem tabItem = bot.tabItem("General Object Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             tabItem.activate();
 
             val             = bot.textWithLabel("Link To Target: ").getText();

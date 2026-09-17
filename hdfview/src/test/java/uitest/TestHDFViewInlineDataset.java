@@ -14,6 +14,7 @@ import hdf.object.FileFormat;
 import hdf.object.HObject;
 import hdf.object.h5.H5File;
 import hdf.object.h5.H5ScalarDS;
+import hdf.view.i18n.I18n;
 
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
@@ -48,10 +49,10 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
 
             firstDataset.click();
 
-            SWTBotTabItem dataTab = waitForTab("Data Content");
+            SWTBotTabItem dataTab = waitForTab("tab.dataContent");
             assertTrue(dataTab.isActive(), "single-clicking a Dataset must select Data Content");
-            assertNotNull(bot.tabItem("Object Attribute Info"));
-            assertNotNull(bot.tabItem("General Object Info"));
+            assertNotNull(bot.tabItem(I18n.text("tab.objectAttributeInfo")));
+            assertNotNull(bot.tabItem(I18n.text("tab.generalObjectInfo")));
             assertTrue(bot.widget(widgetOfType(NatTable.class)) instanceof NatTable,
                        "Data Content must contain the existing NatTable");
 
@@ -60,14 +61,14 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
 
             assertEquals(shellCount, bot.shells().length,
                          "default Dataset double-click must not create a TableView Shell");
-            assertTrue(waitForTab("Data Content").isActive(),
+            assertTrue(waitForTab("tab.dataContent").isActive(),
                        "default Dataset double-click must focus the inline Data Content tab");
 
             SWTBotTreeItem secondDataset = fileItem.getNode("DU64BITS");
             secondDataset.click();
-            assertTrue(waitForTab("Data Content").isActive(),
+            assertTrue(waitForTab("tab.dataContent").isActive(),
                        "switching Dataset must select its own Data Content tab");
-            SWTBotTabItem generalTab = bot.tabItem("General Object Info");
+            SWTBotTabItem generalTab = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             generalTab.activate();
             assertEquals("DU64BITS", bot.textWithLabel("Name: ").getText(),
                          "switching Dataset must refresh General Object Info");
@@ -90,29 +91,29 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
             group.expand();
 
             group.click();
-            SWTBotTabItem generalTab = waitForTab("General Object Info");
+            SWTBotTabItem generalTab = waitForTab("tab.generalObjectInfo");
             generalTab.activate();
             assertEquals("g2", bot.textWithLabel("Name: ").getText(),
                          "Group selection must refresh metadata for the Group");
-            assertThrows(WidgetNotFoundException.class, () -> bot.tabItem("Data Content"),
+            assertThrows(WidgetNotFoundException.class, () -> bot.tabItem(I18n.text("tab.dataContent")),
                          "a Group must not receive an empty editable Data Content tab");
 
             SWTBotTreeItem dataset = group.getNode("array");
             dataset.click();
-            assertTrue(waitForTab("Data Content").isActive(),
+            assertTrue(waitForTab("tab.dataContent").isActive(),
                        "selecting a Dataset after a Group must create Data Content");
 
-            generalTab = bot.tabItem("General Object Info");
+            generalTab = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             generalTab.activate();
             assertEquals("array", bot.textWithLabel("Name: ").getText(),
                          "Dataset metadata must not retain the previous Group");
 
             group.click();
-            generalTab = waitForTab("General Object Info");
+            generalTab = waitForTab("tab.generalObjectInfo");
             generalTab.activate();
             assertEquals("g2", bot.textWithLabel("Name: ").getText(),
                          "returning to a Group must restore Group metadata");
-            assertThrows(WidgetNotFoundException.class, () -> bot.tabItem("Data Content"),
+            assertThrows(WidgetNotFoundException.class, () -> bot.tabItem(I18n.text("tab.dataContent")),
                          "switching back to a Group must remove the Dataset table");
         }
         finally {
@@ -130,7 +131,7 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
         try {
             SWTBotTreeItem dataset = bot.tree().getTreeItem(EDIT_FILE).getNode(EDIT_DATASET);
             dataset.click();
-            waitForTab("Data Content");
+            waitForTab("tab.dataContent");
 
             SWTBotNatTable table = new SWTBotNatTable(bot.widget(widgetOfType(NatTable.class)));
             table.click(1, 1);
@@ -148,7 +149,7 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
             assertEquals(newValue, table.getCellDataValueByPosition(1, 1),
                          "inline editing must update the existing TableView data provider");
 
-            bot.menu().menu("File").menu("Save").click();
+            bot.menu().menu(I18n.text("menu.file")).menu(I18n.text("menu.file.save")).click();
         }
         finally {
             closeFile(hdfFile, false);
@@ -163,8 +164,9 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
                      "the value reread from disk must equal the value saved through HDFView");
     }
 
-    private SWTBotTabItem waitForTab(final String tabName)
+    private SWTBotTabItem waitForTab(final String tabKey)
     {
+        final String tabName = I18n.text(tabKey);
         bot.waitUntil(new DefaultCondition() {
             @Override
             public boolean test()

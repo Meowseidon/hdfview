@@ -11,6 +11,8 @@ import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
+import hdf.view.i18n.I18n;
+
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -140,7 +142,7 @@ public class TestTreeViewFiles extends AbstractWindowTest {
 
             items[0].click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             SWTBotTable attrTable = bot.table();
@@ -230,7 +232,7 @@ public class TestTreeViewFiles extends AbstractWindowTest {
 
             items[0].click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             SWTBotTable attrTable = bot.table();
@@ -377,7 +379,7 @@ public class TestTreeViewFiles extends AbstractWindowTest {
 
             items[0].click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             SWTBotTable attrTable = bot.table();
@@ -445,7 +447,7 @@ public class TestTreeViewFiles extends AbstractWindowTest {
 
             items[0].getNode(7).click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             SWTBotTable attrTable = bot.table();
@@ -834,7 +836,7 @@ public class TestTreeViewFiles extends AbstractWindowTest {
 
             items[0].click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             SWTBotTable attrTable = bot.table();
@@ -945,7 +947,7 @@ public class TestTreeViewFiles extends AbstractWindowTest {
 
             items[0].getNode(1).click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex("Properties.*at.*\\[.*in.*\\]");

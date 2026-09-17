@@ -63,6 +63,7 @@ import hdf.view.ViewProperties.BITMASK_OP;
 import hdf.view.dialog.InputDialog;
 import hdf.view.dialog.MathConversionDialog;
 import hdf.view.dialog.NewDatasetDialog;
+import hdf.view.i18n.I18n;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -723,9 +724,8 @@ public abstract class DefaultBaseTableView implements TableView {
             return;
 
         if (dataProvider != null && dataProvider.getIsValueChanged() && !isReadOnly && dataObject != null) {
-            if (Tools.showConfirm(shell, "Changes Detected",
-                                  "\"" + ((HObject)dataObject).getName() +
-                                      "\" has changed.\nDo you want to save the changes?"))
+            if (Tools.showConfirm(shell, I18n.text("message.changesDetected.title"),
+                                  I18n.text("message.changesDetected.text", ((HObject)dataObject).getName())))
                 updateValueInFile();
             else
                 dataObject.clearData();
@@ -886,13 +886,13 @@ public abstract class DefaultBaseTableView implements TableView {
         boolean isEditable = !isReadOnly;
 
         MenuItem tableMenuItem = new MenuItem(menuBar, SWT.CASCADE);
-        tableMenuItem.setText("&Table");
+        I18n.bind(tableMenuItem, "table");
 
         Menu tableMenu = new Menu(theShell, SWT.DROP_DOWN);
         tableMenuItem.setMenu(tableMenu);
 
         MenuItem item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Select All");
+        I18n.bind(item, "table.selectAll");
         item.setAccelerator(SWT.CTRL | 'A');
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -909,7 +909,7 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Copy");
+        I18n.bind(item, "table.copy");
         item.setAccelerator(SWT.CTRL | 'C');
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -920,7 +920,7 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Paste");
+        I18n.bind(item, "table.paste");
         item.setAccelerator(SWT.CTRL | 'V');
         item.setEnabled(isEditable);
         item.addSelectionListener(new SelectionAdapter() {
@@ -934,7 +934,7 @@ public abstract class DefaultBaseTableView implements TableView {
         new MenuItem(tableMenu, SWT.SEPARATOR);
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Copy to New Dataset");
+        I18n.bind(item, "table.copyToNewDataset");
         item.setEnabled(isEditable && (dataObject instanceof ScalarDS));
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -981,7 +981,7 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Save Changes to File");
+        I18n.bind(item, "table.saveChanges");
         item.setAccelerator(SWT.CTRL | 'U');
         item.setEnabled(isEditable);
         item.addSelectionListener(new SelectionAdapter() {
@@ -1001,7 +1001,7 @@ public abstract class DefaultBaseTableView implements TableView {
         new MenuItem(tableMenu, SWT.SEPARATOR);
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Show Lineplot");
+        I18n.bind(item, "table.showLineplot");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1011,7 +1011,7 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Show Statistics");
+        I18n.bind(item, "table.showStatistics");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1055,7 +1055,7 @@ public abstract class DefaultBaseTableView implements TableView {
         new MenuItem(tableMenu, SWT.SEPARATOR);
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Math Conversion");
+        I18n.bind(item, "table.mathConversion");
         item.setEnabled(isEditable);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1074,7 +1074,7 @@ public abstract class DefaultBaseTableView implements TableView {
         new MenuItem(tableMenu, SWT.SEPARATOR);
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Close");
+        I18n.bind(item, "table.close");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1088,7 +1088,7 @@ public abstract class DefaultBaseTableView implements TableView {
 
         // Set up MenuItems for refreshing the TableView *
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Start Timer");
+        I18n.bind(item, "table.startTimer");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1098,7 +1098,7 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         item = new MenuItem(tableMenu, SWT.PUSH);
-        item.setText("Stop Timer");
+        I18n.bind(item, "table.stopTimer");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1109,19 +1109,19 @@ public abstract class DefaultBaseTableView implements TableView {
 
         // Set up MenuItems for Importing/Exporting Data from the TableView *
         MenuItem importExportMenuItem = new MenuItem(menuBar, SWT.CASCADE);
-        importExportMenuItem.setText("&Import/Export Data");
+        I18n.bind(importExportMenuItem, "table.importExport");
 
         Menu importExportMenu = new Menu(theShell, SWT.DROP_DOWN);
         importExportMenuItem.setMenu(importExportMenu);
 
         item = new MenuItem(importExportMenu, SWT.CASCADE);
-        item.setText("Export Data to");
+        I18n.bind(item, "table.exportDataTo");
 
         Menu exportMenu = new Menu(item);
         item.setMenu(exportMenu);
 
         item = new MenuItem(exportMenu, SWT.PUSH);
-        item.setText("Text File");
+        I18n.bind(item, "table.textFile");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1137,13 +1137,13 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         item = new MenuItem(importExportMenu, SWT.CASCADE);
-        item.setText("Import Data from");
+        I18n.bind(item, "table.importDataFrom");
 
         Menu importMenu = new Menu(item);
         item.setMenu(importMenu);
 
         item = new MenuItem(importMenu, SWT.PUSH);
-        item.setText("Text File");
+        I18n.bind(item, "table.textFile");
         item.setEnabled(!isReadOnly);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -3016,7 +3016,7 @@ public abstract class DefaultBaseTableView implements TableView {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -3037,7 +3037,7 @@ public abstract class DefaultBaseTableView implements TableView {
 
             Button cancelButton = new Button(buttonComposite, SWT.PUSH);
             cancelButton.setFont(curFont);
-            cancelButton.setText(" &Cancel ");
+            I18n.bind(cancelButton, "button.cancel");
             cancelButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             cancelButton.addSelectionListener(new SelectionAdapter() {
                 @Override

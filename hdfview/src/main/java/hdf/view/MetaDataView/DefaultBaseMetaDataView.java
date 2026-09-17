@@ -41,6 +41,7 @@ import hdf.view.ViewProperties;
 import hdf.view.dialog.InputDialog;
 import hdf.view.dialog.NewScalarAttributeDialog;
 import hdf.view.dialog.NewStringAttributeDialog;
+import hdf.view.i18n.I18n;
 
 import hdf.hdf5lib.H5;
 import hdf.hdf5lib.HDF5Constants;
@@ -230,7 +231,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             TabItem attributeInfoItem = usesParentTabFolder
                 ? new TabItem(contentTabFolder, SWT.NONE)
                 : new TabItem(contentTabFolder, SWT.NONE, ATTR_TAB_INDEX);
-            attributeInfoItem.setText("Object Attribute Info");
+            I18n.bind(attributeInfoItem, "tab.objectAttributeInfo");
             attributeInfoItem.setControl(attributeInfoPane);
         }
 
@@ -239,7 +240,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             TabItem generalInfoItem = usesParentTabFolder
                 ? new TabItem(contentTabFolder, SWT.NONE)
                 : new TabItem(contentTabFolder, SWT.NONE, GENERAL_TAB_INDEX);
-            generalInfoItem.setText("General Object Info");
+            I18n.bind(generalInfoItem, "tab.generalObjectInfo");
             generalInfoItem.setControl(generalObjectInfoPane);
         }
 
@@ -1378,7 +1379,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
 
             Button closeButton = new Button(shell, SWT.CENTER);
             closeButton.setFont(curFont);
-            closeButton.setText(" &Close ");
+            I18n.bind(closeButton, "button.close");
             closeButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, true, false, 5, 1));
             closeButton.addSelectionListener(new SelectionAdapter() {
                 @Override

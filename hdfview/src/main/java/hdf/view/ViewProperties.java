@@ -66,6 +66,9 @@ public class ViewProperties extends PreferenceStore {
     /** the maximum number of most recent files. */
     public static final int MAX_RECENT_FILES = 15;
 
+    /** User preference key for the HDFView UI language. */
+    public static final String LANGUAGE_PROPERTY = "language";
+
     /** name of the tab delimiter. */
     public static final String DELIMITER_TAB = "Tab";
 
@@ -351,6 +354,7 @@ public class ViewProperties extends PreferenceStore {
         setDefault("recent.file", "");
         setDefault("palette.file", "");
         setDefault("data.delimiter", DELIMITER_TAB);
+        setDefault(LANGUAGE_PROPERTY, "en");
     }
 
     /**
