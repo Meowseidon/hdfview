@@ -62,7 +62,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
              *
              * retriever.testAllTableLocations(filtersExpectedData);
              *
-             * tableShell.bot().menu().menu("Table").menu("Close").click();
+             * tableMenu(tableShell).menu(ui("action.close")).click();
              * bot.waitUntil(Conditions.shellCloses(tableShell));
              */
 
@@ -73,8 +73,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "alloc_time_incr");
             dataTable  = getNatTable(tableShell);
@@ -83,8 +82,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "alloc_time_late");
             dataTable  = getNatTable(tableShell);
@@ -93,8 +91,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "chunked");
             dataTable  = getNatTable(tableShell);
@@ -103,8 +100,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "compact");
             dataTable  = getNatTable(tableShell);
@@ -113,8 +109,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "contiguous");
             dataTable  = getNatTable(tableShell);
@@ -123,8 +118,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "deflate");
             dataTable  = getNatTable(tableShell);
@@ -133,8 +127,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             tableShell = openTreeviewObject(filetree, testFilename, "fletcher32");
             dataTable  = getNatTable(tableShell);
@@ -143,8 +136,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             /*
              * Future: Add data verification for nbit filter
@@ -156,7 +148,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
              *
              * retriever.testAllTableLocations(filtersExpectedData);
              *
-             * tableShell.bot().menu().menu("Table").menu("Close").click();
+             * tableMenu(tableShell).menu(ui("action.close")).click();
              * bot.waitUntil(Conditions.shellCloses(tableShell));
              */
 
@@ -170,7 +162,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
              *
              * retriever.testAllTableLocations(filtersExpectedData);
              *
-             * tableShell.bot().menu().menu("Table").menu("Close").click();
+             * tableMenu(tableShell).menu(ui("action.close")).click();
              * bot.waitUntil(Conditions.shellCloses(tableShell));
              */
 
@@ -181,8 +173,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
 
             retriever.testAllTableLocations(filtersExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             /*
              * Disabled: SZIP filter not available in test environment
@@ -193,7 +184,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
              *
              * retriever.testAllTableLocations(filtersExpectedData);
              *
-             * tableShell.bot().menu().menu("Table").menu("Close").click();
+             * tableMenu(tableShell).menu(ui("action.close")).click();
              * bot.waitUntil(Conditions.shellCloses(tableShell));
              */
         }
@@ -207,8 +198,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -229,7 +219,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             SWTBotTree filetree = bot.tree();
             checkFileTree(filetree, "checkHDF5Filters()", 17, testFilename);
 
-            SWTBotTabItem tabItem = openMetadataTab(filetree, testFilename, "all", "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, testFilename, "all", "tab.generalObjectInfo");
             tabItem.activate();
 
             String val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -246,7 +236,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
                            "checkHDF5Filters()", "wrong data",
                            "SHUFFLE: Nbytes = 4, SZIP, GZIP, Error detection filter, NBIT", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "alloc_time_early", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "alloc_time_early", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -261,7 +251,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "alloc_time_incr", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "alloc_time_incr", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -276,7 +266,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "alloc_time_late", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "alloc_time_late", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -291,7 +281,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "chunked", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "chunked", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -306,7 +296,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "compact", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "compact", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -320,7 +310,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "contiguous", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "contiguous", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -334,7 +324,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "deflate", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "deflate", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -349,7 +339,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("GZIP"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "GZIP", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "external", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "external", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -366,7 +356,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NONE"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NONE", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "fletcher32", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "fletcher32", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -382,7 +372,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data",
                                                   "Error detection filter", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "myfilter", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "myfilter", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -396,7 +386,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data",
                                                   "USERDEFINED myfilter(405): 5, 6", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "nbit", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "nbit", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -411,7 +401,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
             assertTrue(val.equals("NBIT"),
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data", "NBIT", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "scaleoffset", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "scaleoffset", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -427,7 +417,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
                        constructWrongValueMessage("checkHDF5Filters()", "wrong data",
                                                   "SCALEOFFSET: MIN BITS = 2", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "shuffle", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "shuffle", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();
@@ -443,7 +433,7 @@ public class TestTreeViewFilters extends AbstractWindowTest {
                 val.equals("SHUFFLE: Nbytes = 4"),
                 constructWrongValueMessage("checkHDF5Filters()", "wrong data", "SHUFFLE: Nbytes = 4", val));
 
-            tabItem = openMetadataTab(filetree, testFilename, "szip", "General Object Info");
+            tabItem = openMetadataTab(filetree, testFilename, "szip", "tab.generalObjectInfo");
             tabItem.activate();
 
             val = bot.labelInGroup("Miscellaneous Dataset Information", 0).getText();

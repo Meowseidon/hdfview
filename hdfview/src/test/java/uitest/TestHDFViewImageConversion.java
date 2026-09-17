@@ -11,8 +11,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swtbot.swt.finder.matchers.WithRegex;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTabItem;
@@ -34,9 +32,9 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
         File hdf_file = new File(workDir, HDF4IMAGE);
 
         try {
-            bot.menu().menu("Tools").menu("Convert Image To").menu("HDF4").click();
+            bot.menu().menu(ui("menu.tools")).menu(ui("menu.tools.convertImage")).menu(ui("menu.tools.convertImage.hdf4")).click();
 
-            SWTBotShell convertshell = bot.shell("Convert Image to HDF4 ...");
+            SWTBotShell convertshell = bot.shell(ui("dialog.convertImage.hdf4.title"));
             convertshell.activate();
             bot.waitUntil(Conditions.shellIsActive(convertshell.getText()));
 
@@ -54,7 +52,7 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
                        constructWrongValueMessage("convertImageToHDF4()", "wrong dest file",
                                                   workDir + File.separator + HDF4IMAGE, val));
 
-            convertshell.bot().button("   &OK   ").click();
+            convertshell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(convertshell));
 
             SWTBotTree filetree    = bot.tree();
@@ -72,40 +70,35 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
             SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             tabItem.activate();
 
-            val = bot.textWithLabel("Name: ").getText();
+            val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(val.equals(JPGFILE),
                        constructWrongValueMessage("convertImageToHDF4()", "wrong image name", JPGFILE,
                                                   val)); // Test dataset name
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 0).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 0).getText();
             assertTrue(val.equals("2"), constructWrongValueMessage("convertImageToHDF4()", "wrong image rank",
                                                                    "2", val)); // Test rank
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 1).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 1).getText();
             assertTrue(val.equals("533 x 533"),
                        constructWrongValueMessage("convertImageToHDF4()", "wrong image dimension sizes",
                                                   "533 x 533", val)); // Test dimension sizes
 
             // Test sample pixels
-            items[0].getNode(0).contextMenu().contextMenu("Open As").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.openAs")).click();
 
-            SWTBotShell openAsShell = bot.shell("Dataset Selection - /" + JPGFILE);
-            openAsShell.bot().radio("&Image").click();
-            openAsShell.bot().button("   &OK   ").click();
+            SWTBotShell openAsShell = bot.shell(ui("dialog.dataOption.title", JPGFILE, "/"));
+            openAsShell.bot().radio(ui("common.image")).click();
+            openAsShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(openAsShell));
 
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            SWTBotShell imageShell = bot.shells()[1];
-            imageShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(imageShell.getText()));
+            SWTBotShell imageShell = openStandaloneDataObject(JPGFILE);
 
             testSamplePixel(325, 53, "x=325,   y=53,   value=(152, 106, 91)");
             testSamplePixel(430, 357, "x=430,   y=357,   value=(83, 80, 107)");
             testSamplePixel(197, 239, "x=197,   y=239,   value=(206, 177, 159)");
 
-            bot.activeShell().bot().menu().menu("Image").menu("Close").click();
+            bot.activeShell().bot().menu().menu(ui("image.menu")).menu(ui("action.close")).click();
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -131,9 +124,9 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
         File hdf_file = new File(workDir, HDF5IMAGE);
 
         try {
-            bot.menu().menu("Tools").menu("Convert Image To").menu("HDF5").click();
+            bot.menu().menu(ui("menu.tools")).menu(ui("menu.tools.convertImage")).menu(ui("menu.tools.convertImage.hdf5")).click();
 
-            SWTBotShell convertshell = bot.shell("Convert Image to HDF5 ...");
+            SWTBotShell convertshell = bot.shell(ui("dialog.convertImage.hdf5.title"));
             convertshell.activate();
             bot.waitUntil(Conditions.shellIsActive(convertshell.getText()));
 
@@ -151,7 +144,7 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
                        constructWrongValueMessage("convertImageToHDF5()", "wrong dest file",
                                                   workDir + File.separator + HDF5IMAGE, val));
 
-            convertshell.bot().button("   &OK   ").click();
+            convertshell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(convertshell));
 
             SWTBotTree filetree    = bot.tree();
@@ -168,40 +161,35 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
             SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             tabItem.activate();
 
-            val = bot.textWithLabel("Name: ").getText();
+            val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(val.equals(JPGFILE),
                        constructWrongValueMessage("convertImageToHDF5()", "wrong image name", JPGFILE,
                                                   val)); // Test dataset name
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 0).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 0).getText();
             assertTrue(val.equals("3"), constructWrongValueMessage("convertImageToHDF5()", "wrong image rank",
                                                                    "3", val)); // Test rank
 
-            val = bot.textInGroup("Dataset Dataspace and Datatype", 1).getText();
+            val = bot.textInGroup(ui("meta.datasetDataspaceDatatype"), 1).getText();
             assertTrue(val.equals("533 x 533 x 3"),
                        constructWrongValueMessage("convertImageToHDF5()", "wrong image dimension sizes",
                                                   "533 x 533 x 3", val)); // Test dimension sizes
 
             // Test sample pixels
-            items[0].getNode(0).contextMenu().contextMenu("Open As").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.openAs")).click();
 
-            SWTBotShell openAsShell = bot.shell("Dataset Selection - /" + JPGFILE);
-            openAsShell.bot().radio("&Image").click();
-            openAsShell.bot().button("   &OK   ").click();
+            SWTBotShell openAsShell = bot.shell(ui("dialog.dataOption.title", JPGFILE, "/"));
+            openAsShell.bot().radio(ui("common.image")).click();
+            openAsShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(openAsShell));
 
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            SWTBotShell imageShell = bot.shells()[1];
-            imageShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(imageShell.getText()));
+            SWTBotShell imageShell = openStandaloneDataObject(JPGFILE);
 
             testSamplePixel(325, 53, "x=325,   y=53,   value=(152, 106, 91)");
             testSamplePixel(430, 357, "x=430,   y=357,   value=(83, 80, 107)");
             testSamplePixel(197, 239, "x=197,   y=239,   value=(206, 177, 159)");
 
-            bot.activeShell().bot().menu().menu("Image").menu("Close").click();
+            bot.activeShell().bot().menu().menu(ui("image.menu")).menu(ui("action.close")).click();
         }
         catch (Exception ex) {
             ex.printStackTrace();

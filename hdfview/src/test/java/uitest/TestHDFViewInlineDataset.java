@@ -70,7 +70,7 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
                        "switching Dataset must select its own Data Content tab");
             SWTBotTabItem generalTab = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             generalTab.activate();
-            assertEquals("DU64BITS", bot.textWithLabel("Name: ").getText(),
+            assertEquals("DU64BITS", bot.textWithLabel(I18n.text("meta.objectName")).getText(),
                          "switching Dataset must refresh General Object Info");
         }
         finally {
@@ -93,7 +93,7 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
             group.click();
             SWTBotTabItem generalTab = waitForTab("tab.generalObjectInfo");
             generalTab.activate();
-            assertEquals("g2", bot.textWithLabel("Name: ").getText(),
+            assertEquals("g2", bot.textWithLabel(I18n.text("meta.objectName")).getText(),
                          "Group selection must refresh metadata for the Group");
             assertThrows(WidgetNotFoundException.class, () -> bot.tabItem(I18n.text("tab.dataContent")),
                          "a Group must not receive an empty editable Data Content tab");
@@ -105,13 +105,13 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
 
             generalTab = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             generalTab.activate();
-            assertEquals("array", bot.textWithLabel("Name: ").getText(),
+            assertEquals("array", bot.textWithLabel(I18n.text("meta.objectName")).getText(),
                          "Dataset metadata must not retain the previous Group");
 
             group.click();
             generalTab = waitForTab("tab.generalObjectInfo");
             generalTab.activate();
-            assertEquals("g2", bot.textWithLabel("Name: ").getText(),
+            assertEquals("g2", bot.textWithLabel(I18n.text("meta.objectName")).getText(),
                          "returning to a Group must restore Group metadata");
             assertThrows(WidgetNotFoundException.class, () -> bot.tabItem(I18n.text("tab.dataContent")),
                          "switching back to a Group must remove the Dataset table");
@@ -124,6 +124,7 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
     @Test
     public void editingInlineDatasetAndSavingChangesTheFile()
     {
+        selectLanguage(I18n.Language.SIMPLIFIED_CHINESE);
         File hdfFile = openFile(EDIT_FILE, FILE_MODE.READ_WRITE);
         String originalValue = null;
         String newValue = null;
@@ -153,6 +154,7 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
         }
         finally {
             closeFile(hdfFile, false);
+            selectLanguage(I18n.Language.ENGLISH);
         }
 
         assertNotNull(originalValue, "the Dataset cell was not read before editing");
@@ -162,6 +164,35 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
                         "saving the inline TableView must change the on-disk Dataset value");
         assertEquals(newValue, valueReadFromFile,
                      "the value reread from disk must equal the value saved through HDFView");
+    }
+
+    private void selectLanguage(I18n.Language language)
+    {
+        if (I18n.getLanguage() == language)
+            return;
+
+        String targetKey = language == I18n.Language.ENGLISH
+            ? "menu.tools.language.english"
+            : "menu.tools.language.simplifiedChinese";
+
+        bot.menu().menu(I18n.text("menu.tools"))
+            .menu(I18n.text("menu.tools.language"))
+            .menu(I18n.text(targetKey))
+            .click();
+
+        bot.waitUntil(new DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                return I18n.getLanguage() == language;
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for HDFView language to become " + language;
+            }
+        });
     }
 
     private SWTBotTabItem waitForTab(final String tabKey)

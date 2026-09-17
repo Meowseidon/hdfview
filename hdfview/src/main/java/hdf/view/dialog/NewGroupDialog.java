@@ -106,7 +106,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Group...");
+        I18n.bind(shell, "dialog.newGroup.title");
         shell.setImages(ViewProperties.getHdfIcons());
         GridLayout layout      = new GridLayout(1, false);
         layout.verticalSpacing = 0;
@@ -118,7 +118,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
         Label groupNameLabel = new Label(fieldComposite, SWT.LEFT);
         groupNameLabel.setFont(curFont);
-        groupNameLabel.setText("Group name:");
+        I18n.bind(groupNameLabel, "label.groupName");
 
         nameField = new Text(fieldComposite, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -128,7 +128,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
         Label parentGroupLabel = new Label(fieldComposite, SWT.LEFT);
         parentGroupLabel.setFont(curFont);
-        parentGroupLabel.setText("Parent group:");
+        I18n.bind(parentGroupLabel, "label.parentGroup");
         parentGroupLabel.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false));
 
         parentChoice = new Combo(fieldComposite, SWT.DROP_DOWN | SWT.BORDER | SWT.READ_ONLY);
@@ -175,7 +175,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
             moreButton = new Button(moreOptionsComposite, SWT.PUSH);
             moreButton.setFont(curFont);
-            moreButton.setText("   More   ");
+            I18n.bind(moreButton, "button.more");
             moreButton.setLayoutData(new GridData(SWT.FILL, SWT.TOP, false, false));
             moreButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -269,13 +269,15 @@ public class NewGroupDialog extends NewDataObjectDialog {
         name = nameField.getText();
         if (name == null || name.length() == 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Group name is not specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.group")));
             return null;
         }
 
         if (name.indexOf(HObject.SEPARATOR) >= 0) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Group name cannot contain path.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameNoPath", I18n.text("common.group")));
             return null;
         }
 
@@ -283,17 +285,17 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
         if (pgroup == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", "Parent group is null.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.parentNull"));
             return null;
         }
 
         Group obj = null;
 
         if (orderFlags != null && orderFlags.isEnabled()) {
-            String order = orderFlags.getItem(orderFlags.getSelectionIndex());
-            if (order.equals("Tracked"))
+            int order = orderFlags.getSelectionIndex();
+            if (order == 0)
                 creationOrder = Group.CRT_ORDER_TRACKED;
-            else if (order.equals("Tracked+Indexed"))
+            else if (order == 1)
                 creationOrder = Group.CRT_ORDER_INDEXED;
         }
         else
@@ -305,13 +307,13 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
             if ((maxCompact <= 0) || (maxCompact > 65536) || (minDense > 65536)) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Max Compact and Min Indexed should be > 0 and < 65536.");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.groupStorageBounds"));
                 return null;
             }
 
             if (maxCompact < minDense) {
                 shell.getDisplay().beep();
-                Tools.showError(shell, "Create", "Min Indexed should be <= Max Compact");
+                Tools.showError(shell, I18n.text("action.create"), I18n.text("message.groupStorageOrder"));
                 return null;
             }
 
@@ -331,7 +333,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             return null;
         }
 
@@ -340,7 +342,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
     private void addMoreOptions()
     {
-        moreButton.setText("   Less   ");
+        I18n.bind(moreButton, "button.less");
 
         creationOrderComposite = new Composite(moreOptionsComposite, SWT.BORDER);
         creationOrderComposite.setLayout(new GridLayout(4, true));
@@ -349,29 +351,20 @@ public class NewGroupDialog extends NewDataObjectDialog {
         creationOrderHelpButton = new Button(creationOrderComposite, SWT.PUSH);
         creationOrderHelpButton.setImage(ViewProperties.getHelpIcon());
         creationOrderHelpButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.CENTER, false, false));
-        creationOrderHelpButton.setToolTipText("Help on Creation Order");
+        I18n.bindToolTip(creationOrderHelpButton, "dialog.help.creationOrder.title");
         creationOrderHelpButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                final String msg =
-                    "Use Creation Order allows the user to set the creation order \n"
-                    + "of links in a group, so that tracking, indexing, and iterating over links\n"
-                    + "in groups can be possible. \n\n"
-                    + "If the order flag Tracked is selected, links in a group can now \n"
-                    + "be explicitly tracked by the order that they were created. \n\n"
-                    + "If the order flag Tracked+Indexed is selected, links in a group can \n"
-                    + "now be explicitly tracked and indexed in the order that they were created. \n\n"
-                    +
-                    "The default order in which links in a group are listed is alphanumeric-by-name. \n\n\n";
+                final String msg = I18n.text("dialog.help.creationOrder.text");
 
-                Tools.showInformation(shell, "Create", msg);
+                Tools.showInformation(shell, I18n.text("action.create"), msg);
             }
         });
 
         useCreationOrder = new Button(creationOrderComposite, SWT.CHECK);
         useCreationOrder.setFont(curFont);
-        useCreationOrder.setText("Use Creation Order");
+        I18n.bind(useCreationOrder, "dialog.useCreationOrder");
         useCreationOrder.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -387,15 +380,14 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
         Label label = new Label(creationOrderComposite, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Order Flags: ");
+        I18n.bind(label, "dialog.orderFlags");
         label.setLayoutData(new GridData(SWT.RIGHT, SWT.CENTER, false, false));
 
         orderFlags = new Combo(creationOrderComposite, SWT.DROP_DOWN | SWT.READ_ONLY);
         orderFlags.setFont(curFont);
         orderFlags.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, true));
-        orderFlags.add("Tracked");
-        orderFlags.add("Tracked+Indexed");
-        orderFlags.select(orderFlags.indexOf("Tracked"));
+        I18n.bindItems(orderFlags, "common.tracked", "common.trackedIndexed");
+        orderFlags.select(0);
         orderFlags.setEnabled(false);
 
         storageTypeComposite = new Composite(moreOptionsComposite, SWT.BORDER);
@@ -404,40 +396,21 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
         storageTypeHelpButton = new Button(storageTypeComposite, SWT.PUSH);
         storageTypeHelpButton.setImage(ViewProperties.getHelpIcon());
-        storageTypeHelpButton.setToolTipText("Help on set Link Storage");
+        I18n.bindToolTip(storageTypeHelpButton, "dialog.help.linkStorage.title");
         storageTypeHelpButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.CENTER, false, false));
         storageTypeHelpButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                final String msg =
-                    "Set Link Storage allows the users to explicitly set the storage  \n"
-                    + "type of a group to be Compact or Indexed. \n\n"
-                    + "Compact Storage: For groups with only a few links, compact link storage\n"
-                    + "allows groups containing only a few links to take up much less space \n"
-                    + "in the file. \n\n"
-                    + "Indexed Storage: For groups with large number of links, indexed link storage  \n"
-                    + "provides a faster and more scalable method for storing and working with  \n"
-                    + "large groups containing many links. \n\n"
-                    + "The threshold for switching between the compact and indexed storage   \n"
-                    + "formats is either set to default values or can be set by the user. \n\n"
-                    + "<html><b>Max Compact</b></html> \n"
-                    + "Max Compact is the maximum number of links to store in the group in a  \n"
-                    + "compact format, before converting the group to the Indexed format. Groups \n"
-                    + "that are in compact format and in which the number of links rises above \n"
-                    + " this threshold are automatically converted to indexed format. \n\n"
-                    + "<html><b>Min Indexed</b></html> \n"
-                    + "Min Indexed is the minimum number of links to store in the Indexed format.   \n"
-                    + "Groups which are in indexed format and in which the number of links falls    \n"
-                    + "below this threshold are automatically converted to compact format. \n\n\n";
+                final String msg = I18n.text("dialog.help.linkStorage.text");
 
-                Tools.showInformation(shell, "Create", msg);
+                Tools.showInformation(shell, I18n.text("action.create"), msg);
             }
         });
 
         setLinkStorage = new Button(storageTypeComposite, SWT.CHECK);
         setLinkStorage.setFont(curFont);
-        setLinkStorage.setText("Set Link Storage");
+        I18n.bind(setLinkStorage, "dialog.setLinkStorage");
         setLinkStorage.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -461,11 +434,11 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
         Label minLabel = new Label(indexedComposite, SWT.LEFT);
         minLabel.setFont(curFont);
-        minLabel.setText("Min Indexed: ");
+        I18n.bind(minLabel, "dialog.minIndexed");
 
         Label maxLabel = new Label(indexedComposite, SWT.LEFT);
         maxLabel.setFont(curFont);
-        maxLabel.setText("Max Compact: ");
+        I18n.bind(maxLabel, "dialog.maxCompact");
 
         indexedField = new Text(indexedComposite, SWT.SINGLE | SWT.BORDER);
         indexedField.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
@@ -525,7 +498,7 @@ public class NewGroupDialog extends NewDataObjectDialog {
 
     private void removeMoreOptions()
     {
-        moreButton.setText("   More   ");
+        I18n.bind(moreButton, "button.more");
 
         creationOrderHelpButton.dispose();
         storageTypeHelpButton.dispose();

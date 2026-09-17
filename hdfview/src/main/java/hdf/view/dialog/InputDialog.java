@@ -57,7 +57,10 @@ public class InputDialog extends Dialog {
      *
      * @param parent the dialog parent shell
      */
-    public InputDialog(Shell parent) { this(parent, "HDFView " + HDFVersions.getPropertyVersionView(), ""); }
+    public InputDialog(Shell parent)
+    {
+        this(parent, I18n.text("window.title", HDFVersions.getPropertyVersionView()), "");
+    }
 
     /**
      * Custom SWT dialog to allow the user to input strings for a parent object with a title and message.

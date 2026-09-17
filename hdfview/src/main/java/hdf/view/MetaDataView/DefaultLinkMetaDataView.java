@@ -20,6 +20,7 @@ import hdf.object.HObject;
 import hdf.object.h5.H5Link;
 import hdf.view.DataView.DataViewManager;
 import hdf.view.Tools;
+import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.TraverseEvent;
@@ -61,7 +62,7 @@ public class DefaultLinkMetaDataView extends DefaultBaseMetaDataView implements 
             org.eclipse.swt.widgets.Group linkTargetGroup =
                 new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
             linkTargetGroup.setFont(curFont);
-            linkTargetGroup.setText("Link Target Info");
+            I18n.bind(linkTargetGroup, "meta.linkTargetInfo");
             linkTargetGroup.setLayout(new GridLayout(2, false));
 
             /*
@@ -85,7 +86,7 @@ public class DefaultLinkMetaDataView extends DefaultBaseMetaDataView implements 
 
             Label label = new Label(linkTargetGroup, SWT.LEFT);
             label.setFont(curFont);
-            label.setText("Link To Target: ");
+            I18n.bind(label, "meta.linkToTarget");
 
             final Text linkTarget = new Text(linkTargetGroup, SWT.SINGLE | SWT.BORDER | SWT.H_SCROLL);
             linkTarget.setFont(curFont);
@@ -123,8 +124,8 @@ public class DefaultLinkMetaDataView extends DefaultBaseMetaDataView implements 
         if (pgroup == null) {
             log.debug("addObjectSpecificContent(): parent group is null");
             display.beep();
-            Tools.showError(display.getShells()[0], "Select",
-                            "Parent group is null.\nLink target change failed.");
+            Tools.showError(display.getShells()[0], I18n.text("action.select"),
+                            I18n.text("message.parentNull") + "\n" + I18n.text("message.linkTargetChangeFailed"));
             return;
         }
 
@@ -137,8 +138,8 @@ public class DefaultLinkMetaDataView extends DefaultBaseMetaDataView implements 
         else if ((linkTargetName != null) &&
                  (linkTargetName.equals("/"))) { // do not allow to link to the root
             display.beep();
-            Tools.showError(display.getShells()[0], "Select",
-                            "Link to root not allowed.\nLink target change failed.");
+            Tools.showError(display.getShells()[0], I18n.text("action.select"),
+                            I18n.text("message.linkTargetRoot"));
             return;
         }
 
@@ -157,11 +158,12 @@ public class DefaultLinkMetaDataView extends DefaultBaseMetaDataView implements 
         catch (Exception ex) {
             log.debug("addObjectSpecificContent(): createLink() failure:", ex);
             display.beep();
-            Tools.showError(display.getShells()[0], "Select", "Link target change failed." + ex.getMessage());
+            Tools.showError(display.getShells()[0], I18n.text("action.select"),
+                            I18n.text("message.linkTargetChangeFailed") + ex.getMessage());
             return;
         }
 
-        Tools.showInformation(display.getShells()[0], "Link target changed.",
-                              "Reload file to display changes.");
+        Tools.showInformation(display.getShells()[0], I18n.text("message.linkTargetChangedTitle"),
+                              I18n.text("message.reloadToDisplayChanges"));
     }
 }

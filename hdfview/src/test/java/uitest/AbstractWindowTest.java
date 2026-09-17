@@ -19,9 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import static org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory.allOf;
 import static org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory.widgetOfType;
-import static org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory.withRegex;
 
 import java.io.File;
 import java.lang.reflect.Array;
@@ -31,10 +29,15 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
 import hdf.HDFVersions;
+import hdf.object.Attribute;
+import hdf.object.CompoundDS;
+import hdf.object.Dataset;
+import hdf.object.HObject;
+import hdf.object.ScalarDS;
+import hdf.view.DataView.DataView;
 import hdf.view.HDFView;
 import hdf.view.i18n.I18n;
 
-import org.hamcrest.Matcher;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -48,8 +51,11 @@ import org.slf4j.LoggerFactory;
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Rectangle;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.Monitor;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Table;
@@ -62,6 +68,7 @@ import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.widgets.AbstractSWTBot;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotCanvas;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotMenu;
+import org.eclipse.swtbot.swt.finder.widgets.SWTBotRootMenu;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTabItem;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTable;
@@ -100,7 +107,17 @@ public abstract class AbstractWindowTest {
 
     protected static enum FILE_MODE { READ_ONLY, READ_WRITE, MULTI_READ_ONLY }
 
-    private static final String objectShellTitleRegex = ".*at.*\\[.*in.*\\]";
+    /** Resolve test-facing UI text through the same resources as the app. */
+    protected static String ui(String key, Object... args)
+    {
+        return I18n.text(key, args);
+    }
+
+    /** Resolve a standard HDFView child-window title used by SWTBot lookups. */
+    protected static String applicationDialogTitle(String key)
+    {
+        return ui("window.title", VERSION) + " - " + ui(key);
+    }
 
     @BeforeEach
     public final void setupSWTBot(TestInfo testInfo) throws InterruptedException, BrokenBarrierException
@@ -151,6 +168,7 @@ public abstract class AbstractWindowTest {
     public static void setupApp()
     {
         clearRemovePropertyFile();
+        I18n.setLanguage(I18n.Language.ENGLISH);
 
         if (uiThread == null) {
             uiThread = new Thread(new Runnable() {
@@ -246,7 +264,7 @@ public abstract class AbstractWindowTest {
             else
                 openasMenuItem.menu(I18n.text("menu.file.openAs.readWrite")).click();
 
-            fileNameShell = bot.shell("Enter a file name");
+            fileNameShell = bot.shell(ui("dialog.enterFileName.title"));
             fileNameShell.activate();
             bot.waitUntil(Conditions.shellIsActive(fileNameShell.getText()));
 
@@ -314,7 +332,7 @@ public abstract class AbstractWindowTest {
             else
                 throw new IllegalArgumentException("unknown file type");
 
-            SWTBotShell shell = bot.shell("Enter a file name");
+            SWTBotShell shell = bot.shell(ui("dialog.enterFileName.title"));
             shell.activate();
             bot.waitUntil(Conditions.shellIsActive(shell.getText()));
 
@@ -345,16 +363,18 @@ public abstract class AbstractWindowTest {
     protected void closeFile(File hdfFile, boolean deleteFile)
     {
         try {
-            SWTBotTree filetree = bot.tree();
             log.trace("closeFile {}, open_files={}", hdfFile.getName(), open_files);
 
+            /* Always resolve the tree from the stable main window. */
+            SWTBotShell mainShell = new SWTBotShell(shell);
+            mainShell.activate();
+            bot.waitUntil(Conditions.shellIsActive(mainShell.getText()));
+
+            SWTBotTree filetree = mainShell.bot().tree();
             filetree.select(hdfFile.getName());
             filetree.getTreeItem(hdfFile.getName()).click();
 
-            bot.shells()[0].activate();
-            bot.waitUntil(Conditions.shellIsActive(bot.shells()[0].getText()));
-
-            SWTBotMenu fileMenuItem = bot.menu().menu(I18n.text("menu.file"));
+            SWTBotMenu fileMenuItem = mainShell.bot().menu().menu(I18n.text("menu.file"));
             fileMenuItem.menu(I18n.text("menu.file.close")).click();
 
             if (deleteFile) {
@@ -414,8 +434,8 @@ public abstract class AbstractWindowTest {
             final SWTBotCanvas imageCanvas = thisbot.canvas(1);
 
             // Make sure Show Values is selected
-            SWTBotMenu imageMenuItem      = thisbot.menu().menu("Image");
-            SWTBotMenu showValuesMenuItem = imageMenuItem.menu("Show Values");
+        SWTBotMenu imageMenuItem      = thisbot.menu().menu(ui("image.menu"));
+        SWTBotMenu showValuesMenuItem = imageMenuItem.menu(ui("image.showValues"));
             if (!showValuesMenuItem.isChecked()) {
                 showValuesMenuItem.click();
             }
@@ -462,41 +482,29 @@ public abstract class AbstractWindowTest {
     }
 
     protected SWTBotTabItem openMetadataTab(SWTBotTree tree, String filename, String objectName,
-                                            String tabName)
+                                            String tabKey)
     {
         SWTBotTreeItem fileItem = tree.getTreeItem(filename);
 
         SWTBotTreeItem foundObject = locateItemByPath(fileItem, objectName);
         foundObject.click();
 
-        return bot.tabItem(localizeCoreTabName(tabName));
-    }
-
-    /** Resolve legacy test labels through the current language resources. */
-    private String localizeCoreTabName(String tabName)
-    {
-        if ("Data Content".equals(tabName))
-            return I18n.text("tab.dataContent");
-        if ("Object Attribute Info".equals(tabName))
-            return I18n.text("tab.objectAttributeInfo");
-        if ("General Object Info".equals(tabName))
-            return I18n.text("tab.generalObjectInfo");
-        return tabName;
+        return bot.tabItem(I18n.text(tabKey));
     }
 
     protected SWTBotShell openAttributeObject(SWTBotTable attrTable, String objectName, int rowIndex)
     {
         attrTable.doubleClick(rowIndex, 0);
 
-        return openDataObject(objectName);
+        return openStandaloneDataObject(objectName);
     }
 
     protected SWTBotShell openAttributeContext(SWTBotTable attrTable, String objectName, int rowIndex)
     {
         attrTable.click(rowIndex, 0);
-        attrTable.contextMenu().contextMenu("View/Edit Attribute Value").click();
+        attrTable.contextMenu().contextMenu(ui("meta.viewEditAttribute")).click();
 
-        return openDataObject(objectName);
+        return openStandaloneDataObject(objectName);
     }
 
     protected SWTBotShell openTreeviewObject(SWTBotTree tree, String filename, String objectName)
@@ -507,24 +515,134 @@ public abstract class AbstractWindowTest {
         foundObject.click();
         foundObject.contextMenu().contextMenu(I18n.text("tree.open")).click();
 
-        return openDataObject(objectName);
+        final HObject[] selectedObject = new HObject[1];
+        Display.getDefault().syncExec(new Runnable() {
+            @Override
+            public void run()
+            {
+                selectedObject[0] = (HObject)foundObject.widget.getData();
+            }
+        });
+        HObject object = selectedObject[0];
+        if (isInlineDataset(object))
+            return openInlineDataObject(objectName);
+        return openStandaloneDataObject(objectName);
     }
 
     protected SWTBotShell openDataObject(String objectName)
+    {
+        /* TreeView starts data loading on a worker thread. Wait for either the
+         * embedded table or a specialized/attribute window before locating it. */
+        bot.waitUntil(new org.eclipse.swtbot.swt.finder.waits.DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                return hasInlineTable() || hasStandaloneDataObject(objectName);
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for data object " + objectName;
+            }
+        });
+
+        /* Ordinary Datasets now live in the main window's Data Content tab. */
+        if (hasInlineTable()) {
+            SWTBotShell mainShell = new SWTBotShell(shell);
+            mainShell.activate();
+            bot.waitUntil(Conditions.shellIsActive(mainShell.getText()));
+            return mainShell;
+        }
+
+        return openStandaloneDataObject(objectName);
+    }
+
+    private SWTBotShell openInlineDataObject(String objectName)
+    {
+        bot.waitUntil(new org.eclipse.swtbot.swt.finder.waits.DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                return hasInlineTable();
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for inline data object " + objectName;
+            }
+        });
+
+        SWTBotShell mainShell = new SWTBotShell(shell);
+        mainShell.activate();
+        bot.waitUntil(Conditions.shellIsActive(mainShell.getText()));
+        return mainShell;
+    }
+
+    private boolean hasStandaloneDataObject(String objectName)
+    {
+        String strippedObjectName = objectName;
+        int slashLoc              = objectName.lastIndexOf('/');
+        if (slashLoc >= 0)
+            strippedObjectName = objectName.substring(slashLoc + 1);
+
+        final String titleFragment = strippedObjectName;
+        final boolean[] found      = new boolean[] {false};
+        Display.getDefault().syncExec(new Runnable() {
+            @Override
+            public void run()
+            {
+                for (Shell candidate : shell.getDisplay().getShells()) {
+                    if (candidate != shell && !candidate.isDisposed() &&
+                        isStandaloneDataShell(candidate, titleFragment)) {
+                        found[0] = true;
+                        return;
+                    }
+                }
+            }
+        });
+        return found[0];
+    }
+
+    protected SWTBotShell openStandaloneDataObject(String objectName)
     {
         String strippedObjectName = objectName;
         int slashLoc              = objectName.lastIndexOf('/');
         if (slashLoc >= 0) {
             strippedObjectName = objectName.substring(slashLoc + 1);
         }
+        final String targetObjectName = strippedObjectName;
 
-        Matcher<Shell> classMatcher = widgetOfType(Shell.class);
-        Matcher<Shell> regexMatcher = withRegex(strippedObjectName + objectShellTitleRegex);
-        @SuppressWarnings("unchecked")
-        Matcher<Shell> shellMatcher = allOf(classMatcher, regexMatcher);
-        bot.waitUntil(Conditions.waitForShell(shellMatcher));
+        final Shell[] dataShell = new Shell[1];
+        bot.waitUntil(new org.eclipse.swtbot.swt.finder.waits.DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                Display.getDefault().syncExec(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        for (Shell candidate : shell.getDisplay().getShells()) {
+                            if (candidate != shell && !candidate.isDisposed() &&
+                                isStandaloneDataShell(candidate, targetObjectName)) {
+                                dataShell[0] = candidate;
+                                return;
+                            }
+                        }
+                    }
+                });
+                return dataShell[0] != null && !dataShell[0].isDisposed();
+            }
 
-        final SWTBotShell botShell = new SWTBotShell(bot.widget(shellMatcher));
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for data object " + objectName;
+            }
+        });
+
+        final SWTBotShell botShell = new SWTBotShell(dataShell[0]);
 
         botShell.activate();
         bot.waitUntil(Conditions.shellIsActive(botShell.getText()));
@@ -542,6 +660,105 @@ public abstract class AbstractWindowTest {
         });
 
         return botShell;
+    }
+
+    /** Match a standalone view by its stable DataView object before using its localized title. */
+    private boolean isStandaloneDataShell(Shell candidate, String objectName)
+    {
+        Object shellData = candidate.getData();
+        if (shellData instanceof DataView) {
+            HObject displayedObject = ((DataView)shellData).getDataObject();
+            if (displayedObject != null && objectName.equals(displayedObject.getName()))
+                return true;
+        }
+
+        /* Keep a title fallback for third-party views which do not expose shell data. */
+        return candidate.getText().contains(objectName);
+    }
+
+    private boolean isInlineDataset(HObject object)
+    {
+        if (object == null || object instanceof Attribute || !(object instanceof Dataset))
+            return false;
+
+        Dataset dataset = (Dataset)object;
+        if (dataset.isNULL() || (!(dataset instanceof ScalarDS) && !(dataset instanceof CompoundDS)))
+            return false;
+
+        if (dataset instanceof ScalarDS) {
+            try {
+                if (!dataset.isInited())
+                    dataset.init();
+                return !((ScalarDS)dataset).isImage();
+            }
+            catch (Exception ex) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasInlineTable()
+    {
+        final boolean[] found = new boolean[] {false};
+        Display.getDefault().syncExec(new Runnable() {
+            @Override
+            public void run()
+            {
+                found[0] = findNatTable(shell) != null;
+            }
+        });
+        return found[0];
+    }
+
+    private static NatTable findNatTable(Composite root)
+    {
+        if (root == null || root.isDisposed())
+            return null;
+
+        for (Control child : root.getChildren()) {
+            if (child.isDisposed())
+                continue;
+
+            if (child instanceof NatTable)
+                return (NatTable)child;
+            if (child instanceof Composite) {
+                NatTable table = findNatTable((Composite)child);
+                if (table != null)
+                    return table;
+            }
+        }
+        return null;
+    }
+
+    /** Return the localized Table menu for either a standalone or inline view. */
+    protected SWTBotMenu tableMenu(SWTBotShell theShell)
+    {
+        if (theShell == null || !theShell.isOpen())
+            throw new WidgetNotFoundException("TableView shell is not open");
+
+        if (theShell.widget != shell)
+            return theShell.bot().menu().menu(ui("table"));
+
+        final Menu[] popupMenu = new Menu[] {null};
+        Display.getDefault().syncExec(new Runnable() {
+            @Override
+            public void run()
+            {
+                NatTable table = findNatTable(shell);
+                Control current = table;
+                while (current != null && popupMenu[0] == null) {
+                    if (!current.isDisposed())
+                        popupMenu[0] = current.getMenu();
+                    current = current.getParent();
+                }
+            }
+        });
+
+        if (popupMenu[0] == null || popupMenu[0].isDisposed())
+            throw new WidgetNotFoundException("Inline TableView menu is not available");
+
+        return new SWTBotRootMenu(popupMenu[0]).menu(ui("table"));
     }
 
     private SWTBotTreeItem locateItemByPath(SWTBotTreeItem startNode, String objPath)
@@ -675,7 +892,16 @@ public abstract class AbstractWindowTest {
                           lastVisibleCellPos.column);
                 table.click(lastVisibleCellPos.row, lastVisibleCellPos.column);
                 bot.sleep(50);
-                String val = bot.shells()[1].bot().text(textboxIndex).getText();
+                final Shell[] tableParentShell = new Shell[1];
+                Display.getDefault().syncExec(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        tableParentShell[0] = table.widget.getShell();
+                    }
+                });
+                SWTBotShell tableShell = new SWTBotShell(tableParentShell[0]);
+                String val = tableShell.bot().text(textboxIndex).getText();
 
                 // Disabled until Data conversion can be figured out
                 // String val = table.getCellDataValueByPosition(rowIndex, colIndex);
@@ -753,9 +979,35 @@ public abstract class AbstractWindowTest {
         if (theShell == null || !theShell.isOpen())
             return;
 
+        if (theShell.widget == shell) {
+            if (!hasInlineTable())
+                return;
+
+            try {
+                tableMenu(theShell).menu(ui("table.close")).click();
+                bot.waitUntil(new org.eclipse.swtbot.swt.finder.waits.DefaultCondition() {
+                    @Override
+                    public boolean test()
+                    {
+                        return !hasInlineTable();
+                    }
+
+                    @Override
+                    public String getFailureMessage()
+                    {
+                        return "Timed out waiting for the inline TableView to close";
+                    }
+                });
+            }
+            catch (WidgetNotFoundException ex) {
+                // The inline view may already have been replaced or disposed.
+            }
+            return;
+        }
+
         SWTBotMenu closeButton = null;
         try {
-            closeButton = theShell.bot().menu("Close");
+            closeButton = theShell.bot().menu(ui("table.close"));
         }
         catch (WidgetNotFoundException ex) {
             closeButton = null;
@@ -765,6 +1017,21 @@ public abstract class AbstractWindowTest {
             closeButton.click();
             bot.waitUntil(Conditions.shellCloses(theShell));
         }
+    }
+
+    /** Close a TableView regardless of whether it is embedded or standalone. */
+    protected final void closeDataObject(SWTBotShell dataShell)
+    {
+        if (dataShell == null || !dataShell.isOpen())
+            return;
+
+        if (dataShell.widget == shell) {
+            closeShell(dataShell);
+            return;
+        }
+
+        tableMenu(dataShell).menu(ui("action.close")).click();
+        bot.waitUntil(Conditions.shellCloses(dataShell));
     }
 
     /*

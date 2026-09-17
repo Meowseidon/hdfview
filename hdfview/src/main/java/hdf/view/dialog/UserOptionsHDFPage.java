@@ -16,6 +16,7 @@ package hdf.view.dialog;
 
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,7 +99,7 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
      */
     public UserOptionsHDFPage()
     {
-        super("HDF Settings");
+        super(I18n.text("options.hdf"));
         isPluginListChanged = false;
     }
 
@@ -281,11 +282,11 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
         fileExtensionGroup.setLayout(new GridLayout(2, false));
         fileExtensionGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         fileExtensionGroup.setFont(curFont);
-        fileExtensionGroup.setText("File Extensions");
+        I18n.bind(fileExtensionGroup, "options.fileExtensions");
 
         Label label = new Label(fileExtensionGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Extensions: ");
+        I18n.bind(label, "options.extensions");
 
         fileExtField = new Text(fileExtensionGroup, SWT.SINGLE | SWT.BORDER);
         fileExtField.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
@@ -296,48 +297,48 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
         defaultLibVersionGroup.setLayout(new GridLayout());
         defaultLibVersionGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         defaultLibVersionGroup.setFont(curFont);
-        defaultLibVersionGroup.setText("Default Lib Version");
+        I18n.bind(defaultLibVersionGroup, "options.defaultLibVersion");
 
         org.eclipse.swt.widgets.Group earlyLibVersionGroup =
             new org.eclipse.swt.widgets.Group(defaultLibVersionGroup, SWT.NONE);
         earlyLibVersionGroup.setLayout(new GridLayout(4, true));
         earlyLibVersionGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         earlyLibVersionGroup.setFont(curFont);
-        earlyLibVersionGroup.setText("Default Early Lib Version");
+        I18n.bind(earlyLibVersionGroup, "options.defaultEarlyLibVersion");
 
         earlyLibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         earlyLibVersion.setFont(curFont);
-        earlyLibVersion.setText("Earliest");
+        I18n.bind(earlyLibVersion, "common.earliest");
         earlyLibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         early18LibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         early18LibVersion.setFont(curFont);
-        early18LibVersion.setText("v18");
+        I18n.bind(early18LibVersion, "common.v18");
         early18LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         early110LibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         early110LibVersion.setFont(curFont);
-        early110LibVersion.setText("v110");
+        I18n.bind(early110LibVersion, "common.v110");
         early110LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         early112LibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         early112LibVersion.setFont(curFont);
-        early112LibVersion.setText("v112");
+        I18n.bind(early112LibVersion, "common.v112");
         early112LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         early114LibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         early114LibVersion.setFont(curFont);
-        early114LibVersion.setText("v114");
+        I18n.bind(early114LibVersion, "common.v114");
         early114LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         early200LibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         early200LibVersion.setFont(curFont);
-        early200LibVersion.setText("v200");
+        I18n.bind(early200LibVersion, "common.v200");
         early200LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         earlyLateLibVersion = new Button(earlyLibVersionGroup, SWT.RADIO);
         earlyLateLibVersion.setFont(curFont);
-        earlyLateLibVersion.setText("Latest");
+        I18n.bind(earlyLateLibVersion, "common.latest");
         earlyLateLibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         org.eclipse.swt.widgets.Group lateLibVersionGroup =
@@ -345,74 +346,69 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
         lateLibVersionGroup.setLayout(new GridLayout(4, true));
         lateLibVersionGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         lateLibVersionGroup.setFont(curFont);
-        lateLibVersionGroup.setText("Default Late Lib Version");
+        I18n.bind(lateLibVersionGroup, "options.defaultLateLibVersion");
 
         lateLibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         lateLibVersion.setFont(curFont);
-        lateLibVersion.setText("Earliest");
+        I18n.bind(lateLibVersion, "common.earliest");
         lateLibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         late18LibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         late18LibVersion.setFont(curFont);
-        late18LibVersion.setText("v18");
+        I18n.bind(late18LibVersion, "common.v18");
         late18LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         late110LibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         late110LibVersion.setFont(curFont);
-        late110LibVersion.setText("v110");
+        I18n.bind(late110LibVersion, "common.v110");
         late110LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         late112LibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         late112LibVersion.setFont(curFont);
-        late112LibVersion.setText("v112");
+        I18n.bind(late112LibVersion, "common.v112");
         late112LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         late114LibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         late114LibVersion.setFont(curFont);
-        late114LibVersion.setText("v114");
+        I18n.bind(late114LibVersion, "common.v114");
         late114LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         late200LibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         late200LibVersion.setFont(curFont);
-        late200LibVersion.setText("v200");
+        I18n.bind(late200LibVersion, "common.v200");
         late200LibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         lateLateLibVersion = new Button(lateLibVersionGroup, SWT.RADIO);
         lateLateLibVersion.setFont(curFont);
-        lateLateLibVersion.setText("Latest");
+        I18n.bind(lateLateLibVersion, "common.latest");
         lateLateLibVersion.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         org.eclipse.swt.widgets.Group dataGroup = new org.eclipse.swt.widgets.Group(composite, SWT.NONE);
         dataGroup.setLayout(new GridLayout(4, false));
         dataGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         dataGroup.setFont(curFont);
-        dataGroup.setText("Data");
+        I18n.bind(dataGroup, "options.data");
 
         helpButton = new Button(dataGroup, SWT.PUSH);
         helpButton.setImage(ViewProperties.getHelpIcon());
-        helpButton.setToolTipText("Help on Convert Enum");
+        I18n.bindToolTip(helpButton, "options.convertEnumHelp");
         helpButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                final String msg = "Convert enum data to strings. \n"
-                                   + "For example, a dataset of an enum type of (R=0, G=, B=2) \n"
-                                   +
-                                   "has values of (0, 2, 2, 2, 1, 1). With conversion, the data values are \n"
-                                   + "shown as (R, B, B, B, G, G).\n\n\n";
-
-                Tools.showInformation(getShell(), "Help", msg);
+                Tools.showInformation(getShell(), I18n.text("dialog.help.convertEnum.title"),
+                                      I18n.text("dialog.help.convertEnum.text"));
             }
         });
 
         checkConvertEnum = new Button(dataGroup, SWT.CHECK);
         checkConvertEnum.setFont(curFont);
-        checkConvertEnum.setText("Convert Enum");
+        I18n.bind(checkConvertEnum, "options.convertEnum");
         checkConvertEnum.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         checkShowRegRefValues = new Button(dataGroup, SWT.CHECK);
         checkShowRegRefValues.setFont(curFont);
-        checkShowRegRefValues.setText("Show RegRef Values");
+        I18n.bind(checkShowRegRefValues, "options.showRegRefValues");
         checkShowRegRefValues.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         org.eclipse.swt.widgets.Group displayIndexingGroup =
@@ -420,23 +416,23 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
         displayIndexingGroup.setLayout(new GridLayout());
         displayIndexingGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         displayIndexingGroup.setFont(curFont);
-        displayIndexingGroup.setText("Display Indexing Options");
+        I18n.bind(displayIndexingGroup, "options.displayIndexing");
 
         org.eclipse.swt.widgets.Group indexingTypeGroup =
             new org.eclipse.swt.widgets.Group(displayIndexingGroup, SWT.NONE);
         indexingTypeGroup.setLayout(new GridLayout(2, true));
         indexingTypeGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         indexingTypeGroup.setFont(curFont);
-        indexingTypeGroup.setText("Indexing Type");
+        I18n.bind(indexingTypeGroup, "options.indexingType");
 
         checkIndexName = new Button(indexingTypeGroup, SWT.RADIO);
         checkIndexName.setFont(curFont);
-        checkIndexName.setText("By Name");
+        I18n.bind(checkIndexName, "common.byName");
         checkIndexName.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         checkIndexCreateOrder = new Button(indexingTypeGroup, SWT.RADIO);
         checkIndexCreateOrder.setFont(curFont);
-        checkIndexCreateOrder.setText("By Creation Order");
+        I18n.bind(checkIndexCreateOrder, "common.byCreationOrder");
         checkIndexCreateOrder.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         org.eclipse.swt.widgets.Group indexingOrderGroup =
@@ -444,21 +440,21 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
         indexingOrderGroup.setLayout(new GridLayout(3, true));
         indexingOrderGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         indexingOrderGroup.setFont(curFont);
-        indexingOrderGroup.setText("Indexing Order");
+        I18n.bind(indexingOrderGroup, "options.indexingOrder");
 
         checkIncOrder = new Button(indexingOrderGroup, SWT.RADIO);
         checkIncOrder.setFont(curFont);
-        checkIncOrder.setText("Increments");
+        I18n.bind(checkIncOrder, "common.increments");
         checkIncOrder.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         checkDecOrder = new Button(indexingOrderGroup, SWT.RADIO);
         checkDecOrder.setFont(curFont);
-        checkDecOrder.setText("Decrements");
+        I18n.bind(checkDecOrder, "common.decrements");
         checkDecOrder.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         checkNativeOrder = new Button(indexingOrderGroup, SWT.RADIO);
         checkNativeOrder.setFont(curFont);
-        checkNativeOrder.setText("Native");
+        I18n.bind(checkNativeOrder, "common.native");
         checkNativeOrder.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         org.eclipse.swt.widgets.Group pluginDirectoryGroup =
@@ -466,7 +462,7 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
         pluginDirectoryGroup.setLayout(new GridLayout(3, false));
         pluginDirectoryGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         pluginDirectoryGroup.setFont(curFont);
-        pluginDirectoryGroup.setText("Plugin Paths");
+        I18n.bind(pluginDirectoryGroup, "options.pluginPaths");
 
         pluginPathList = ViewProperties.loadPluginPaths();
         pluginCombo    = new Combo(pluginDirectoryGroup, SWT.BORDER | SWT.SINGLE);
@@ -498,7 +494,7 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
 
         pluginDirButton = new Button(pluginDirectoryGroup, SWT.PUSH);
         pluginDirButton.setFont(curFont);
-        pluginDirButton.setText("Browse...");
+        I18n.bind(pluginDirButton, "button.browse");
         pluginDirButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, false, false));
         pluginDirButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -506,7 +502,7 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
             {
                 final DirectoryDialog dChooser = new DirectoryDialog(shell);
                 dChooser.setFilterPath(System.getProperty("user.dir"));
-                dChooser.setText("Select a Directory");
+                dChooser.setText(I18n.text("options.selectDirectory"));
 
                 String dir = dChooser.open();
 
@@ -519,8 +515,8 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
 
         insertTextButton = new Button(pluginDirectoryGroup, SWT.PUSH);
         insertTextButton.setFont(curFont);
-        insertTextButton.setToolTipText("Append current selection");
-        insertTextButton.setText("Add Path");
+        I18n.bindToolTip(insertTextButton, "options.appendCurrentSelection");
+        I18n.bind(insertTextButton, "button.addPath");
         insertTextButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         insertTextButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -543,8 +539,8 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
 
         deleteTextButton = new Button(pluginDirectoryGroup, SWT.PUSH);
         deleteTextButton.setFont(curFont);
-        deleteTextButton.setToolTipText("Remove current selection");
-        deleteTextButton.setText("Remove Path");
+        I18n.bindToolTip(deleteTextButton, "options.removeCurrentSelection");
+        I18n.bind(deleteTextButton, "button.removePath");
         deleteTextButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         deleteTextButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -573,8 +569,8 @@ public class UserOptionsHDFPage extends UserOptionsDefaultPage {
 
         clearTextButton = new Button(pluginDirectoryGroup, SWT.PUSH);
         clearTextButton.setFont(curFont);
-        clearTextButton.setToolTipText("Clear current selection");
-        clearTextButton.setText("Clear Path Text");
+        I18n.bindToolTip(clearTextButton, "options.clearCurrentSelection");
+        I18n.bind(clearTextButton, "button.clearPathText");
         clearTextButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         clearTextButton.addSelectionListener(new SelectionAdapter() {
             @Override

@@ -243,7 +243,7 @@ public class DefaultFileFilter {
         String fileExtensions = ViewProperties.getFileExtension();
 
         DefaultFileFilter filter = new DefaultFileFilter();
-        filter.setDescription("HDF & more");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.hdfMore"));
 
         filter.addExtension(fileExtensions);
 
@@ -259,7 +259,7 @@ public class DefaultFileFilter {
     {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("nc");
-        filter.setDescription("NetCDF3 files");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.netcdf3"));
 
         return filter;
     }
@@ -275,7 +275,7 @@ public class DefaultFileFilter {
         filter.addExtension("hdf");
         filter.addExtension("h4");
         filter.addExtension("hdf4");
-        filter.setDescription("HDF4 files");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.hdf4"));
 
         return filter;
     }
@@ -290,7 +290,7 @@ public class DefaultFileFilter {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("h5");
         filter.addExtension("hdf5");
-        filter.setDescription("HDF5 files");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.hdf5"));
 
         return filter;
     }
@@ -309,7 +309,7 @@ public class DefaultFileFilter {
         filter.addExtension("jif");
         filter.addExtension("jfif");
         filter.addExtension("jfi");
-        filter.setDescription("JPEG images");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.jpeg"));
 
         return filter;
     }
@@ -324,7 +324,7 @@ public class DefaultFileFilter {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("tif");
         filter.addExtension("tiff");
-        filter.setDescription("TIFF images");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.tiff"));
 
         return filter;
     }
@@ -338,7 +338,7 @@ public class DefaultFileFilter {
     {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("png");
-        filter.setDescription("PNG images");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.png"));
 
         return filter;
     }
@@ -353,7 +353,7 @@ public class DefaultFileFilter {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("bmp");
         filter.addExtension("dib");
-        filter.setDescription("BMP images");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.bmp"));
 
         return filter;
     }
@@ -367,7 +367,7 @@ public class DefaultFileFilter {
     {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("gif");
-        filter.setDescription("GIF images");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.gif"));
 
         return filter;
     }
@@ -390,7 +390,7 @@ public class DefaultFileFilter {
         filter.addExtension("gif");
         filter.addExtension("bmp");
         filter.addExtension("dib");
-        filter.setDescription("GIF, JPEG, BMP, or PNG images");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.images"));
 
         return filter;
     }
@@ -405,7 +405,7 @@ public class DefaultFileFilter {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("txt");
         filter.addExtension("text");
-        filter.setDescription("Text");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.text"));
 
         return filter;
     }
@@ -419,7 +419,7 @@ public class DefaultFileFilter {
     {
         DefaultFileFilter filter = new DefaultFileFilter();
         filter.addExtension("bin");
-        filter.setDescription("Binary");
+        filter.setDescription(hdf.view.i18n.I18n.text("fileFilter.binary"));
 
         return filter;
     }

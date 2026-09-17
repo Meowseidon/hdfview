@@ -37,9 +37,9 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
             SWTBotTreeItem[] items = filetree.getAllItems();
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Group").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            groupShell = bot.shell("New Group...");
+            groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -49,7 +49,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
             assertTrue(val.equals(groupname), constructWrongValueMessage("createNewHDF5Group()",
                                                                          "wrong group name", groupname, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
         }
         catch (Exception ex) {
@@ -79,9 +79,9 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
             SWTBotTreeItem[] items = filetree.getAllItems();
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("New").menu("Dataset").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.dataset")).click();
 
-            datasetShell = bot.shell("New Dataset...");
+            datasetShell = bot.shell(ui("dialog.newDataset.title"));
             datasetShell.activate();
             bot.waitUntil(Conditions.shellIsActive(datasetShell.getText()));
 
@@ -99,21 +99,15 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 val.equals(currentSize),
                 constructWrongValueMessage("createNewHDF5Dataset()", "wrong current size", currentSize, val));
 
-            datasetShell.bot().button("   &OK   ").click();
+            datasetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(datasetShell));
 
             filetree.expandNode(items[0].getText(), true);
             items = filetree.getAllItems();
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(datasetname + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             final SWTBotNatTable table =
                 new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
@@ -138,10 +132,9 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             });
 
-            tableShell.bot().menu().menu("Table").menu("Save Changes to File").click();
+            tableMenu(tableShell).menu(ui("table.saveChanges")).click();
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -158,8 +151,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
             }
 
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
         }
     }
@@ -197,19 +189,19 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        "testCopyPasteGroupInSameFile() filetree is missing dataset '" + datasetname + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Copy").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.copy")).click();
 
             items[0].click();
-            items[0].contextMenu().contextMenu("Paste").click();
+            items[0].contextMenu().contextMenu(ui("tree.paste")).click();
 
             SWTBotShell copyTargetShell = bot.shells()[1];
             copyTargetShell.activate();
-            copyTargetShell.bot().button("OK").click();
+            copyTargetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(copyTargetShell));
 
             // Reload file
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[0].getText(), true);
@@ -224,13 +216,8 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        "testCopyPasteGroupInSameFile() filetree is missing group '" + group_copy_name + "'");
 
             items[0].getNode(1).click();
-            items[0].getNode(1).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(1).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -246,8 +233,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -259,8 +245,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -352,26 +337,26 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Copy").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.copy")).click();
 
             items[1].click();
-            items[1].contextMenu().contextMenu("Paste").click();
+            items[1].contextMenu().contextMenu(ui("tree.paste")).click();
 
             SWTBotShell copyTargetShell = bot.shells()[1];
             copyTargetShell.activate();
-            copyTargetShell.bot().button("OK").click();
+            copyTargetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(copyTargetShell));
 
             // Reload file
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[0].getText(), true);
 
             // Reload file
             items[1].click();
-            items[1].contextMenu().contextMenu("Reload File").click();
+            items[1].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[1].getText(), true);
@@ -392,13 +377,8 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[1].getNode(0).click();
-            items[1].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[1].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -414,8 +394,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -427,8 +406,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -521,26 +499,26 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Cut").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.cut")).click();
 
             items[1].click();
-            items[1].contextMenu().contextMenu("Paste").click();
+            items[1].contextMenu().contextMenu(ui("tree.paste")).click();
 
             SWTBotShell copyTargetShell = bot.shells()[1];
             copyTargetShell.activate();
-            copyTargetShell.bot().button("OK").click();
+            copyTargetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(copyTargetShell));
 
             // Reload file
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[0].getText(), true);
 
             // Reload file
             items[1].click();
-            items[1].contextMenu().contextMenu("Reload File").click();
+            items[1].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[1].getText(), true);
@@ -556,13 +534,8 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[1].getNode(0).click();
-            items[1].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[1].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -578,8 +551,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -591,8 +563,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -638,12 +609,12 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        "testCopyPasteDatasetInSameFile() filetree is missing dataset '" + datasetname + "'");
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Copy").click();
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.copy")).click();
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Group").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            SWTBotShell groupShell = bot.shell("New Group...");
+            SWTBotShell groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -654,7 +625,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        constructWrongValueMessage("testCopyPasteDatasetInSameFile()", "wrong group name",
                                                   group_copy_name, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
 
             assertTrue(filetree.visibleRowCount() == 4,
@@ -668,16 +639,16 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[0].getNode(1).click();
-            items[0].getNode(1).contextMenu().contextMenu("Paste").click();
+            items[0].getNode(1).contextMenu().contextMenu(ui("tree.paste")).click();
 
             SWTBotShell copyTargetShell = bot.shells()[1];
             copyTargetShell.activate();
-            copyTargetShell.bot().button("OK").click();
+            copyTargetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(copyTargetShell));
 
             // Reload file
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[0].getText(), true);
@@ -693,13 +664,8 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[0].getNode(1).click();
-            items[0].getNode(1).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(1).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -715,8 +681,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -728,8 +693,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -826,12 +790,12 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Copy").click();
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.copy")).click();
 
             items[1].click();
-            items[1].contextMenu().contextMenu("New").menu("Group").click();
+            items[1].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            SWTBotShell groupShell = bot.shell("New Group...");
+            SWTBotShell groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -842,24 +806,24 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        constructWrongValueMessage("testCutPasteDatasetInSameFile()", "wrong group name",
                                                   group_copy_name, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
 
             items[1].getNode(0).click();
-            items[1].getNode(0).contextMenu().contextMenu("Paste").click();
+            items[1].getNode(0).contextMenu().contextMenu(ui("tree.paste")).click();
 
             SWTBotShell copyTargetShell = bot.shells()[1];
             copyTargetShell.activate();
-            copyTargetShell.bot().button("OK").click();
+            copyTargetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(copyTargetShell));
 
             // Reload file
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             // Reload file
             items[1].click();
-            items[1].contextMenu().contextMenu("Reload File").click();
+            items[1].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[0].getText(), true);
@@ -882,13 +846,8 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                            "'");
 
             items[1].getNode(0).click();
-            items[1].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[1].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -904,8 +863,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -917,8 +875,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -964,12 +921,12 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        "testCutPasteDatasetInSameFile() filetree is missing dataset '" + datasetname + "'");
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Cut").click();
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.cut")).click();
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Group").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            SWTBotShell groupShell = bot.shell("New Group...");
+            SWTBotShell groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -980,20 +937,20 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        constructWrongValueMessage("testCutPasteDatasetInSameFile()", "wrong group name",
                                                   group_copy_name, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
 
             items[0].getNode(1).click();
-            items[0].getNode(1).contextMenu().contextMenu("Paste").click();
+            items[0].getNode(1).contextMenu().contextMenu(ui("tree.paste")).click();
 
             SWTBotShell copyTargetShell = bot.shells()[1];
             copyTargetShell.activate();
-            copyTargetShell.bot().button("OK").click();
+            copyTargetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(copyTargetShell));
 
             // Reload file
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
             filetree.expandNode(items[0].getText(), true);
@@ -1008,13 +965,8 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                        "testCutPasteDatasetInSameFile() filetree is missing group '" + group_copy_name + "'");
 
             items[0].getNode(1).getNode(0).click();
-            items[0].getNode(1).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(1).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             SWTBotNatTable table2 =
                 new SWTBotNatTable(tableShell.bot().widget(WidgetOfType.widgetOfType(NatTable.class)));
@@ -1030,8 +982,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
                 }
             }
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -1043,8 +994,7 @@ public class TestHDFViewCutCopyPaste extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {

@@ -38,6 +38,7 @@ import hdf.view.DataView.DataViewManager;
 import hdf.view.HDFView;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -237,7 +238,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
 
         if ((cols <= 0) || (rows <= 0)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Select", "No data is selected.");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.noDataSelected"));
             return null;
         }
 
@@ -291,7 +292,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
 
         if (selectedData == null) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Select", "Unsupported data type.");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.unsupportedDataType"));
             return null;
         }
 
@@ -356,7 +357,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
     {
 
         if (refarr == null || (refarr.length <= 0) || H5Datatype.zeroArrayCheck(refarr)) {
-            Tools.showError(shell, "Select", "Could not show reference data: invalid or null data");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.referenceDataInvalid"));
             log.debug("showObjRefData(): refarr is null or invalid");
             return;
         }
@@ -378,7 +379,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
     protected void showObjRefData(byte[] refarr)
     {
         if (refarr == null || (refarr.length <= 0) || H5Datatype.zeroArrayCheck(refarr)) {
-            Tools.showError(shell, "Select", "Could not show object reference data: invalid or null data");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.referenceInvalid"));
             log.debug("showObjRefData(): refarr is null or invalid");
             return;
         }
@@ -390,7 +391,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
         String oidStr = objref.substring(objref.indexOf('/'), objref.indexOf("H5O_TYPE_OBJ_REF") - 1);
         HObject obj   = FileFormat.findObject(((HObject)dataObject).getFileFormat(), oidStr);
         if (obj == null || !(obj instanceof ScalarDS)) {
-            Tools.showError(shell, "Select", "Could not show object reference data: invalid or null data");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.referenceInvalid"));
             log.debug("showObjRefData(): obj is null or not a Scalar Dataset");
             return;
         }
@@ -412,7 +413,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
         }
         catch (Exception ex) {
             log.debug("showObjRefData(): couldn't show data: ", ex);
-            Tools.showError(shell, "Select", "Object Reference: " + ex.getMessage());
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("message.objectReferenceError") + ": " + ex.getMessage());
             data = null;
         }
 
@@ -463,8 +465,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
             }
             catch (Exception ex) {
                 log.debug("showObjRefData(): no suitable display class found");
-                Tools.showError(shell, "Select",
-                                "Could not show reference data: no suitable display class found");
+                Tools.showError(shell, I18n.text("action.select"),
+                                I18n.text("message.referenceDisplayUnavailable"));
                 return;
             }
         }
@@ -478,7 +480,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
         }
         catch (Exception ex) {
             log.debug("showObjRefData(): Could not show reference data: ", ex);
-            Tools.showError(shell, "Select", "Could not show reference data: " + ex.toString());
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("message.referenceDisplayFailed") + ": " + ex.toString());
         }
     }
 
@@ -494,7 +497,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
     protected void showRegRefData(byte[] refarr)
     {
         if (refarr == null || (refarr.length <= 0) || H5Datatype.zeroArrayCheck(refarr)) {
-            Tools.showError(shell, "Select", "Could not show region reference data: invalid or null data");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.regionReferenceInvalid"));
             log.debug("showRegRefData(): refarr is null or invalid");
             return;
         }
@@ -509,8 +512,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
         // decode the region selection
         String regStr = reg.substring(reg.indexOf('{') + 1, reg.indexOf('}'));
         if (regStr == null || regStr.length() <= 0) {
-            Tools.showError(shell, "Select",
-                            "Could not show region reference data: no region selection made.");
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("message.regionReferenceNoSelection"));
             log.debug("showRegRefData(): no region selection made");
             return; // no selection
         }
@@ -524,15 +527,15 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
         StringTokenizer st = new StringTokenizer(regStr);
         int nSelections    = st.countTokens();
         if (nSelections <= 0) {
-            Tools.showError(shell, "Select",
-                            "Could not show region reference data: no region selection made.");
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("message.regionReferenceNoSelection"));
             log.debug("showRegRefData(): no region selection made");
             return; // no selection
         }
 
         HObject obj = FileFormat.findObject(((HObject)dataObject).getFileFormat(), oidStr);
         if (obj == null || !(obj instanceof ScalarDS)) {
-            Tools.showError(shell, "Select", "Could not show object reference data: invalid or null data");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("table.referenceInvalid"));
             log.debug("showRegRefData(): obj is null or not a Scalar Dataset");
             return;
         }
@@ -625,7 +628,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
             }
             catch (Exception ex) {
                 log.debug("showRegRefData(): getData failure: ", ex);
-                Tools.showError(shell, "Select", "Region Reference: " + ex.getMessage());
+                Tools.showError(shell, I18n.text("action.select"),
+                                I18n.text("message.regionReferenceError") + ": " + ex.getMessage());
             }
 
             Class<?> theClass = null;
@@ -672,8 +676,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
                 }
                 catch (Exception ex) {
                     log.debug("showRegRefData(): no suitable display class found");
-                    Tools.showError(shell, "Select",
-                                    "Could not show reference data: no suitable display class found");
+                    Tools.showError(shell, I18n.text("action.select"),
+                                    I18n.text("message.referenceDisplayUnavailable"));
                     return;
                 }
             }
@@ -687,7 +691,8 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
             }
             catch (Exception ex) {
                 log.debug("showRegRefData(): Could not show reference data: ", ex);
-                Tools.showError(shell, "Select", "Could not show reference data: " + ex.toString());
+                Tools.showError(shell, I18n.text("action.select"),
+                                I18n.text("message.referenceDisplayFailed") + ": " + ex.toString());
             }
         } // (st.hasMoreTokens())
     }     // end of showRegRefData()
@@ -799,10 +804,10 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
                 Object val =
                     dataTable.getDataValueByPosition(event.getColumnPosition(), event.getRowPosition());
 
-                cellLabel.setText(String.valueOf(rowIndex) + ", " + fieldName + colIndex + " =  ");
+                I18n.bind(cellLabel, "table.cellLocation", rowIndex, fieldName + colIndex);
 
                 if (val == null) {
-                    cellValueField.setText("Null");
+                    cellValueField.setText(I18n.text("common.nullUpper"));
                     return;
                 }
 

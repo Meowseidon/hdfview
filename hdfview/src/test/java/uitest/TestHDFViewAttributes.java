@@ -57,9 +57,9 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
             SWTBotTreeItem[] items = filetree.getAllItems();
 
             items[0].click();
-            items[0].contextMenu().contextMenu("New").menu("Group").click();
+            items[0].contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.group")).click();
 
-            groupShell = bot.shell("New Group...");
+            groupShell = bot.shell(ui("dialog.newGroup.title"));
             groupShell.activate();
             bot.waitUntil(Conditions.shellIsActive(groupShell.getText()));
 
@@ -69,7 +69,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
             assertTrue(val.equals(groupname),
                        constructWrongValueMessage("createNewGroup()", "wrong group name", groupname, val));
 
-            groupShell.bot().button("   &OK   ").click();
+            groupShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(groupShell));
         }
         catch (Exception ex) {
@@ -99,9 +99,9 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
             SWTBotTreeItem[] items = filetree.getAllItems();
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("New").menu("Dataset").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.new")).menu(ui("tree.new.dataset")).click();
 
-            datasetShell = bot.shell("New Dataset...");
+            datasetShell = bot.shell(ui("dialog.newDataset.title"));
             datasetShell.activate();
             bot.waitUntil(Conditions.shellIsActive(datasetShell.getText()));
 
@@ -119,50 +119,50 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
                 val.equals(currentSize),
                 constructWrongValueMessage("createNewDataset()", "wrong current size", currentSize, val));
 
-            datasetShell.bot().button("   &OK   ").click();
+            datasetShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(datasetShell));
 
             filetree.expandNode(items[0].getText(), true);
             items = filetree.getAllItems();
 
             items[0].getNode(0).getNode(0).click();
-            items[0].getNode(0).getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(datasetname + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(datasetname);
 
             final SWTBotNatTable table =
                 new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
-            Display.getDefault().syncExec(new Runnable() {
-                @Override
-                public void run()
-                {
-                    for (int row = 1; row <= 4; row++) {
-                        for (int col = 1; col <= 4; col++) {
-                            String val = String.valueOf(((row - 1) * 4) + (col));
-                            table.doubleclick(row, col);
-                            table.widget.getActiveCellEditor().setEditorValue(val);
+            for (int row = 1; row <= 4; row++) {
+                for (int col = 1; col <= 4; col++) {
+                    final int editRow = row;
+                    final int editCol = col;
+                    final String expectedValue = String.valueOf(((row - 1) * 4) + (col));
+
+                    table.doubleclick(editRow, editCol);
+                    waitForActiveCellEditor(table);
+
+                    Display.getDefault().syncExec(new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            table.widget.getActiveCellEditor().setEditorValue(expectedValue);
                             table.widget.getActiveCellEditor().commit(SelectionLayer.MoveDirectionEnum.RIGHT,
                                                                       true, true);
-                            assertTrue(
-                                table.getCellDataValueByPosition(row, col).equals(val),
-                                constructWrongValueMessage("createNewDataset()", "wrong value", val,
-                                                           table.getCellDataValueByPosition(row, col)));
+                            if (table.widget.getActiveCellEditor() != null)
+                                table.widget.getActiveCellEditor().close();
                         }
-                    }
+                    });
+                    assertTrue(
+                        table.getCellDataValueByPosition(editRow, editCol).equals(expectedValue),
+                        constructWrongValueMessage("createNewDataset()", "wrong value", expectedValue,
+                                                   table.getCellDataValueByPosition(editRow, editCol)));
                 }
-            });
+            }
 
-            SWTBotMenu tableMenuItem = tableShell.bot().menu().menu("Table");
-            tableMenuItem.menu("Save Changes to File").click();
+            SWTBotMenu tableMenuItem = tableMenu(tableShell);
+            tableMenuItem.menu(ui("table.saveChanges")).click();
 
-            tableMenuItem.menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -179,10 +179,34 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
             }
 
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
         }
+    }
+
+    private void waitForActiveCellEditor(final SWTBotNatTable table)
+    {
+        bot.waitUntil(new org.eclipse.swtbot.swt.finder.waits.DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                final boolean[] active = new boolean[1];
+                Display.getDefault().syncExec(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        active[0] = table.widget.getActiveCellEditor() != null;
+                    }
+                });
+                return active[0];
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for the Dataset cell editor";
+            }
+        });
     }
 
     public SWTBotTableItem addAttributeToObject(String testname, SWTBotTable attrTable, int attrindex)
@@ -197,17 +221,17 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
                                                   String.valueOf(attrindex),
                                                   String.valueOf(attrTable.rowCount())));
 
-            SWTBotButton addButton = bot.button("Add Attribute");
+            SWTBotButton addButton = bot.button(ui("meta.addAttribute"));
             addButton.click();
 
-            newAttributeShell = bot.shell("New Attribute...");
+            newAttributeShell = bot.shell(ui("dialog.newAttribute.title"));
             newAttributeShell.activate();
 
-            newAttributeShell.bot().textWithLabel("Name: ").setText(attrName);
-            newAttributeShell.bot().textWithLabel("Value: ").setText(attrValue);
+            newAttributeShell.bot().textWithLabel(ui("meta.objectName")).setText(attrName);
+            newAttributeShell.bot().textWithLabel(ui("label.value")).setText(attrValue);
             newAttributeShell.bot().comboBox(2).setSelection("16");
 
-            newAttributeShell.bot().button("   &OK   ").click();
+            newAttributeShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(newAttributeShell));
 
             /* Verify that the attribute has been added to the table with the correct name and value */
@@ -254,17 +278,17 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
                                                   String.valueOf(attrindex),
                                                   String.valueOf(attrTable.rowCount())));
 
-            SWTBotButton addButton = bot.button("Add Attribute");
+            SWTBotButton addButton = bot.button(ui("meta.addAttribute"));
             addButton.click();
 
-            newAttributeShell = bot.shell("New Attribute...");
+            newAttributeShell = bot.shell(ui("dialog.newAttribute.title"));
             newAttributeShell.activate();
 
-            newAttributeShell.bot().textWithLabel("Attribute name: ").setText(attrName);
-            newAttributeShell.bot().textWithLabel("Current size").setText(attrDimsize);
+            newAttributeShell.bot().textWithLabel(ui("label.attributeName")).setText(attrName);
+            newAttributeShell.bot().textWithLabel(ui("dialog.currentSize")).setText(attrDimsize);
             newAttributeShell.bot().comboBox(2).setSelection("16");
 
-            newAttributeShell.bot().button("   &OK   ").click();
+            newAttributeShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(newAttributeShell));
 
             /* Verify that the attribute has been added to the table with the correct name and value */
@@ -307,18 +331,19 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
         try {
             newItem.click();
             if (useButton)
-                bot.button("Delete Attribute").click();
+                bot.button(ui("meta.deleteAttribute")).click();
             else
-                bot.table().contextMenu().contextMenu("Delete Attribute").click();
+                bot.table().contextMenu().contextMenu(ui("meta.deleteAttribute")).click();
 
-            org.hamcrest.Matcher<Shell> shellMatcher = WithRegex.withRegex(".*" + VERSION + " - Delete");
+            org.hamcrest.Matcher<Shell> shellMatcher =
+                WithRegex.withRegex(".*" + VERSION + " - " + ui("action.delete"));
             bot.waitUntil(Conditions.waitForShell(shellMatcher));
 
-            deleteAttributeShell = bot.shell("HDFView " + VERSION + " - Delete");
+            deleteAttributeShell = bot.shell(applicationDialogTitle("action.delete"));
             deleteAttributeShell.activate();
             bot.waitUntil(Conditions.shellIsActive(deleteAttributeShell.getText()));
 
-            deleteAttributeShell.bot().button("OK").click();
+            deleteAttributeShell.bot().button(ui("button.yes")).click();
             bot.waitUntil(Conditions.shellCloses(deleteAttributeShell));
 
             /*
@@ -351,17 +376,17 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
         try {
             newItem.click();
-            bot.table().contextMenu().contextMenu("Rename Attribute").click();
+            bot.table().contextMenu().contextMenu(ui("meta.renameAttribute")).click();
 
             org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(".*" + VERSION + " - Rename Attribute");
+                WithRegex.withRegex(".*" + VERSION + " - " + ui("meta.renameAttribute"));
             bot.waitUntil(Conditions.waitForShell(shellMatcher));
 
-            renameAttributeShell = bot.shell("HDFView " + VERSION + " - Rename Attribute");
+            renameAttributeShell = bot.shell(applicationDialogTitle("meta.renameAttribute"));
             renameAttributeShell.activate();
             bot.waitUntil(Conditions.shellIsActive(renameAttributeShell.getText()));
 
-            renameAttributeShell.bot().button("   &OK   ").click();
+            renameAttributeShell.bot().button(ui("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(renameAttributeShell));
 
             /*
@@ -510,11 +535,11 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
             /* Reload the file for good measure */
             SWTBotTreeItem[] items = filetree.getAllItems();
             items[0].click();
-            items[0].contextMenu().menu("&Reload File As").menu("Read/Write").click();
+            items[0].contextMenu().menu(ui("tree.reloadFileAs")).menu(ui("menu.file.openAs.readWrite")).click();
 
             filetree = bot.tree();
             items    = filetree.getAllItems();
-            items[0].contextMenu().contextMenu("Expand All").click();
+            items[0].contextMenu().contextMenu(ui("tree.expandAll")).click();
             checkFileTree(filetree, "testHDF5DeleteAttribute()", 3, testFilename);
             attrTable = openAttributeTable(filetree, testFilename, groupname);
             newItem   = addH5ScalarAttributeToObject("testHDF5DeleteAttribute()", attrTable, 0);
@@ -620,7 +645,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             attrTable  = openAttributeTable(filetree, testFilename, groupname);
             tableShell = openAttributeObject(attrTable, attrName, 0);
-            tableShell.close();
+            closeDataObject(tableShell);
 
             /* Now repeat the process for the dataset that was created */
             attrTable = openAttributeTable(filetree, testFilename, groupname + '/' + datasetname);
@@ -628,28 +653,28 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             attrTable  = openAttributeTable(filetree, testFilename, groupname + '/' + datasetname);
             tableShell = openAttributeObject(attrTable, attrName, 1);
-            tableShell.close();
+            closeDataObject(tableShell);
 
             /* Test open of attribute by popup menu */
 
             /* Reload file for good measure */
             SWTBotTreeItem[] items = filetree.getAllItems();
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
-            items[0].contextMenu().contextMenu("Expand All").click();
+            items[0].contextMenu().contextMenu(ui("tree.expandAll")).click();
 
             attrTable  = openAttributeTable(filetree, testFilename, groupname);
             tableShell = openAttributeContext(attrTable, attrName, 0);
-            tableShell.close();
+            closeDataObject(tableShell);
 
             /* Now repeat the process for the previously-created dataset */
             /* However the dataset has dimension coords */
             attrTable =
                 openAttributeTable(filetree, testFilename, groupname + '/' + datasetname + " (dimension)");
             tableShell = openAttributeContext(attrTable, attrName, 1);
-            tableShell.close();
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -661,8 +686,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -695,7 +719,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             attrTable  = openAttributeTable(filetree, testFilename, groupname);
             tableShell = openAttributeObject(attrTable, attrName, 0);
-            tableShell.close();
+            closeDataObject(tableShell);
 
             /* Now repeat the process for the dataset that was created */
             attrTable = openAttributeTable(filetree, testFilename, groupname + '/' + datasetname);
@@ -703,26 +727,26 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             attrTable  = openAttributeTable(filetree, testFilename, groupname + '/' + datasetname);
             tableShell = openAttributeObject(attrTable, attrName, 0);
-            tableShell.close();
+            closeDataObject(tableShell);
 
             /* Test open of attribute by popup menu */
 
             /* Reload file for good measure */
             SWTBotTreeItem[] items = filetree.getAllItems();
             items[0].click();
-            items[0].contextMenu().contextMenu("Reload File").click();
+            items[0].contextMenu().contextMenu(ui("tree.reloadFile")).click();
 
             items = filetree.getAllItems();
-            items[0].contextMenu().contextMenu("Expand All").click();
+            items[0].contextMenu().contextMenu(ui("tree.expandAll")).click();
 
             attrTable  = openAttributeTable(filetree, testFilename, groupname);
             tableShell = openAttributeContext(attrTable, attrName, 0);
-            tableShell.close();
+            closeDataObject(tableShell);
 
             /* Now repeat the process for the previously-created dataset */
             attrTable  = openAttributeTable(filetree, testFilename, groupname + '/' + datasetname);
             tableShell = openAttributeContext(attrTable, attrName, 0);
-            tableShell.close();
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -734,8 +758,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.close();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -876,7 +899,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             newItem.click();
 
-            assertTrue(!bot.table().contextMenu().contextMenu("Rename Attribute").isEnabled(),
+            assertTrue(!bot.table().contextMenu().contextMenu(ui("meta.renameAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF4RenameAttributeFunctionDisabled()",
                                                   "rename attribute menuitem not disabled", "disabled",
                                                   "enabled"));
@@ -887,7 +910,7 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             newItem.click();
 
-            assertTrue(!bot.table().contextMenu().contextMenu("Rename Attribute").isEnabled(),
+            assertTrue(!bot.table().contextMenu().contextMenu(ui("meta.renameAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF4RenameAttributeFunctionDisabled()",
                                                   "rename attribute menuitem not disabled", "disabled",
                                                   "enabled"));
@@ -932,11 +955,11 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             newItem.click();
 
-            assertTrue(!bot.table().contextMenu().contextMenu("Delete Attribute").isEnabled(),
+            assertTrue(!bot.table().contextMenu().contextMenu(ui("meta.deleteAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF4DeleteAttributeFunctionDisabled()",
                                                   "delete attribute menuitem not disabled", "disabled",
                                                   "enabled"));
-            assertTrue(!bot.button("Delete Attribute").isEnabled(),
+            assertTrue(!bot.button(ui("meta.deleteAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF4DeleteAttributeFunctionDisabled()",
                                                   "delete attribute button not disabled", "disabled",
                                                   "enabled"));
@@ -947,11 +970,11 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
 
             newItem.click();
 
-            assertTrue(!bot.table().contextMenu().contextMenu("Delete Attribute").isEnabled(),
+            assertTrue(!bot.table().contextMenu().contextMenu(ui("meta.deleteAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF4DeleteAttributeFunctionDisabled()",
                                                   "delete attribute menuitem not disabled", "disabled",
                                                   "enabled"));
-            assertTrue(!bot.button("Delete Attribute").isEnabled(),
+            assertTrue(!bot.button(ui("meta.deleteAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF4DeleteAttributeFunctionDisabled()",
                                                   "delete attribute button not disabled", "disabled",
                                                   "enabled"));
@@ -1033,18 +1056,18 @@ public class TestHDFViewAttributes extends AbstractWindowTest {
         try {
             SWTBotTree filetree    = bot.tree();
             SWTBotTreeItem[] items = filetree.getAllItems();
-            items[0].contextMenu().contextMenu("Expand All").click();
+            items[0].contextMenu().contextMenu(ui("tree.expandAll")).click();
             checkFileTree(filetree, "testHDF5RenameAttributeDisabledForReadOnly()", 3, testFilename);
             SWTBotTable attrTable = openAttributeTable(filetree, testFilename, groupname);
 
-            assertTrue(!bot.table().contextMenu().contextMenu("Rename Attribute").isEnabled(),
+            assertTrue(!bot.table().contextMenu().contextMenu(ui("meta.renameAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF5RenameAttributeDisabledForReadOnly()",
                                                   "rename attribute menuitem not disabled", "disabled",
                                                   "enabled"));
 
             attrTable = openAttributeTable(filetree, testFilename, groupname + '/' + datasetname);
 
-            assertTrue(!bot.table().contextMenu().contextMenu("Rename Attribute").isEnabled(),
+            assertTrue(!bot.table().contextMenu().contextMenu(ui("meta.renameAttribute")).isEnabled(),
                        constructWrongValueMessage("testHDF5RenameAttributeDisabledForReadOnly()",
                                                   "rename attribute menuitem not disabled", "disabled",
                                                   "enabled"));

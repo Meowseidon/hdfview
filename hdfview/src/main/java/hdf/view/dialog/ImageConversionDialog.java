@@ -114,18 +114,18 @@ public class ImageConversionDialog extends Dialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText(parent.getText());
+        I18n.bind(shell, "dialog.convertImage.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
         if (fileTypeTo.equals(FileFormat.FILE_TYPE_HDF5)) {
             toFileExtension = ".h5";
-            shell.setText("Convert Image to HDF5 ...");
+            I18n.bind(shell, "dialog.convertImage.hdf5.title");
             isConvertedFromImage = true;
         }
         else if (fileTypeTo.equals(FileFormat.FILE_TYPE_HDF4)) {
             toFileExtension = ".hdf";
-            shell.setText("Convert Image to HDF4 ...");
+            I18n.bind(shell, "dialog.convertImage.hdf4.title");
             isConvertedFromImage = true;
         }
 
@@ -136,7 +136,7 @@ public class ImageConversionDialog extends Dialog {
 
         Label label = new Label(contentComposite, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("IMAGE File: ");
+        I18n.bind(label, "label.imageFile");
 
         srcFileField = new Text(contentComposite, SWT.SINGLE | SWT.BORDER);
         srcFileField.setFont(curFont);
@@ -146,7 +146,7 @@ public class ImageConversionDialog extends Dialog {
 
         Button browseButton = new Button(contentComposite, SWT.PUSH);
         browseButton.setFont(curFont);
-        browseButton.setText("Browse...");
+        I18n.bind(browseButton, "button.browse");
         browseButton.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e)
             {
@@ -156,12 +156,13 @@ public class ImageConversionDialog extends Dialog {
                 if (isConvertedFromImage) {
                     DefaultFileFilter filter = DefaultFileFilter.getImageFileFilter();
                     fChooser.setFilterExtensions(new String[] {"*", filter.getExtensions()});
-                    fChooser.setFilterNames(new String[] {"All Files", filter.getDescription()});
+                    fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles"),
+                                                          filter.getDescription()});
                     fChooser.setFilterIndex(1);
                 }
                 else {
                     fChooser.setFilterExtensions(new String[] {"*"});
-                    fChooser.setFilterNames(new String[] {"All Files"});
+                    fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles")});
                     fChooser.setFilterIndex(0);
                 }
 
@@ -181,7 +182,7 @@ public class ImageConversionDialog extends Dialog {
 
         label = new Label(contentComposite, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("HDF File: ");
+        I18n.bind(label, "label.hdfFile");
 
         dstFileField = new Text(contentComposite, SWT.SINGLE | SWT.BORDER);
         dstFileField.setFont(curFont);
@@ -189,14 +190,14 @@ public class ImageConversionDialog extends Dialog {
 
         browseButton = new Button(contentComposite, SWT.PUSH);
         browseButton.setFont(curFont);
-        browseButton.setText("Browse...");
+        I18n.bind(browseButton, "button.browse");
         browseButton.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e)
             {
                 FileDialog fChooser = new FileDialog(shell, SWT.OPEN);
 
                 fChooser.setFilterExtensions(new String[] {"*"});
-                fChooser.setFilterNames(new String[] {"All Files"});
+                fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles")});
                 fChooser.setFilterIndex(0);
 
                 String filename = fChooser.open();
@@ -296,12 +297,12 @@ public class ImageConversionDialog extends Dialog {
         File f = new File(srcFile);
         if (!f.exists()) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Convert", "Source file does not exist.");
+            Tools.showError(shell, I18n.text("action.convert"), I18n.text("message.sourceFileMissing"));
             return false;
         }
         else if (f.isDirectory()) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Convert", "Source file is a directory.");
+            Tools.showError(shell, I18n.text("action.convert"), I18n.text("message.sourceFileDirectory"));
             return false;
         }
 
@@ -315,7 +316,8 @@ public class ImageConversionDialog extends Dialog {
         }
         else if (!pfile.exists()) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Convert", "Destination file path does not exist at\n" + pfile.getPath());
+            Tools.showError(shell, I18n.text("action.convert"),
+                            I18n.text("message.destinationPathMissing", pfile.getPath()));
             return false;
         }
 
@@ -327,14 +329,16 @@ public class ImageConversionDialog extends Dialog {
                 theFile = (FileFormat)iterator.next();
                 if (theFile.getFilePath().equals(dstFile)) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Convert", "The destination file is being used.");
+                    Tools.showError(shell, I18n.text("action.convert"),
+                                    I18n.text("message.destinationInUse"));
                     return false;
                 }
             }
         }
 
         if (f.exists()) {
-            if (!Tools.showConfirm(shell, "Convert", "Destination file exists. Do you want to replace it ?"))
+            if (!Tools.showConfirm(shell, I18n.text("action.convert"),
+                                   I18n.text("message.destinationExists")))
                 return false;
         }
 
@@ -347,7 +351,7 @@ public class ImageConversionDialog extends Dialog {
             convertedFile = null;
             converted     = false;
             shell.getDisplay().beep();
-            Tools.showError(shell, "Convert", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.convert"), ex.getMessage());
             return false;
         }
 

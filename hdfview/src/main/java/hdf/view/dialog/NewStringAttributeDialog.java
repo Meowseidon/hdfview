@@ -27,6 +27,7 @@ import hdf.object.HObject;
 import hdf.object.MetaDataContainer;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +108,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
         shell.setFont(curFont);
-        shell.setText("New Attribute...");
+        I18n.bind(shell, "dialog.newAttribute.title");
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
@@ -118,7 +119,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         Label label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Name: ");
+        I18n.bind(label, "label.name");
 
         nameField = new Text(content, SWT.SINGLE | SWT.BORDER);
         nameField.setFont(curFont);
@@ -126,7 +127,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Type: ");
+        I18n.bind(label, "label.type");
 
         Composite optionsComposite = new Composite(content, SWT.NONE);
         optionsComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
@@ -153,17 +154,17 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
         if (!isH5 && (parentObj instanceof Group) && ((Group)parentObj).isRoot()) {
             Button h4SdAttrRadioButton = new Button(optionsComposite, SWT.RADIO);
             h4SdAttrRadioButton.setFont(curFont);
-            h4SdAttrRadioButton.setText("SD");
+            I18n.bind(h4SdAttrRadioButton, "common.sd");
             h4SdAttrRadioButton.setSelection(true);
 
             h4GrAttrRadioButton = new Button(optionsComposite, SWT.RADIO);
             h4GrAttrRadioButton.setFont(curFont);
-            h4GrAttrRadioButton.setText("GR");
+            I18n.bind(h4GrAttrRadioButton, "common.gr");
         }
 
         arrayLengthLabel = new Label(content, SWT.LEFT);
         arrayLengthLabel.setFont(curFont);
-        arrayLengthLabel.setText("Array Size: ");
+        I18n.bind(arrayLengthLabel, "label.arraySize");
 
         lengthField = new Text(content, SWT.SINGLE | SWT.BORDER);
         lengthField.setFont(curFont);
@@ -173,7 +174,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Value: ");
+        I18n.bind(label, "label.value");
 
         valueField = new Text(content, SWT.SINGLE | SWT.BORDER);
         valueField.setFont(curFont);
@@ -182,7 +183,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         label = new Label(content, SWT.LEFT);
         label.setFont(curFont);
-        label.setText("Object List: ");
+        I18n.bind(label, "label.objectList");
 
         objChoice = new Combo(content, SWT.DROP_DOWN | SWT.READ_ONLY);
         objChoice.setFont(curFont);
@@ -241,7 +242,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         Button okButton = new Button(buttonComposite, SWT.PUSH);
         okButton.setFont(curFont);
-        okButton.setText("   &OK   ");
+        I18n.bind(okButton, "button.ok");
         okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
         okButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -255,7 +256,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         Button cancelButton = new Button(buttonComposite, SWT.PUSH);
         cancelButton.setFont(curFont);
-        cancelButton.setText(" &Cancel ");
+        I18n.bind(cancelButton, "button.cancel");
         cancelButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, false, false));
         cancelButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -268,7 +269,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
 
         Button helpButton = new Button(buttonComposite, SWT.PUSH);
         helpButton.setFont(curFont);
-        helpButton.setText(" &Help ");
+        I18n.bind(helpButton, "button.help");
         helpButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
         helpButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -316,7 +317,8 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
         }
 
         if ((attrName == null) || (attrName.length() < 1)) {
-            Tools.showError(shell, "Create", "No attribute name specified.");
+            Tools.showError(shell, I18n.text("action.create"),
+                            I18n.text("message.nameMissing", I18n.text("common.attribute")));
             return false;
         }
 
@@ -337,7 +339,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
         }
 
         if (arraySize <= 0) {
-            Tools.showError(shell, "Create", "Invalid attribute length.");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.invalidAttributeLength"));
             return false;
         }
 
@@ -382,7 +384,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                         ref[j] = Long.parseLong(theToken);
                     }
                     catch (NumberFormatException ex) {
-                        Tools.showError(shell, "Create", ex.getMessage());
+                        Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                         return false;
                     }
                 }
@@ -401,7 +403,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 sv = Short.parseShort(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                             if (sv < 0) {
@@ -423,7 +425,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 iv = Integer.parseInt(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                             if (iv < 0) {
@@ -445,7 +447,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 lv = Long.parseLong(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                             if (lv < 0) {
@@ -467,7 +469,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 lv = new BigInteger(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                             i[j] = lv.longValue();
@@ -484,7 +486,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 b[j] = Byte.parseByte(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                         }
@@ -499,7 +501,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 s[j] = Short.parseShort(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                         }
@@ -514,7 +516,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 i[j] = Integer.parseInt(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                         }
@@ -528,7 +530,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                                 l[j] = Long.parseLong(theToken);
                             }
                             catch (NumberFormatException ex) {
-                                Tools.showError(shell, "Create", ex.getMessage());
+                                Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                                 return false;
                             }
                         }
@@ -546,7 +548,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                             f[j] = Float.parseFloat(theToken);
                         }
                         catch (NumberFormatException ex) {
-                            Tools.showError(shell, "Create", ex.getMessage());
+                            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                             return false;
                         }
                         if (Float.isInfinite(f[j]) || Float.isNaN(f[j])) {
@@ -563,7 +565,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                             d[j] = Double.parseDouble(theToken);
                         }
                         catch (NumberFormatException ex) {
-                            Tools.showError(shell, "Create", ex.getMessage());
+                            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
                             return false;
                         }
                         if (Double.isInfinite(d[j]) || Double.isNaN(d[j])) {
@@ -584,12 +586,12 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
                 attr = new hdf.object.nc2.NC2Attribute(parentObj, attrName, datatype, dims);
         }
         catch (Exception ex) {
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             log.debug("createAttribute(): ", ex);
             return false;
         }
         if (attr == null) {
-            Tools.showError(shell, "Create", "Attribute could not be created");
+            Tools.showError(shell, I18n.text("action.create"), I18n.text("message.attributeCreateFailed"));
             log.debug("createAttribute(): failed");
             return false;
         }
@@ -613,7 +615,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
             }
         }
         catch (Exception ex) {
-            Tools.showError(shell, "Create", ex.getMessage());
+            Tools.showError(shell, I18n.text("action.create"), ex.getMessage());
             log.debug("createAttribute(): ", ex);
             return false;
         }
@@ -688,7 +690,7 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
             helpShell =
                 new Shell(parent, SWT.TITLE | SWT.CLOSE | SWT.RESIZE | SWT.BORDER | SWT.APPLICATION_MODAL);
             helpShell.setFont(curFont);
-            helpShell.setText("Create New Attribute");
+            I18n.bind(helpShell, "dialog.createNewAttribute.title");
             helpShell.setImages(ViewProperties.getHdfIcons());
             helpShell.setLayout(new GridLayout(1, true));
 
@@ -696,12 +698,12 @@ public class NewStringAttributeDialog extends NewDataObjectDialog {
             StyledText helpText = new StyledText(
                 helpShell, SWT.MULTI | SWT.READ_ONLY | SWT.WRAP | SWT.V_SCROLL | SWT.BORDER);
             helpText.setFont(curFont);
-            helpText.setText(HELP_INFORMATION);
+            I18n.bind(helpText, "dialog.help.newAttribute.text");
             helpText.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
             Button okButton = new Button(helpShell, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override

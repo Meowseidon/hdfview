@@ -12,9 +12,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import org.eclipse.nebula.widgets.nattable.NatTable;
-import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
-import org.eclipse.swtbot.swt.finder.matchers.WithRegex;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTable;
@@ -130,8 +128,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(testExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // Open dataset 2D
             tableShell = openTreeviewObject(filetree, testFilename, datasetName2);
@@ -141,8 +138,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(test2DExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // Open dataset 3D
             tableShell = openTreeviewObject(filetree, testFilename, datasetName3);
@@ -153,12 +149,11 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(test3DPage1ExpectedData);
 
-            tableShell.bot().toolbarButtonWithTooltip("Next Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.nextPage")).click();
 
             retriever.testAllTableLocations(test3DPage2ExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -192,8 +187,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
             retriever.setContainerHeaderOffset(2, 0);
             retriever.testAllTableLocations(testExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // Open dataset 2D
             tableShell = openTreeviewObject(filetree, testFilename, datasetName2);
@@ -204,8 +198,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
             retriever.setContainerHeaderOffset(2, 0);
             retriever.testAllTableLocations(test2DExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // Open dataset 3D
             tableShell = openTreeviewObject(filetree, testFilename, datasetName3);
@@ -217,12 +210,11 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
             retriever.setContainerHeaderOffset(2, 0);
             retriever.testAllTableLocations(test3DPage1ExpectedData);
 
-            tableShell.bot().toolbarButtonWithTooltip("Next Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.nextPage")).click();
 
             retriever.testAllTableLocations(test3DPage2ExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -315,8 +307,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(testExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // Open attribute 2D
             tableShell = openAttributeObject(attrTable, attrName2, rowIndex + 1);
@@ -326,8 +317,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
 
             retriever.testAllTableLocations(test2DExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // TODO: attribute 3D tables are different and don't page
             //  Open attribute 3D
@@ -339,12 +329,11 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
 
             // retriever.testAllTableLocations(test3DPage1ExpectedData);
 
-            tableShell.bot().toolbarButtonWithTooltip("Next Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.nextPage")).click();
 
             // retriever.testAllTableLocations(test3DPage2ExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -378,8 +367,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
             retriever.setContainerHeaderOffset(2, 0);
             retriever.testAllTableLocations(testExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // Open attribute 2D
             tableShell = openAttributeObject(attrTable, attrName2, rowIndex + 1);
@@ -390,8 +378,7 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
             retriever.setContainerHeaderOffset(2, 0);
             retriever.testAllTableLocations(test2DExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
 
             // TODO: attribute 3D compound tables are different and don't page
             //  Open attribute 3D
@@ -405,12 +392,11 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
             retriever.setContainerHeaderOffset(2, 0);
             // retriever.testAllTableLocations(test3DPage1ExpectedData);
 
-            tableShell.bot().toolbarButtonWithTooltip("Next Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.nextPage")).click();
 
             // retriever.testAllTableLocations(test3DPage2ExpectedData);
 
-            tableShell.bot().menu().menu("Table").menu("Close").click();
-            bot.waitUntil(Conditions.shellCloses(tableShell));
+            closeDataObject(tableShell);
         }
         catch (Exception ex) {
             ex.printStackTrace();
@@ -574,17 +560,11 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
                        "openTAttr2GroupReferenceAsTable() filetree is missing group '" + group_name2 + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Expand All").click();
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.expandAll")).click();
 
             items[0].getNode(2).getNode(23).click();
-            items[0].getNode(2).getNode(23).contextMenu().menu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(datasetg2Name3 + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(2).getNode(23).contextMenu().menu(ui("action.open")).click();
+            tableShell = openDataObject(datasetg2Name3);
 
             SWTBotNatTable table = new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
@@ -593,20 +573,11 @@ public class TestHDFViewTAttr2 extends AbstractWindowTest {
                        "openTAttr2GroupReferenceAsTable() data [" + tableShell.bot().text(2).getText() +
                            "] did not match regex '/dset H5O_TYPE_OBJ_REF'");
 
-            table.contextMenu(3, 3).menu("Show As &Table").click();
-            org.hamcrest.Matcher<Shell> shell2Matcher =
-                WithRegex.withRegex(dataset_name + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shell2Matcher));
+            table.contextMenu(3, 3).menu(ui("table.showAsTable")).click();
+            table2Shell = openStandaloneDataObject(dataset_name);
 
-            table2Shell = bot.shells()[2];
-            table2Shell.activate();
-            bot.waitUntil(Conditions.shellIsActive(table2Shell.getText()));
-
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             SWTBotNatTable table2 =

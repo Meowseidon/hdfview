@@ -19,6 +19,7 @@ import java.io.File;
 
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +82,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
      */
     public UserOptionsGeneralPage()
     {
-        super("General Settings");
+        super(I18n.text("options.general"));
         isFontChanged      = false;
         isUserGuideChanged = false;
         isWorkDirChanged   = false;
@@ -171,10 +172,21 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         }
 
         // set data delimiter
-        if (delimiterChoice != null)
-            ViewProperties.setDataDelimiter(delimiterChoice.getItem(delimiterChoice.getSelectionIndex()));
-        if (imageOriginChoice != null)
-            ViewProperties.setImageOrigin(imageOriginChoice.getItem(imageOriginChoice.getSelectionIndex()));
+        if (delimiterChoice != null) {
+            String[] delimiterValues = {ViewProperties.DELIMITER_TAB, ViewProperties.DELIMITER_COMMA,
+                                        ViewProperties.DELIMITER_SPACE, ViewProperties.DELIMITER_COLON,
+                                        ViewProperties.DELIMITER_SEMI_COLON};
+            int index = delimiterChoice.getSelectionIndex();
+            if (index >= 0 && index < delimiterValues.length)
+                ViewProperties.setDataDelimiter(delimiterValues[index]);
+        }
+        if (imageOriginChoice != null) {
+            String[] originValues = {ViewProperties.ORIGIN_UL, ViewProperties.ORIGIN_LL,
+                                     ViewProperties.ORIGIN_UR, ViewProperties.ORIGIN_LR};
+            int index = imageOriginChoice.getSelectionIndex();
+            if (index >= 0 && index < originValues.length)
+                ViewProperties.setImageOrigin(originValues[index]);
+        }
 
         if (checkReadAll != null) {
             if (checkReadAll.getSelection()) {
@@ -313,11 +325,13 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         String[] imageOriginChoices = {ViewProperties.ORIGIN_UL, ViewProperties.ORIGIN_LL,
                                        ViewProperties.ORIGIN_UR, ViewProperties.ORIGIN_LR};
-        imageOriginChoice.setItems(imageOriginChoices);
+        I18n.bindItems(imageOriginChoice, "options.originUpperLeft", "options.originLowerLeft",
+                       "options.originUpperRight", "options.originLowerRight");
 
         try {
-            int selectionIndex = imageOriginChoice.indexOf(ViewProperties.getImageOrigin());
-            imageOriginChoice.select(selectionIndex);
+            int selectionIndex = java.util.Arrays.asList(imageOriginChoices)
+                                     .indexOf(ViewProperties.getImageOrigin());
+            imageOriginChoice.select(selectionIndex < 0 ? 0 : selectionIndex);
         }
         catch (Exception ex) {
             imageOriginChoice.select(0);
@@ -333,11 +347,13 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         String[] delimiterChoices = {ViewProperties.DELIMITER_TAB, ViewProperties.DELIMITER_COMMA,
                                      ViewProperties.DELIMITER_SPACE, ViewProperties.DELIMITER_COLON,
                                      ViewProperties.DELIMITER_SEMI_COLON};
-        delimiterChoice.setItems(delimiterChoices);
+        I18n.bindItems(delimiterChoice, "options.delimiterTab", "options.delimiterComma",
+                       "options.delimiterSpace", "options.delimiterColon", "options.delimiterSemicolon");
 
         try {
-            int selectionIndex = delimiterChoice.indexOf(ViewProperties.getDataDelimiter());
-            delimiterChoice.select(selectionIndex);
+            int selectionIndex = java.util.Arrays.asList(delimiterChoices)
+                                     .indexOf(ViewProperties.getDataDelimiter());
+            delimiterChoice.select(selectionIndex < 0 ? 0 : selectionIndex);
         }
         catch (Exception ex) {
             delimiterChoice.select(0);
@@ -374,11 +390,11 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         workingDirectoryGroup.setLayout(new GridLayout(4, false));
         workingDirectoryGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         workingDirectoryGroup.setFont(curFont);
-        workingDirectoryGroup.setText("Default Working Directory");
+        I18n.bind(workingDirectoryGroup, "options.defaultWorkingDirectory");
 
         checkCurrentUserDir = new Button(workingDirectoryGroup, SWT.CHECK);
         checkCurrentUserDir.setFont(curFont);
-        checkCurrentUserDir.setText("\"User Work\" or");
+        I18n.bind(checkCurrentUserDir, "options.userWork");
         checkCurrentUserDir.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false, 2, 1));
         checkCurrentUserDir.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -394,7 +410,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         checkUserHomeDir = new Button(workingDirectoryGroup, SWT.CHECK);
         checkUserHomeDir.setFont(curFont);
-        checkUserHomeDir.setText("\"User Home\" or");
+        I18n.bind(checkUserHomeDir, "options.userHome");
         checkUserHomeDir.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false, 2, 1));
         checkUserHomeDir.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -414,7 +430,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         currentDirButton = new Button(workingDirectoryGroup, SWT.PUSH);
         currentDirButton.setFont(curFont);
-        currentDirButton.setText("Browse...");
+        I18n.bind(currentDirButton, "button.browse");
         currentDirButton.setLayoutData(new GridData(SWT.END, SWT.FILL, false, false));
         currentDirButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -422,7 +438,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
             {
                 final DirectoryDialog dChooser = new DirectoryDialog(shell);
                 dChooser.setFilterPath(workDir);
-                dChooser.setText("Select a Directory");
+                dChooser.setText(I18n.text("options.selectDirectory"));
 
                 String dir = dChooser.open();
 
@@ -438,11 +454,11 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         helpDocumentGroup.setLayout(new GridLayout(3, false));
         helpDocumentGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         helpDocumentGroup.setFont(curFont);
-        helpDocumentGroup.setText("Help Document");
+        I18n.bind(helpDocumentGroup, "options.helpDocument");
 
         Label label = new Label(helpDocumentGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("User's Guide:  ");
+        I18n.bind(label, "options.usersGuide");
 
         ugField = new Text(helpDocumentGroup, SWT.SINGLE | SWT.BORDER);
         ugField.setFont(curFont);
@@ -450,7 +466,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         Button browseButton = new Button(helpDocumentGroup, SWT.PUSH);
         browseButton.setFont(curFont);
-        browseButton.setText("Browse...");
+        I18n.bind(browseButton, "button.browse");
         browseButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         browseButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -459,7 +475,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
                 final FileDialog fChooser = new FileDialog(shell, SWT.OPEN);
                 fChooser.setFilterPath(rootDir);
                 fChooser.setFilterExtensions(new String[] {"*"});
-                fChooser.setFilterNames(new String[] {"All Files"});
+                fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles")});
                 fChooser.setFilterIndex(0);
 
                 if (fChooser.open() == null) {
@@ -483,27 +499,27 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         fileAccessModeGroup.setLayout(new GridLayout(2, true));
         fileAccessModeGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         fileAccessModeGroup.setFont(curFont);
-        fileAccessModeGroup.setText("Default File Access Mode");
+        I18n.bind(fileAccessModeGroup, "options.defaultFileAccessMode");
 
         checkReadOnly = new Button(fileAccessModeGroup, SWT.RADIO);
         checkReadOnly.setFont(curFont);
-        checkReadOnly.setText("Read Only");
+        I18n.bind(checkReadOnly, "options.readOnly");
         checkReadOnly.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         rwButton = new Button(fileAccessModeGroup, SWT.RADIO);
         rwButton.setFont(curFont);
-        rwButton.setText("Read/Write");
+        I18n.bind(rwButton, "options.readWrite");
         rwButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         org.eclipse.swt.widgets.Group textFontGroup = new org.eclipse.swt.widgets.Group(composite, SWT.NONE);
         textFontGroup.setLayout(new GridLayout(4, false));
         textFontGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         textFontGroup.setFont(curFont);
-        textFontGroup.setText("Text Font");
+        I18n.bind(textFontGroup, "options.textFont");
 
         label = new Label(textFontGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Font Size: ");
+        I18n.bind(label, "label.fontSize");
 
         String[] fontSizeChoices = {"8",  "10", "12", "14", "16", "18", "20", "22",
                                     "24", "26", "28", "30", "32", "34", "36", "48"};
@@ -514,7 +530,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         label = new Label(textFontGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Font Type: ");
+        I18n.bind(label, "label.fontType");
 
         String[] fontNames = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
 
@@ -527,63 +543,36 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         imageGroup.setLayout(new GridLayout(6, false));
         imageGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         imageGroup.setFont(curFont);
-        imageGroup.setText("Image");
+        I18n.bind(imageGroup, "options.image");
 
         helpButton = new Button(imageGroup, SWT.PUSH);
         helpButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         helpButton.setImage(ViewProperties.getHelpIcon());
-        helpButton.setToolTipText("Help on Auto Contrast");
+        I18n.bindToolTip(helpButton, "options.autoContrast");
         helpButton.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                final String msg =
-                    "Auto Contrast does the following to compute a gain/bias \n"
-                    + "that will stretch the pixels in the image to fit the pixel \n"
-                    + "values of the graphics system. For example, it stretches unsigned\n"
-                    + "short data to fit the full range of an unsigned short. Later \n"
-                    + "code simply takes the high order byte and passes it to the graphics\n"
-                    + "system (which expects 0-255). It uses some statistics on the pixels \n"
-                    + "to prevent outliers from throwing off the gain/bias calculations much.\n\n"
-                    + "To compute the gain/bias we... \n"
-                    + "Find the mean and std. deviation of the pixels in the image \n"
-                    + "min = mean - 3 * std.dev. \n"
-                    + "max = mean + 3 * std.dev. \n"
-                    + "small fudge factor because this tends to overshoot a bit \n"
-                    + "Stretch to 0-USHRT_MAX \n"
-                    + "        gain = USHRT_MAX / (max-min) \n"
-                    + "        bias = -min \n"
-                    + "\n"
-                    + "To apply the gain/bias to a pixel, use the formula \n"
-                    + "data[i] = (data[i] + bias) * gain \n"
-                    + "\n"
-                    // +
-                    // "Finally, for auto-ranging the sliders for gain/bias, we do the following \n"
-                    // + "gain_min = 0 \n"
-                    // + "gain_max = gain * 3.0 \n"
-                    // + "bias_min = -fabs(bias) * 3.0 \n"
-                    // + "bias_max = fabs(bias) * 3.0 \n"
-                    + "\n\n";
-
-                Tools.showInformation(getShell(), "Help", msg);
+                Tools.showInformation(getShell(), I18n.text("dialog.help.autoContrast.title"),
+                                      I18n.text("dialog.help.autoContrast.text"));
             }
         });
 
         checkAutoContrast = new Button(imageGroup, SWT.CHECK);
         checkAutoContrast.setFont(curFont);
-        checkAutoContrast.setText("Autogain Image Contrast");
+        I18n.bind(checkAutoContrast, "options.autogainImageContrast");
         checkAutoContrast.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         checkShowValues = new Button(imageGroup, SWT.CHECK);
         checkShowValues.setFont(curFont);
-        checkShowValues.setText("Show Values");
+        I18n.bind(checkShowValues, "button.showValues");
         checkShowValues.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         label = new Label(imageGroup, SWT.NONE);
 
         label = new Label(imageGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Image Origin: ");
+        I18n.bind(label, "options.imageOrigin");
 
         imageOriginChoice = new Combo(imageGroup, SWT.SINGLE | SWT.READ_ONLY);
         imageOriginChoice.setFont(curFont);
@@ -593,21 +582,20 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         dataGroup.setLayout(new GridLayout(4, false));
         dataGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         dataGroup.setFont(curFont);
-        dataGroup.setText("Data");
+        I18n.bind(dataGroup, "options.data");
 
         label = new Label(dataGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Index Base: ");
+        I18n.bind(label, "options.indexBase");
 
-        String[] indexBaseChoices = {"0-based", "1-based"};
         indexBaseChoice           = new Combo(dataGroup, SWT.SINGLE | SWT.READ_ONLY);
         indexBaseChoice.setFont(curFont);
-        indexBaseChoice.setItems(indexBaseChoices);
+        I18n.bindItems(indexBaseChoice, "dataOption.zeroBased", "dataOption.oneBased");
         indexBaseChoice.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
 
         Label delimLabel = new Label(dataGroup, SWT.RIGHT);
         delimLabel.setFont(curFont);
-        delimLabel.setText("Data Delimiter: ");
+        I18n.bind(delimLabel, "label.dataDelimiter");
         delimLabel.setLayoutData(new GridData(SWT.END, SWT.CENTER, false, false));
 
         delimiterChoice = new Combo(dataGroup, SWT.SINGLE | SWT.READ_ONLY);
@@ -616,7 +604,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         Label timerRefreshLabel = new Label(dataGroup, SWT.RIGHT);
         timerRefreshLabel.setFont(curFont);
-        timerRefreshLabel.setText("Timer Refresh (ms): ");
+        I18n.bind(timerRefreshLabel, "label.timerRefresh");
 
         timerRefreshField = new Text(dataGroup, SWT.SINGLE | SWT.BORDER);
         timerRefreshField.setFont(curFont);
@@ -626,11 +614,11 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
         objectsGroup.setLayout(new GridLayout(5, true));
         objectsGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         objectsGroup.setFont(curFont);
-        objectsGroup.setText("Objects to Open");
+        I18n.bind(objectsGroup, "options.objectsToOpen");
 
         checkReadAll = new Button(objectsGroup, SWT.CHECK);
         checkReadAll.setFont(curFont);
-        checkReadAll.setText("Open All");
+        I18n.bind(checkReadAll, "options.openAll");
         checkReadAll.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         checkReadAll.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -643,7 +631,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         label = new Label(objectsGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Start Member: ");
+        I18n.bind(label, "label.startMember");
 
         startMemberField = new Text(objectsGroup, SWT.SINGLE | SWT.BORDER);
         startMemberField.setFont(curFont);
@@ -651,7 +639,7 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
 
         label = new Label(objectsGroup, SWT.RIGHT);
         label.setFont(curFont);
-        label.setText("Member Count: ");
+        I18n.bind(label, "label.memberCount");
 
         maxMemberField = new Text(objectsGroup, SWT.SINGLE | SWT.BORDER);
         maxMemberField.setFont(curFont);

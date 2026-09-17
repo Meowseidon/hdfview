@@ -31,10 +31,10 @@ public class TestNCTreeView extends AbstractWindowTest {
             checkFileTree(filetree, "testRoy_attributes()", 2, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, groupname, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, groupname, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(constructWrongValueMessage("testRoy_attributes()", "wrong name", groupname, val),
                        val.equals(groupname)); // Test group name
         }
@@ -71,10 +71,10 @@ public class TestNCTreeView extends AbstractWindowTest {
             checkFileTree(filetree, "testRoy()", 3, filename);
 
             // Test metadata
-            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "General Object Info");
+            SWTBotTabItem tabItem = openMetadataTab(filetree, filename, datasetName, "tab.generalObjectInfo");
             tabItem.activate();
 
-            String val = bot.textWithLabel("Name: ").getText();
+            String val = bot.textWithLabel(ui("meta.objectName")).getText();
             assertTrue(constructWrongValueMessage("testRoy()", "wrong name", datasetName, val),
                        val.equals(datasetName)); // Test dataset name
         }

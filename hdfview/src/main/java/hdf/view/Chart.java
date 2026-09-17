@@ -15,6 +15,9 @@
 package hdf.view;
 
 import java.lang.reflect.Array;
+import java.util.function.Supplier;
+
+import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.DisposeEvent;
@@ -54,6 +57,9 @@ public class Chart extends Dialog {
     private Font curFont;
 
     private String windowTitle;
+
+    /** Supplies a language-sensitive title for an already-open chart window. */
+    private Supplier<String> windowTitleSupplier = () -> windowTitle;
 
     private Color barColor;
 
@@ -200,13 +206,25 @@ public class Chart extends Dialog {
             format = new java.text.DecimalFormat("###.####E0#");
     }
 
+    /**
+     * Set a title supplier for a chart whose title contains localized text.
+     * Existing callers using the String constructor retain their fixed title.
+     *
+     * @param supplier supplies the complete chart title
+     */
+    public void setWindowTitleSupplier(Supplier<String> supplier)
+    {
+        if (supplier != null)
+            windowTitleSupplier = supplier;
+    }
+
     /** Show the Chart dialog. */
     public void open()
     {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM);
         shell.setFont(curFont);
-        shell.setText(windowTitle);
+        I18n.bindDynamic(shell, windowTitleSupplier);
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setLayout(new GridLayout(1, true));
 
@@ -234,7 +252,7 @@ public class Chart extends Dialog {
 
         Button closeButton = new Button(buttonComposite, SWT.PUSH);
         closeButton.setFont(curFont);
-        closeButton.setText("   &Close   ");
+        I18n.bind(closeButton, "button.close");
         closeButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, false, false));
         closeButton.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e) { shell.dispose(); }
@@ -260,19 +278,19 @@ public class Chart extends Dialog {
         Menu menu = new Menu(parent, SWT.BAR);
 
         MenuItem item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Histogram");
+        I18n.bind(item, "chart.histogram");
 
         Menu histogramMenu = new Menu(item);
         item.setMenu(histogramMenu);
 
         MenuItem setColor = new MenuItem(histogramMenu, SWT.PUSH);
-        setColor.setText("Change bar color");
+        I18n.bind(setColor, "chart.changeBarColor");
         setColor.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e)
             {
                 ColorDialog dialog = new ColorDialog(shell);
                 dialog.setRGB(barColor.getRGB());
-                dialog.setText("Select a bar color");
+                dialog.setText(I18n.text("chart.selectBarColor"));
 
                 RGB newColor = dialog.open();
 
@@ -287,7 +305,7 @@ public class Chart extends Dialog {
         new MenuItem(histogramMenu, SWT.SEPARATOR);
 
         MenuItem close = new MenuItem(histogramMenu, SWT.PUSH);
-        close.setText("Close");
+        I18n.bind(close, "chart.close");
         close.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e) { shell.dispose(); }
         });

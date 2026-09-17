@@ -65,6 +65,7 @@ import hdf.view.ViewProperties;
 import hdf.view.ViewProperties.BITMASK_OP;
 import hdf.view.ViewProperties.DataViewType;
 import hdf.view.dialog.NewDatasetDialog;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -206,7 +207,7 @@ public class DefaultImageView implements ImageView {
     /**
      * The title of this imageview.
      */
-    private String frameTitle;
+    private Object[] frameTitleArgs;
 
     /** TextField to show the image value. */
     private Text valueField;
@@ -409,7 +410,7 @@ public class DefaultImageView implements ImageView {
         }
 
         if ((hobject == null) || !(hobject instanceof ScalarDS)) {
-            viewer.showError("Display data in image failed for - " + hobject);
+            viewer.showError(I18n.text("message.displayImageFailed", hobject));
             return;
         }
 
@@ -432,7 +433,7 @@ public class DefaultImageView implements ImageView {
         }
 
         if (image == null) {
-            viewer.showError("Loading image failed - " + dataset.getName());
+            viewer.showError(I18n.text("message.loadingImageFailed", dataset.getName()));
             dataset = null;
             return;
         }
@@ -441,17 +442,10 @@ public class DefaultImageView implements ImageView {
         originalRange[1] = dataRange[1];
 
         // set title
-        StringBuilder sb = new StringBuilder(hobject.getName());
-        sb.append("  at  ")
-            .append(hobject.getPath())
-            .append("  [")
-            .append(dataset.getFileFormat().getName())
-            .append("  in  ")
-            .append(dataset.getFileFormat().getParent())
-            .append("]");
-
-        frameTitle = sb.toString();
-        shell.setText(sb.toString());
+        frameTitleArgs = new Object[] {hobject.getName(), hobject.getPath(),
+                                       dataset.getFileFormat().getName(),
+                                       dataset.getFileFormat().getParent()};
+        updateFrameTitle();
 
         // setup subset information
         int rank            = dataset.getRank();
@@ -467,33 +461,25 @@ public class DefaultImageView implements ImageView {
             maxFrame = (indexBase == 1) ? dims[selectedIndex[2]] : dims[selectedIndex[2]] - 1;
         }
 
-        sb.append(" [ dims");
-        sb.append(selectedIndex[0]);
+        StringBuilder dimsText = new StringBuilder(String.valueOf(selectedIndex[0]));
         for (int i = 1; i < n; i++) {
-            sb.append("x");
-            sb.append(selectedIndex[i]);
+            dimsText.append("x").append(selectedIndex[i]);
         }
-        sb.append(", start");
-        sb.append(start[selectedIndex[0]]);
+        StringBuilder startText = new StringBuilder(String.valueOf(start[selectedIndex[0]]));
         for (int i = 1; i < n; i++) {
-            sb.append("x");
-            sb.append(start[selectedIndex[i]]);
+            startText.append("x").append(start[selectedIndex[i]]);
         }
-        sb.append(", count");
-        sb.append(count[selectedIndex[0]]);
+        StringBuilder countText = new StringBuilder(String.valueOf(count[selectedIndex[0]]));
         for (int i = 1; i < n; i++) {
-            sb.append("x");
-            sb.append(count[selectedIndex[i]]);
+            countText.append("x").append(count[selectedIndex[i]]);
         }
-        sb.append(", stride");
-        sb.append(stride[selectedIndex[0]]);
+        StringBuilder strideText = new StringBuilder(String.valueOf(stride[selectedIndex[0]]));
         for (int i = 1; i < n; i++) {
-            sb.append("x");
-            sb.append(stride[selectedIndex[i]]);
+            strideText.append("x").append(stride[selectedIndex[i]]);
         }
-        sb.append(" ] ");
+        String subsetStatus = I18n.text("table.subsetStatus", dimsText, startText, countText, strideText);
 
-        viewer.showStatus(sb.toString());
+        viewer.showStatus(subsetStatus);
 
         shell.setMenuBar(createMenuBar());
 
@@ -588,19 +574,19 @@ public class DefaultImageView implements ImageView {
         Menu menuBar = new Menu(shell, SWT.BAR);
 
         MenuItem item = new MenuItem(menuBar, SWT.CASCADE);
-        item.setText("Image");
+        I18n.bind(item, "image.menu");
 
         Menu menu = new Menu(item);
         item.setMenu(menu);
 
         item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Save Image As");
+        I18n.bind(item, "image.saveAs");
 
         Menu saveAsMenu = new Menu(item);
         item.setMenu(saveAsMenu);
 
         item = new MenuItem(saveAsMenu, SWT.PUSH);
-        item.setText("JPEG");
+        I18n.bind(item, "fileFilter.jpeg");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -612,7 +598,7 @@ public class DefaultImageView implements ImageView {
                 }
                 catch (Exception ex) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Save", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.save"), ex.getMessage());
                 }
             }
         });
@@ -627,7 +613,7 @@ public class DefaultImageView implements ImageView {
         // Tools.showError(shell, "Save", ex.getMessage()); } } });
 
         item = new MenuItem(saveAsMenu, SWT.PUSH);
-        item.setText("PNG");
+        I18n.bind(item, "fileFilter.png");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -638,13 +624,13 @@ public class DefaultImageView implements ImageView {
                     saveImageAs(filetype);
                 }
                 catch (Exception ex) {
-                    Tools.showError(shell, "Save", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.save"), ex.getMessage());
                 }
             }
         });
 
         item = new MenuItem(saveAsMenu, SWT.PUSH);
-        item.setText("GIF");
+        I18n.bind(item, "fileFilter.gif");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -655,13 +641,13 @@ public class DefaultImageView implements ImageView {
                     saveImageAs(filetype);
                 }
                 catch (Exception ex) {
-                    Tools.showError(shell, "Save", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.save"), ex.getMessage());
                 }
             }
         });
 
         item = new MenuItem(saveAsMenu, SWT.PUSH);
-        item.setText("BMP");
+        I18n.bind(item, "fileFilter.bmp");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -672,7 +658,7 @@ public class DefaultImageView implements ImageView {
                     saveImageAs(filetype);
                 }
                 catch (Exception ex) {
-                    Tools.showError(shell, "Save", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.save"), ex.getMessage());
                 }
             }
         });
@@ -680,7 +666,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Write Selection to Image");
+        I18n.bind(item, "image.writeSelection");
         item.setEnabled(!dataset.getFileFormat().isReadOnly());
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -695,7 +681,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Change Palette");
+        I18n.bind(item, "image.changePalette");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -706,7 +692,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Import Palette");
+        I18n.bind(item, "image.importPalette");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -716,7 +702,7 @@ public class DefaultImageView implements ImageView {
                 fChooser.setFilterPath(ViewProperties.getWorkDir());
 
                 fChooser.setFilterExtensions(new String[] {"*"});
-                fChooser.setFilterNames(new String[] {"All Files"});
+                fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles")});
                 fChooser.setFilterIndex(0);
 
                 if (fChooser.open() == null)
@@ -735,7 +721,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Export Palette");
+        I18n.bind(item, "image.exportPalette");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -749,7 +735,8 @@ public class DefaultImageView implements ImageView {
                 fChooser.setFilterPath(workDir);
 
                 fChooser.setFilterExtensions(new String[] {"*", "*.lut"});
-                fChooser.setFilterNames(new String[] {"All Files", "Color Lookup Table"});
+                fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles"),
+                                                      I18n.text("fileFilter.colorLookupTable")});
                 fChooser.setFilterIndex(1);
 
                 File pfile = Tools.checkNewFile(workDir, ".lut");
@@ -766,7 +753,8 @@ public class DefaultImageView implements ImageView {
 
                 if (chosenFile.exists()) {
                     int answer = SWT.NO;
-                    if (Tools.showConfirm(shell, "Export", "File exists. Do you want to replace it ?"))
+                    if (Tools.showConfirm(shell, I18n.text("action.export"),
+                                          I18n.text("message.fileExists")))
                         answer = SWT.YES;
 
                     if (answer == SWT.NO)
@@ -808,7 +796,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Set Value Range");
+        I18n.bind(item, "image.valueRange");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -841,7 +829,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Show Histogram");
+        I18n.bind(item, "image.histogram");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -855,7 +843,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Zoom In");
+        I18n.bind(item, "image.zoomIn");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -865,7 +853,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Zoom Out");
+        I18n.bind(item, "image.zoomOut");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -877,13 +865,13 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Flip Image");
+        I18n.bind(item, "image.flip");
 
         Menu flipMenu = new Menu(item);
         item.setMenu(flipMenu);
 
         item = new MenuItem(flipMenu, SWT.PUSH);
-        item.setText("Horizontal");
+        I18n.bind(item, "image.horizontal");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -893,7 +881,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(flipMenu, SWT.PUSH);
-        item.setText("Vertical");
+        I18n.bind(item, "image.vertical");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -903,7 +891,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Rotate Image");
+        I18n.bind(item, "image.rotate");
 
         Menu rotateMenu = new Menu(item);
         item.setMenu(rotateMenu);
@@ -911,7 +899,7 @@ public class DefaultImageView implements ImageView {
         char t = 186;
 
         item = new MenuItem(rotateMenu, SWT.PUSH);
-        item.setText("90" + t + " CW");
+        I18n.bind(item, "image.rotateClockwise", t);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -927,7 +915,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(rotateMenu, SWT.PUSH);
-        item.setText("90" + t + " CCW");
+        I18n.bind(item, "image.rotateCounterClockwise", t);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -945,7 +933,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Brightness/Contrast");
+        I18n.bind(item, "image.brightnessContrast");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -957,7 +945,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Contour");
+        I18n.bind(item, "image.contour");
 
         Menu contourMenu = new Menu(item);
         item.setMenu(contourMenu);
@@ -978,7 +966,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Show Animation");
+        I18n.bind(item, "image.showAnimation");
         item.setEnabled(is3D);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -993,7 +981,7 @@ public class DefaultImageView implements ImageView {
         });
 
         item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Animation Speed (frames/second)");
+        I18n.bind(item, "image.animationSpeed");
         item.setEnabled(is3D);
 
         Menu animationSpeedMenu = new Menu(item);
@@ -1015,7 +1003,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.CHECK);
-        item.setText("Show Values");
+        I18n.bind(item, "image.showValues");
         item.setSelection(showValues);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1028,7 +1016,7 @@ public class DefaultImageView implements ImageView {
         rotateRelatedItems.add(item);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Show Statistics");
+        I18n.bind(item, "image.showStatistics");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1045,17 +1033,15 @@ public class DefaultImageView implements ImageView {
 
                     Tools.findMinMax(theData, minmax, dataset.getFillValue());
                     if (Tools.computeStatistics(theData, stat, dataset.getFillValue()) > 0) {
-                        String statistics = "Min                      = " + minmax[0] +
-                                            "\nMax                      = " + minmax[1] +
-                                            "\nMean                     = " + stat[0] +
-                                            "\nStandard deviation = " + stat[1];
+                        String statistics = I18n.text("message.statistics", minmax[0], minmax[1], stat[0],
+                                                       stat[1]);
 
-                        Tools.showInformation(shell, "Statistics", statistics);
+                        Tools.showInformation(shell, I18n.text("action.statistics"), statistics);
                     }
                 }
                 catch (Exception ex) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Statistics", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.statistics"), ex.getMessage());
                 }
             }
         });
@@ -1063,7 +1049,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Select All");
+        I18n.bind(item, "image.selectAll");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1073,7 +1059,7 @@ public class DefaultImageView implements ImageView {
                 }
                 catch (Exception ex) {
                     shell.getDisplay().beep();
-                    Tools.showError(shell, "Select", ex.getMessage());
+                    Tools.showError(shell, I18n.text("action.select"), ex.getMessage());
                 }
             }
         });
@@ -1081,7 +1067,7 @@ public class DefaultImageView implements ImageView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Close");
+        I18n.bind(item, "image.close");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1102,7 +1088,7 @@ public class DefaultImageView implements ImageView {
         // Chart button
         ToolItem item = new ToolItem(toolbar, SWT.PUSH);
         item.setImage(ViewProperties.getChartIcon());
-        item.setToolTipText("Histogram");
+        I18n.bindToolTip(item, "image.tooltip.histogram");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1115,7 +1101,7 @@ public class DefaultImageView implements ImageView {
         // Palette button
         item = new ToolItem(toolbar, SWT.PUSH);
         item.setImage(ViewProperties.getPaletteIcon());
-        item.setToolTipText("Palette");
+        I18n.bindToolTip(item, "image.tooltip.palette");
         item.setEnabled(!isTrueColor);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1128,7 +1114,7 @@ public class DefaultImageView implements ImageView {
         // Brightness button
         item = new ToolItem(toolbar, SWT.PUSH);
         item.setImage(ViewProperties.getBrightIcon());
-        item.setToolTipText("Brightness");
+        I18n.bindToolTip(item, "image.tooltip.brightness");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1142,7 +1128,7 @@ public class DefaultImageView implements ImageView {
         // Zoom in button
         item = new ToolItem(toolbar, SWT.PUSH);
         item.setImage(ViewProperties.getZoominIcon());
-        item.setToolTipText("Zoom In");
+        I18n.bindToolTip(item, "image.tooltip.zoomIn");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1154,7 +1140,7 @@ public class DefaultImageView implements ImageView {
         // Zoom out button
         item = new ToolItem(toolbar, SWT.PUSH);
         item.setImage(ViewProperties.getZoomoutIcon());
-        item.setToolTipText("Zoom Out");
+        I18n.bindToolTip(item, "image.tooltip.zoomOut");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1169,7 +1155,7 @@ public class DefaultImageView implements ImageView {
             // First frame button
             item = new ToolItem(toolbar, SWT.PUSH);
             item.setImage(ViewProperties.getFirstIcon());
-            item.setToolTipText("First Page");
+            I18n.bindToolTip(item, "image.tooltip.firstPage");
             item.addSelectionListener(new SelectionAdapter() {
                 @Override
                 public void widgetSelected(SelectionEvent e)
@@ -1188,7 +1174,7 @@ public class DefaultImageView implements ImageView {
             // Previous frame button
             item = new ToolItem(toolbar, SWT.PUSH);
             item.setImage(ViewProperties.getPreviousIcon());
-            item.setToolTipText("Previous Page");
+            I18n.bindToolTip(item, "image.tooltip.previousPage");
             item.addSelectionListener(new SelectionAdapter() {
                 @Override
                 public void widgetSelected(SelectionEvent e)
@@ -1258,7 +1244,7 @@ public class DefaultImageView implements ImageView {
             // Next frame button
             item = new ToolItem(toolbar, SWT.PUSH);
             item.setImage(ViewProperties.getNextIcon());
-            item.setToolTipText("Next Page");
+            I18n.bindToolTip(item, "image.tooltip.nextPage");
             item.addSelectionListener(new SelectionAdapter() {
                 @Override
                 public void widgetSelected(SelectionEvent e)
@@ -1277,7 +1263,7 @@ public class DefaultImageView implements ImageView {
             // Last frame button
             item = new ToolItem(toolbar, SWT.PUSH);
             item.setImage(ViewProperties.getLastIcon());
-            item.setToolTipText("Last Page");
+            I18n.bindToolTip(item, "image.tooltip.lastPage");
             item.addSelectionListener(new SelectionAdapter() {
                 @Override
                 public void widgetSelected(SelectionEvent e)
@@ -1296,7 +1282,7 @@ public class DefaultImageView implements ImageView {
             // Animation button
             item = new ToolItem(toolbar, SWT.PUSH);
             item.setImage(ViewProperties.getAnimationIcon());
-            item.setToolTipText("View Animation");
+            I18n.bindToolTip(item, "image.tooltip.animation");
             item.addSelectionListener(new SelectionAdapter() {
                 @Override
                 public void widgetSelected(SelectionEvent e)
@@ -1422,7 +1408,8 @@ public class DefaultImageView implements ImageView {
         }
         catch (Exception ex) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Select", "ImageView: " + shell.getText());
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("message.imageViewFailed", shell.getText()));
             return null;
         }
 
@@ -1452,7 +1439,7 @@ public class DefaultImageView implements ImageView {
         if (imagePalette == null) {
             noPalette    = true;
             imagePalette = Tools.createGrayPalette();
-            viewer.showStatus("\nNo attached palette found, default grey palette is used to display image");
+            viewer.showStatus("\n" + I18n.text("message.noPalette"));
         }
 
         // Make sure entire dataset is not loaded when looking at 3D
@@ -1611,10 +1598,21 @@ public class DefaultImageView implements ImageView {
         imageComponent.setImageSize(imageSize);
         imageComponent.redraw();
 
-        if ((zoomFactor > 0.99) && (zoomFactor < 1.01))
-            shell.setText(frameTitle);
-        else
-            shell.setText(frameTitle + " - " + 100 * zoomFactor + "%");
+        updateFrameTitle();
+    }
+
+    private void updateFrameTitle()
+    {
+        if (shell == null || shell.isDisposed() || frameTitleArgs == null)
+            return;
+
+        if ((zoomFactor > 0.99) && (zoomFactor < 1.01)) {
+            I18n.bind(shell, "table.objectTitle", frameTitleArgs);
+        }
+        else {
+            I18n.bind(shell, "image.zoomedObjectTitle", frameTitleArgs[0], frameTitleArgs[1],
+                      frameTitleArgs[2], frameTitleArgs[3], 100 * zoomFactor);
+        }
     }
 
     // implementing ImageObserver
@@ -1629,7 +1627,7 @@ public class DefaultImageView implements ImageView {
         }
         catch (Exception ex) {
             log.debug("showColorTable(): error occurred while instantiating PaletteView factory class", ex);
-            viewer.showError("Error occurred while instantiating PaletteView factory class");
+            viewer.showError(I18n.text("message.paletteFactoryFailed"));
             return;
         }
 
@@ -1644,18 +1642,16 @@ public class DefaultImageView implements ImageView {
 
             if (theView == null) {
                 log.debug("showColorTable(): error occurred while instantiating PaletteView class");
-                viewer.showError("Error occurred while instantiating PaletteView class");
-                Tools.showError(shell, "Show Palette",
-                                "Error occurred while instantiating PaletteView class");
+                viewer.showError(I18n.text("message.paletteViewFailed"));
+                Tools.showError(shell, I18n.text("action.showPalette"),
+                                I18n.text("message.paletteViewFailed"));
             }
         }
         catch (ClassNotFoundException ex) {
             log.debug("showColorTable(): no suitable PaletteView class found");
-            viewer.showError("Unable to find suitable PaletteView class for object '" + dataset.getName() +
-                             "'");
-            Tools.showError(shell, "Show Palette",
-                            "Unable to find suitable PaletteView class for object '" + dataset.getName() +
-                                "'");
+            viewer.showError(I18n.text("message.paletteClassUnavailable", dataset.getName()));
+            Tools.showError(shell, I18n.text("action.showPalette"),
+                            I18n.text("message.paletteClassUnavailable", dataset.getName()));
         }
     }
 
@@ -1665,15 +1661,13 @@ public class DefaultImageView implements ImageView {
 
         if (isTrueColor) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Select",
-                            "Unsupported operation: unable to draw histogram for true color image.");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("message.histogramTrueColor"));
             return;
         }
 
         if ((rec == null) || (rec.width <= 0) || (rec.height <= 0)) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Select",
-                            "No data for histogram.\nUse Shift+Mouse_drag to select an image area.");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("message.histogramNoData"));
             return;
         }
 
@@ -1706,9 +1700,11 @@ public class DefaultImageView implements ImageView {
             Tools.findMinMax(data, xRange, null);
         }
 
+        final String chartObjectPath = dataset.getPath() + dataset.getName();
         Chart cv =
-            new Chart(shell, "Histogram - " + dataset.getPath() + dataset.getName() + " - by pixel index",
-                      Chart.HISTOGRAM, chartData, xRange, null);
+            new Chart(shell, I18n.text("chart.histogramTitle", chartObjectPath), Chart.HISTOGRAM, chartData,
+                      xRange, null);
+        cv.setWindowTitleSupplier(() -> I18n.text("chart.histogramTitle", chartObjectPath));
         cv.open();
     }
 
@@ -1852,16 +1848,16 @@ public class DefaultImageView implements ImageView {
 
         if (filter == null) {
             fChooser.setFilterExtensions(new String[] {"*"});
-            fChooser.setFilterNames(new String[] {"All Files"});
+            fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles")});
             fChooser.setFilterIndex(0);
         }
         else {
             fChooser.setFilterExtensions(new String[] {"*", filter.getExtensions()});
-            fChooser.setFilterNames(new String[] {"All Files", filter.getDescription()});
+            fChooser.setFilterNames(new String[] {I18n.text("fileChooser.allFiles"), filter.getDescription()});
             fChooser.setFilterIndex(1);
         }
 
-        fChooser.setText("Save Current Image To " + type + " File --- " + dataset.getName());
+        fChooser.setText(I18n.text("message.imageFileSaveTitle", type, dataset.getName()));
 
         File chosenFile = new File(dataset.getName() + "." + type.toLowerCase());
         fChooser.setFileName(chosenFile.getName());
@@ -1890,17 +1886,17 @@ public class DefaultImageView implements ImageView {
         }
         catch (OutOfMemoryError err) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Save", err.getMessage());
+            Tools.showError(shell, I18n.text("action.save"), err.getMessage());
             return;
         }
 
         Tools.saveImageAs(bi, chosenFile, type);
 
-        viewer.showStatus("Current image saved to: " + chosenFile.getAbsolutePath());
+        viewer.showStatus(I18n.text("message.imageSavedTo", chosenFile.getAbsolutePath()));
 
         try (RandomAccessFile rf = new RandomAccessFile(chosenFile, "r")) {
             long size = rf.length();
-            viewer.showStatus("File size (bytes): " + size);
+            viewer.showStatus(I18n.text("message.fileSizeBytes", size));
         }
         catch (Exception ex) {
             log.debug("File {} size:", chosenFile.getName(), ex);
@@ -2120,9 +2116,9 @@ public class DefaultImageView implements ImageView {
 
         if ((idx < 0) || (idx >= dims[selectedIndex[2]])) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Select",
-                            "Frame number must be between " + indexBase + " and " +
-                                (dims[selectedIndex[2]] - 1 + indexBase));
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("message.frameRange", indexBase,
+                                      dims[selectedIndex[2]] - 1 + indexBase));
             return;
         }
 
@@ -2328,7 +2324,7 @@ public class DefaultImageView implements ImageView {
         }
         catch (Exception err) {
             shell.getDisplay().beep();
-            Tools.showError(shell, "Apply Image Filter", err.getMessage());
+            Tools.showError(shell, I18n.text("message.applyImageFilter"), err.getMessage());
             status = false;
         }
 
@@ -2363,8 +2359,7 @@ public class DefaultImageView implements ImageView {
     private void writeSelectionToImage()
     {
         if ((getSelectedArea().width <= 0) || (getSelectedArea().height <= 0)) {
-            Tools.showError(shell, "Select",
-                            "No data to write.\nUse Shift+Mouse_drag to select an image area.");
+            Tools.showError(shell, I18n.text("action.select"), I18n.text("message.imageSelectionEmpty"));
             return;
         }
 
@@ -3704,7 +3699,7 @@ public class DefaultImageView implements ImageView {
             Shell parent = getParent();
             shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
             shell.setFont(curFont);
-            shell.setText("Animation - " + dataset.getName());
+            I18n.bind(shell, "dialog.image.animation.title", dataset.getName());
             shell.setImages(ViewProperties.getHdfIcons());
             shell.setLayout(new GridLayout(1, true));
 
@@ -3742,7 +3737,7 @@ public class DefaultImageView implements ImageView {
 
             Button closeButton = new Button(shell, SWT.PUSH);
             closeButton.setFont(curFont);
-            closeButton.setText("&Close");
+            I18n.bind(closeButton, "button.close");
             closeButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, false, false));
             closeButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -3847,7 +3842,7 @@ public class DefaultImageView implements ImageView {
             Shell parent = getParent();
             shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
             shell.setFont(curFont);
-            shell.setText("Image Value Range");
+            I18n.bind(shell, "dialog.image.valueRange.title");
             shell.setImages(ViewProperties.getHdfIcons());
             shell.setLayout(new GridLayout(1, true));
 
@@ -3920,7 +3915,7 @@ public class DefaultImageView implements ImageView {
             org.eclipse.swt.widgets.Group lowerBoundGroup =
                 new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
             lowerBoundGroup.setFont(curFont);
-            lowerBoundGroup.setText("Lower Bound");
+            I18n.bind(lowerBoundGroup, "image.lowerBound");
             lowerBoundGroup.setLayout(new GridLayout(1, true));
             lowerBoundGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -3970,7 +3965,7 @@ public class DefaultImageView implements ImageView {
             org.eclipse.swt.widgets.Group upperBoundGroup =
                 new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
             upperBoundGroup.setFont(curFont);
-            upperBoundGroup.setText("Upper Bound");
+            I18n.bind(upperBoundGroup, "image.upperBound");
             upperBoundGroup.setLayout(new GridLayout(1, true));
             upperBoundGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -4024,7 +4019,7 @@ public class DefaultImageView implements ImageView {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -4039,7 +4034,7 @@ public class DefaultImageView implements ImageView {
 
             Button cancelButton = new Button(buttonComposite, SWT.PUSH);
             cancelButton.setFont(curFont);
-            cancelButton.setText(" &Cancel ");
+            I18n.bind(cancelButton, "button.cancel");
             cancelButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, false, false));
             cancelButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -4056,7 +4051,7 @@ public class DefaultImageView implements ImageView {
 
             Button applyButton = new Button(buttonComposite, SWT.PUSH);
             applyButton.setFont(curFont);
-            applyButton.setText("&Apply");
+            I18n.bind(applyButton, "image.apply");
             applyButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             applyButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -4125,20 +4120,21 @@ public class DefaultImageView implements ImageView {
             Shell parent = getParent();
             shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
             shell.setFont(curFont);
-            shell.setText("Brightness/Contrast");
+            I18n.bind(shell, "dialog.image.brightnessContrast.title");
             shell.setImages(ViewProperties.getHdfIcons());
             shell.setLayout(new GridLayout(1, true));
 
             if (doAutoGainContrast && gainBias != null) {
                 bLabel = "Bias";
                 cLabel = "Gain";
-                shell.setText(bLabel + "/" + cLabel);
+                I18n.bind(shell, "dialog.image.biasGain.title");
             }
 
             org.eclipse.swt.widgets.Group brightnessGroup =
                 new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
             brightnessGroup.setFont(curFont);
-            brightnessGroup.setText(bLabel + " %");
+            I18n.bind(brightnessGroup,
+                      doAutoGainContrast && gainBias != null ? "image.biasPercent" : "image.brightnessPercent");
             brightnessGroup.setLayout(new GridLayout(1, true));
             brightnessGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -4182,7 +4178,8 @@ public class DefaultImageView implements ImageView {
 
             org.eclipse.swt.widgets.Group contrastGroup = new org.eclipse.swt.widgets.Group(shell, SWT.NONE);
             contrastGroup.setFont(curFont);
-            contrastGroup.setText(cLabel + " %");
+            I18n.bind(contrastGroup,
+                      doAutoGainContrast && gainBias != null ? "image.gainPercent" : "image.contrastPercent");
             contrastGroup.setLayout(new GridLayout(1, true));
             contrastGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -4231,7 +4228,7 @@ public class DefaultImageView implements ImageView {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -4251,7 +4248,7 @@ public class DefaultImageView implements ImageView {
 
             Button cancelButton = new Button(buttonComposite, SWT.PUSH);
             cancelButton.setFont(curFont);
-            cancelButton.setText(" &Cancel ");
+            I18n.bind(cancelButton, "button.cancel");
             cancelButton.setLayoutData(new GridData(SWT.CENTER, SWT.FILL, false, false));
             cancelButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -4264,7 +4261,7 @@ public class DefaultImageView implements ImageView {
 
             Button applyButton = new Button(buttonComposite, SWT.PUSH);
             applyButton.setFont(curFont);
-            applyButton.setText("&Apply");
+            I18n.bind(applyButton, "image.apply");
             applyButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             applyButton.addSelectionListener(new SelectionAdapter() {
                 @Override

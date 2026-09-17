@@ -18,10 +18,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.eclipse.jface.preference.PreferenceDialog;
+import org.eclipse.jface.preference.IPreferenceNode;
 import org.eclipse.jface.preference.PreferenceManager;
+import org.eclipse.jface.preference.PreferencePage;
+import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.widgets.Shell;
+
+import hdf.view.i18n.I18n;
 
 /**
  * UserOptionsDialog displays components for choosing user options.
@@ -66,6 +71,50 @@ public class UserOptionsDialog extends PreferenceDialog {
     public void create()
     {
         super.create();
+        I18n.bind(getShell(), "dialog.userOptions.title");
+        I18n.bind(getButton(IDialogConstants.OK_ID), "button.applyAndClose");
+        I18n.bind(getButton(IDialogConstants.CANCEL_ID), "button.cancel");
+        refreshPreferencePageTitles();
         getShell().setSize(getShell().computeSize(SWT.DEFAULT, SWT.DEFAULT, true));
+    }
+
+    /** Refresh the JFace-owned title and button area in an already-open dialog. */
+    public void refreshLanguage()
+    {
+        if (getShell() == null || getShell().isDisposed())
+            return;
+
+        I18n.bind(getShell(), "dialog.userOptions.title");
+        I18n.bind(getButton(IDialogConstants.OK_ID), "button.applyAndClose");
+        I18n.bind(getButton(IDialogConstants.CANCEL_ID), "button.cancel");
+        refreshPreferencePageTitles();
+        I18n.refresh(getShell());
+        getShell().layout(true, true);
+    }
+
+    private void refreshPreferencePageTitles()
+    {
+        for (IPreferenceNode node : getPreferenceManager().getRootSubNodes()) {
+            String key = preferencePageTitleKey(node.getId());
+            if (key == null)
+                continue;
+
+            if (node.getPage() instanceof PreferencePage)
+                ((PreferencePage)node.getPage()).setTitle(I18n.text(key));
+        }
+        if (getTreeViewer() != null && !getTreeViewer().getControl().isDisposed())
+            getTreeViewer().refresh();
+        updateTitle();
+    }
+
+    private String preferencePageTitleKey(String id)
+    {
+        if ("general".equals(id))
+            return "options.general";
+        if ("hdf".equals(id))
+            return "options.hdf";
+        if ("modules".equals(id))
+            return "options.modules";
+        return null;
     }
 }

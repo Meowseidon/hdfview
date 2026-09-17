@@ -58,14 +58,8 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
                        "testNextFrame() filetree is missing dataset '" + dataset_name + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(dataset_name + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dataset_name);
 
             SWTBotNatTable table = new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
@@ -98,7 +92,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
             assertTrue(val.equals("52"),
                        constructWrongValueMessage("testNextFrame()", "wrong data", "52", val));
 
-            tableShell.bot().toolbarButtonWithTooltip("Next Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.nextPage")).click();
 
             val = tableShell.bot().text(0).getText();
             assertTrue(val.equals("1"), constructWrongValueMessage(
@@ -122,8 +116,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -154,14 +147,8 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
                        "testPreviousFrame() filetree is missing dataset '" + dataset_name + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(dataset_name + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dataset_name);
 
             SWTBotNatTable table = new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
@@ -194,7 +181,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
             assertTrue(val.equals("215"),
                        constructWrongValueMessage("testPreviousFrame()", "wrong data", "215", val));
 
-            tableShell.bot().toolbarButtonWithTooltip("Previous Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.previousPage")).click();
 
             val = tableShell.bot().text(0).getText();
             assertTrue(
@@ -219,8 +206,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -251,14 +237,8 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
                        "testFirstFrame() filetree is missing dataset '" + dataset_name + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(dataset_name + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dataset_name);
 
             SWTBotNatTable table = new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
@@ -284,7 +264,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
             }
 
             for (int i = 0; i < 3; i++)
-                tableShell.bot().toolbarButtonWithTooltip("Next Frame").click();
+                tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.nextPage")).click();
 
             String val = tableShell.bot().text(0).getText();
             assertTrue(val.equals("3"), constructWrongValueMessage(
@@ -298,7 +278,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
             assertTrue(val.equals("7"),
                        constructWrongValueMessage("testFirstFrame()", "wrong data", "7", val));
 
-            tableShell.bot().toolbarButtonWithTooltip("First Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.firstPage")).click();
 
             val = tableShell.bot().text(0).getText();
             assertTrue(val.equals("0"), constructWrongValueMessage(
@@ -322,8 +302,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -354,14 +333,8 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
                        "testLastFrame() filetree is missing dataset '" + dataset_name + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(dataset_name + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dataset_name);
 
             SWTBotNatTable table = new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
@@ -394,7 +367,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
             assertTrue(val.equals("2"),
                        constructWrongValueMessage("testLastFrame()", "wrong data", "2", val));
 
-            tableShell.bot().toolbarButtonWithTooltip("Last Frame").click();
+            tableShell.bot().toolbarButtonWithTooltip(ui("image.tooltip.lastPage")).click();
 
             val = tableShell.bot().text(0).getText();
             assertTrue(val.equals("4"), constructWrongValueMessage(
@@ -418,8 +391,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {
@@ -450,14 +422,8 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
                        "testEnterFrame() filetree is missing dataset '" + dataset_name + "'");
 
             items[0].getNode(0).click();
-            items[0].getNode(0).contextMenu().contextMenu("Open").click();
-            org.hamcrest.Matcher<Shell> shellMatcher =
-                WithRegex.withRegex(dataset_name + ".*at.*\\[.*in.*\\]");
-            bot.waitUntil(Conditions.waitForShell(shellMatcher));
-
-            tableShell = bot.shells()[1];
-            tableShell.activate();
-            bot.waitUntil(Conditions.shellIsActive(tableShell.getText()));
+            items[0].getNode(0).contextMenu().contextMenu(ui("tree.open")).click();
+            tableShell = openDataObject(dataset_name);
 
             SWTBotNatTable table = new SWTBotNatTable(tableShell.bot().widget(widgetOfType(NatTable.class)));
 
@@ -545,8 +511,7 @@ public class TestHDFViewDatasetFrameSelection extends AbstractWindowTest {
         }
         finally {
             if (tableShell != null && tableShell.isOpen()) {
-                tableShell.bot().menu().menu("Table").menu("Close").click();
-                bot.waitUntil(Conditions.shellCloses(tableShell));
+                closeDataObject(tableShell);
             }
 
             try {

@@ -23,6 +23,7 @@ import hdf.object.CompoundDataFormat;
 import hdf.object.DataFormat;
 import hdf.object.Datatype;
 import hdf.object.h5.H5Datatype;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,7 +176,7 @@ public class DataValidatorFactory {
         {
             throwValidationFailedException(
                 rowIndex, colIndex, newValue,
-                "A proper DataValidator wasn't found for this type of data. Writing this type of data will be disabled.");
+                I18n.text("message.validation.noValidator"));
 
             return false;
         }
@@ -189,10 +190,10 @@ public class DataValidatorFactory {
         protected void checkValidValue(Object newValue) throws ValidationFailedException
         {
             if (newValue == null)
-                throw new ValidationFailedException("value is null");
+                throw new ValidationFailedException(I18n.text("message.validation.nullValue"));
 
             if (!(newValue instanceof String))
-                throw new ValidationFailedException("value is not a String");
+                throw new ValidationFailedException(I18n.text("message.validation.notString"));
         }
 
         /**
@@ -210,9 +211,8 @@ public class DataValidatorFactory {
         protected void throwValidationFailedException(int rowIndex, int colIndex, Object newValue,
                                                       String reason) throws ValidationFailedException
         {
-            throw new ValidationFailedException("Failed to update value at "
-                                                + "(" + rowIndex + ", " + colIndex + ") to '" +
-                                                newValue.toString() + "': " + reason);
+            throw new ValidationFailedException(I18n.text("message.validation.failed", rowIndex, colIndex,
+                                                          String.valueOf(newValue), reason));
         }
     }
 
@@ -509,8 +509,10 @@ public class DataValidatorFactory {
                     long lenDiff = ((String)newValue).length() - datasetDatatype.getDatatypeSize();
 
                     if (lenDiff > 0)
-                        throw new Exception("string size larger than datatype size by " + lenDiff +
-                                            ((lenDiff > 1) ? " bytes." : " byte."));
+                        throw new Exception(I18n.text(lenDiff > 1
+                                                          ? "message.validation.stringTooLong"
+                                                          : "message.validation.stringTooLongOne",
+                                                      lenDiff));
 
                     /*
                      * TODO(HDFView) [2025-12]: Add user warning dialog when input may overwrite string NULL
@@ -573,10 +575,12 @@ public class DataValidatorFactory {
                      */
                     Short shortValue = Short.parseShort((String)newValue);
                     if (shortValue < 0)
-                        throw new NumberFormatException("Invalid negative value for unsigned datatype");
+                        throw new NumberFormatException(
+                            I18n.text("message.validation.invalidNegativeUnsigned"));
 
                     if (shortValue > (Byte.MAX_VALUE * 2) + 1)
-                        throw new NumberFormatException("Value out of range. Value:\"" + newValue + "\"");
+                        throw new NumberFormatException(
+                            I18n.text("message.validation.valueOutOfRange", newValue));
                 }
                 else {
                     Byte.parseByte((String)newValue);
@@ -633,10 +637,12 @@ public class DataValidatorFactory {
                          */
                         Short shortValue = Short.parseShort((String)newValue);
                         if (shortValue < 0)
-                            throw new NumberFormatException("Invalid negative value for unsigned datatype");
+                            throw new NumberFormatException(
+                                I18n.text("message.validation.invalidNegativeUnsigned"));
 
                         if (shortValue > (Byte.MAX_VALUE * 2) + 1)
-                            throw new NumberFormatException("Value out of range. Value:\"" + newValue + "\"");
+                            throw new NumberFormatException(
+                                I18n.text("message.validation.valueOutOfRange", newValue));
                     }
                     else {
                         Byte.parseByte((String)newValue);
@@ -652,11 +658,11 @@ public class DataValidatorFactory {
                             Integer intValue = Integer.parseInt((String)newValue);
                             if (intValue < 0)
                                 throw new NumberFormatException(
-                                    "Invalid negative value for unsigned datatype");
+                                    I18n.text("message.validation.invalidNegativeUnsigned"));
 
                             if (intValue > (Short.MAX_VALUE * 2) + 1)
-                                throw new NumberFormatException("Value out of range. Value:\"" + newValue +
-                                                                "\"");
+                                throw new NumberFormatException(
+                                    I18n.text("message.validation.valueOutOfRange", newValue));
                         }
                         else {
                             Short.parseShort((String)newValue);
@@ -677,11 +683,11 @@ public class DataValidatorFactory {
                             Long longValue = Long.parseLong((String)newValue);
                             if (longValue < 0)
                                 throw new NumberFormatException(
-                                    "Invalid negative value for unsigned datatype");
+                                    I18n.text("message.validation.invalidNegativeUnsigned"));
 
                             if (longValue > ((long)Integer.MAX_VALUE * 2) + 1)
-                                throw new NumberFormatException("Value out of range. Value:\"" + newValue +
-                                                                "\"");
+                                throw new NumberFormatException(
+                                    I18n.text("message.validation.valueOutOfRange", newValue));
                         }
                         else {
                             Integer.parseInt((String)newValue);
@@ -702,14 +708,14 @@ public class DataValidatorFactory {
                             BigInteger bigValue = new BigInteger((String)newValue);
                             if (bigValue.compareTo(BigInteger.ZERO) < 0)
                                 throw new NumberFormatException(
-                                    "Invalid negative value for unsigned datatype");
+                                    I18n.text("message.validation.invalidNegativeUnsigned"));
 
                             BigInteger maxRange = BigInteger.valueOf(Long.MAX_VALUE)
                                                       .multiply(BigInteger.valueOf(2))
                                                       .add(BigInteger.valueOf(1));
                             if (bigValue.compareTo(maxRange) > 0)
-                                throw new NumberFormatException("Value out of range. Value:\"" + newValue +
-                                                                "\"");
+                                throw new NumberFormatException(
+                                    I18n.text("message.validation.valueOutOfRange", newValue));
                         }
                         else {
                             Long.parseLong((String)newValue);
@@ -734,8 +740,8 @@ public class DataValidatorFactory {
                         break;
 
                 default:
-                    throw new ValidationFailedException("No validation logic for numerical data of size " +
-                                                        datasetDatatype.getDatatypeSize());
+                    throw new ValidationFailedException(
+                        I18n.text("message.validation.noNumericalValidation", datasetDatatype.getDatatypeSize()));
                 }
             }
             catch (Exception ex) {
