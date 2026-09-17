@@ -581,57 +581,94 @@ public final class I18n {
         if (widget == null || widget.isDisposed())
             return;
 
+        refreshWidget(widget);
+        relayout(widget);
+    }
+
+    /** Refresh a widget hierarchy without repeatedly laying out every child. */
+    private static void refreshWidget(Widget widget)
+    {
+        if (widget == null || widget.isDisposed())
+            return;
+
         apply(widget);
 
         if (widget instanceof Menu) {
             for (MenuItem item : ((Menu)widget).getItems())
-                refresh(item);
+                refreshWidget(item);
             return;
         }
 
         if (widget instanceof MenuItem) {
             Menu submenu = ((MenuItem)widget).getMenu();
             if (submenu != null)
-                refresh(submenu);
+                refreshWidget(submenu);
             return;
         }
 
         if (widget instanceof TabFolder) {
             for (TabItem item : ((TabFolder)widget).getItems()) {
-                refresh(item);
+                refreshWidget(item);
                 Control control = item.getControl();
                 if (control != null)
-                    refresh(control);
+                    refreshWidget(control);
             }
         }
 
         if (widget instanceof ToolBar) {
             for (ToolItem item : ((ToolBar)widget).getItems())
-                refresh(item);
+                refreshWidget(item);
         }
 
         if (widget instanceof Table) {
             for (TableColumn column : ((Table)widget).getColumns())
-                refresh(column);
+                refreshWidget(column);
             for (TableItem item : ((Table)widget).getItems())
-                refresh(item);
+                refreshWidget(item);
         }
 
         if (widget instanceof Shell) {
             Menu menuBar = ((Shell)widget).getMenuBar();
             if (menuBar != null)
-                refresh(menuBar);
+                refreshWidget(menuBar);
         }
 
         if (widget instanceof Control) {
             Menu contextMenu = ((Control)widget).getMenu();
             if (contextMenu != null)
-                refresh(contextMenu);
+                refreshWidget(contextMenu);
         }
 
         if (widget instanceof Composite) {
             for (Control child : ((Composite)widget).getChildren())
-                refresh(child);
+                refreshWidget(child);
+        }
+    }
+
+    /**
+     * Recompute layouts for the existing widget hierarchy without changing a
+     * top-level Shell's size or position. SWT text changes do not invalidate
+     * every parent layout synchronously, so the nearest owning Shell is laid
+     * out after a refresh. The recursive layout call also reaches nested
+     * composites, tab folders, toolbars, and table columns.
+     */
+    private static void relayout(Widget widget)
+    {
+        Shell shell = null;
+        if (widget instanceof Shell)
+            shell = (Shell)widget;
+        else if (widget instanceof Control)
+            shell = ((Control)widget).getShell();
+        else if (widget instanceof TabItem)
+            shell = ((TabItem)widget).getParent().getShell();
+        else if (widget instanceof TableColumn)
+            shell = ((TableColumn)widget).getParent().getShell();
+        else if (widget instanceof TableItem)
+            shell = ((TableItem)widget).getParent().getShell();
+
+        if (shell != null && !shell.isDisposed()) {
+            shell.layout(true, true);
+            shell.update();
         }
     }
 
@@ -647,8 +684,21 @@ public final class I18n {
         if (display == null || display.isDisposed())
             return;
 
-        for (Shell shell : display.getShells())
-            refresh(shell);
+        Shell[] shells = display.getShells();
+        for (Shell shell : shells) {
+            if (shell == null || shell.isDisposed())
+                continue;
+
+            shell.setRedraw(false);
+            try {
+                refreshWidget(shell);
+            }
+            finally {
+                shell.layout(true, true);
+                shell.setRedraw(true);
+                shell.update();
+            }
+        }
     }
 
     private static void apply(Widget widget)
