@@ -550,6 +550,10 @@ public class HDFView implements DataViewManager {
         shell.setFont(currentFont);
         I18n.bind(shell, "window.title", HDFVIEW_VERSION);
         shell.setLayout(new GridLayout(3, false));
+        shell.addListener(SWT.Close, event -> {
+            if (inlineTableView != null && !inlineTableView.isViewDisposed())
+                inlineTableView.commitActiveCellEditor();
+        });
         shell.addDisposeListener(new DisposeListener() {
             @Override
             public void widgetDisposed(DisposeEvent e)

@@ -86,6 +86,7 @@ import org.eclipse.nebula.widgets.nattable.edit.action.KeyEditAction;
 import org.eclipse.nebula.widgets.nattable.edit.action.MouseEditAction;
 import org.eclipse.nebula.widgets.nattable.edit.config.DefaultEditConfiguration;
 import org.eclipse.nebula.widgets.nattable.edit.config.DialogErrorHandling;
+import org.eclipse.nebula.widgets.nattable.edit.editor.ICellEditor;
 import org.eclipse.nebula.widgets.nattable.grid.GridRegion;
 import org.eclipse.nebula.widgets.nattable.grid.layer.ColumnHeaderLayer;
 import org.eclipse.nebula.widgets.nattable.grid.layer.GridLayer;
@@ -333,6 +334,10 @@ public abstract class DefaultBaseTableView implements TableView {
             viewParent.setData(this);
 
         viewParent.setLayout(new GridLayout(1, true));
+
+        if (!isEmbedded) {
+            viewParent.addListener(SWT.Close, event -> commitActiveCellEditor());
+        }
 
         /*
          * When the table is closed, make sure to prompt the user about saving their
@@ -687,6 +692,8 @@ public abstract class DefaultBaseTableView implements TableView {
         if (viewDisposed)
             return;
 
+        commitActiveCellEditor();
+
         if (viewParent.isDisposed())
             cleanupView();
         else
@@ -703,11 +710,46 @@ public abstract class DefaultBaseTableView implements TableView {
             viewParent.dispose();
     }
 
+    /**
+     * Commit the editor before its control can be destroyed.
+     *
+     * <p>NatTable normally commits on focus loss. This hook covers lifecycle
+     * paths where the parent Shell/Composite is closed while the editor still
+     * owns focus, such as application exit.</p>
+     */
+    @Override
+    public void commitActiveCellEditor()
+    {
+        try {
+            if (dataTable == null) {
+                log.debug("commitActiveCellEditor(): No active cell editor");
+                return;
+            }
+
+            ICellEditor activeCellEditor = dataTable.getActiveCellEditor();
+            if (activeCellEditor == null) {
+                log.debug("commitActiveCellEditor(): No active cell editor");
+                return;
+            }
+
+            log.debug("commitActiveCellEditor(): Active cell editor detected - committing before disposal");
+            activeCellEditor.commit(SelectionLayer.MoveDirectionEnum.NONE, true, true);
+            log.debug("commitActiveCellEditor(): Cell editor committed successfully");
+        }
+        catch (Exception ex) {
+            log.warn("commitActiveCellEditor(): Failed to commit active editor", ex);
+        }
+    }
+
     /** Perform the common close/dispose cleanup exactly once. */
     private void cleanupView()
     {
         if (viewDisposed)
             return;
+
+        // This is also a fallback for callers which dispose the parent directly
+        // instead of going through disposeView() or a Shell close event.
+        commitActiveCellEditor();
 
         if (dataProvider != null && dataProvider.getIsValueChanged() && !isReadOnly && dataObject != null) {
             if (Tools.showConfirm(shell, I18n.text("message.changesDetected.title"),
@@ -1304,23 +1346,9 @@ public abstract class DefaultBaseTableView implements TableView {
     {
         log.debug("updateValueInFile(): ENTRY");
 
-        // Commit any active cell editor before saving
-        // This ensures that uncommitted edits (e.g., user typed but didn't press ENTER/TAB) are saved
-        if (dataTable != null && dataTable.getActiveCellEditor() != null) {
-            log.debug("updateValueInFile(): Active cell editor detected - committing before save");
-            try {
-                dataTable.getActiveCellEditor().commit(
-                    org.eclipse.nebula.widgets.nattable.selection.SelectionLayer.MoveDirectionEnum.NONE, true,
-                    true);
-                log.debug("updateValueInFile(): Cell editor committed successfully");
-            }
-            catch (Exception ex) {
-                log.warn("updateValueInFile(): Failed to commit active editor", ex);
-            }
-        }
-        else {
-            log.debug("updateValueInFile(): No active cell editor to commit");
-        }
+        // Commit any active cell editor before saving. This is the same lifecycle
+        // operation used before a view or its parent is disposed.
+        commitActiveCellEditor();
 
         if (isReadOnly || !dataProvider.getIsValueChanged() || showAsBin || showAsHex) {
             log.debug(
