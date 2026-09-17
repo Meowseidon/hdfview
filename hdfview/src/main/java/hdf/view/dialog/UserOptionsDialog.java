@@ -24,6 +24,7 @@ import org.eclipse.jface.preference.PreferencePage;
 import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Shell;
 
 import hdf.view.i18n.I18n;
@@ -89,7 +90,30 @@ public class UserOptionsDialog extends PreferenceDialog {
         I18n.bind(getButton(IDialogConstants.CANCEL_ID), "button.cancel");
         refreshPreferencePageTitles();
         I18n.refresh(getShell());
-        getShell().layout(true, true);
+        relayoutToPreferredSize();
+    }
+
+    /**
+     * Recompute the JFace dialog layout and grow only when the new language
+     * needs more room. The existing size and location are retained when they
+     * are already sufficient, so repeated language switches do not continually
+     * resize the dialog.
+     */
+    private void relayoutToPreferredSize()
+    {
+        Shell dialogShell = getShell();
+        if (dialogShell == null || dialogShell.isDisposed())
+            return;
+
+        dialogShell.layout(true, true);
+
+        Point currentSize   = dialogShell.getSize();
+        Point preferredSize = dialogShell.computeSize(SWT.DEFAULT, SWT.DEFAULT, true);
+        int width  = Math.max(currentSize.x, preferredSize.x);
+        int height = Math.max(currentSize.y, preferredSize.y);
+
+        if (width != currentSize.x || height != currentSize.y)
+            dialogShell.setSize(width, height);
     }
 
     private void refreshPreferencePageTitles()
