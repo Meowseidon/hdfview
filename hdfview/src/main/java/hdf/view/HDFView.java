@@ -213,6 +213,16 @@ public class HDFView implements DataViewManager {
     private Button recentFilesButton;
     private Button clearTextButton;
 
+    /** Persistent status bar showing the access mode of the selected file. */
+    private Composite accessModeBar;
+    private Label accessModeFileLabel;
+    private Label accessModeLabel;
+    private Label accessModeValueLabel;
+    private Button reopenReadWriteButton;
+
+    /** File represented by the persistent access-mode status bar. */
+    private FileFormat accessModeFile;
+
     /** GUI component: A list of current data windows. */
     private Menu windowMenu;
 
@@ -836,6 +846,7 @@ public class HDFView implements DataViewManager {
                 disposeInlineDataView();
                 clearRightTabs();
                 displayedMetadataObject = null;
+                updateAccessModeStatus(null);
                 layoutRightTabs();
 
                 urlBar.setText("");
@@ -1467,7 +1478,110 @@ public class HDFView implements DataViewManager {
             }
         });
 
+        createAccessModeBar(shell);
+
         log.info("URL Toolbar created");
+    }
+
+    /** Create the long-lived access-mode status and recovery controls. */
+    private void createAccessModeBar(final Shell shell)
+    {
+        accessModeBar = new Composite(shell, SWT.BORDER);
+        accessModeBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1));
+        accessModeBar.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND));
+
+        GridLayout accessLayout = new GridLayout(4, false);
+        accessLayout.marginWidth  = 6;
+        accessLayout.marginHeight = 3;
+        accessLayout.horizontalSpacing = 6;
+        accessModeBar.setLayout(accessLayout);
+
+        accessModeFileLabel = new Label(accessModeBar, SWT.NONE);
+        accessModeFileLabel.setFont(currentFont);
+        accessModeFileLabel.setBackground(accessModeBar.getBackground());
+        accessModeFileLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        I18n.bindDynamic(accessModeFileLabel, () -> {
+            if (accessModeFile == null)
+                return I18n.text("fileAccessMode.noFile");
+            return I18n.text("fileAccessMode.file", accessModeFile.getName());
+        });
+
+        accessModeLabel = new Label(accessModeBar, SWT.NONE);
+        accessModeLabel.setFont(currentFont);
+        accessModeLabel.setBackground(accessModeBar.getBackground());
+        I18n.bind(accessModeLabel, "fileAccessMode.label");
+
+        accessModeValueLabel = new Label(accessModeBar, SWT.NONE);
+        accessModeValueLabel.setFont(currentFont);
+        accessModeValueLabel.setBackground(accessModeBar.getBackground());
+        I18n.bindDynamic(accessModeValueLabel, () -> {
+            if (accessModeFile == null)
+                return I18n.text("fileAccessMode.noFile");
+            return accessModeFile.isReadOnly()
+                ? I18n.text("fileAccessMode.readOnly")
+                : I18n.text("fileAccessMode.readWrite");
+        });
+
+        reopenReadWriteButton = new Button(accessModeBar, SWT.PUSH);
+        reopenReadWriteButton.setFont(currentFont);
+        I18n.bind(reopenReadWriteButton, "button.reopenReadWrite");
+        I18n.bindToolTip(reopenReadWriteButton, "tooltip.reopenReadWrite");
+        reopenReadWriteButton.setEnabled(false);
+        reopenReadWriteButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                reopenCurrentFileReadWrite();
+            }
+        });
+    }
+
+    /** Update the persistent access-mode status for a newly opened file. */
+    public void fileOpened(FileFormat file)
+    {
+        updateAccessModeStatus(file);
+    }
+
+    /** Update the persistent access-mode status without rebuilding any views. */
+    private void updateAccessModeStatus(FileFormat file)
+    {
+        accessModeFile = file;
+
+        if (accessModeFileLabel != null && !accessModeFileLabel.isDisposed())
+            I18n.refresh(accessModeFileLabel);
+        if (accessModeLabel != null && !accessModeLabel.isDisposed())
+            I18n.refresh(accessModeLabel);
+        if (accessModeValueLabel != null && !accessModeValueLabel.isDisposed())
+            I18n.refresh(accessModeValueLabel);
+
+        if (reopenReadWriteButton != null && !reopenReadWriteButton.isDisposed())
+            reopenReadWriteButton.setEnabled(accessModeFile != null && accessModeFile.isReadOnly());
+    }
+
+    /** Reopen the file shown in the status bar through the existing TreeView path. */
+    private void reopenCurrentFileReadWrite()
+    {
+        FileFormat file = accessModeFile;
+        if (file == null) {
+            display.beep();
+            Tools.showError(mainWindow, I18n.text("action.reopenReadWrite"),
+                            I18n.text("message.reopenNoFile"));
+            return;
+        }
+
+        String filename = file.getAbsolutePath();
+        try {
+            FileFormat reopened = treeView.reopenFile(file, FileFormat.WRITE);
+            if (reopened == null || reopened.isReadOnly())
+                throw new java.io.IOException(I18n.text("message.reopenReadWriteNotWritable", filename));
+
+            updateAccessModeStatus(reopened);
+        }
+        catch (Exception ex) {
+            display.beep();
+            Tools.showError(mainWindow, I18n.text("action.reopenReadWrite"),
+                            I18n.text("message.reopenReadWriteFailed", filename, ex.getMessage()));
+        }
     }
 
     private void createContentArea(final Shell shell)
@@ -1718,6 +1832,8 @@ public class HDFView implements DataViewManager {
     {
         if (rightTabFolder == null || rightTabFolder.isDisposed())
             return;
+
+        updateAccessModeStatus(obj == null ? null : obj.getFileFormat());
 
         /* A repeated notification for the same object does not rebuild the view. */
         if (obj != null && sameObject(displayedMetadataObject, obj) && rightTabFolder.getItemCount() > 0) {
@@ -2005,6 +2121,8 @@ public class HDFView implements DataViewManager {
             return;
         }
 
+        boolean wasAccessModeFile = accessModeFile != null && accessModeFile.equals(theFile);
+
         if (inlineTableView != null) {
             HObject inlineObject = inlineTableView.getDataObject();
             if (inlineObject != null && theFile.equals(inlineObject.getFileFormat()))
@@ -2054,6 +2172,9 @@ public class HDFView implements DataViewManager {
             clearRightTabs();
             displayedMetadataObject = null;
         }
+
+        if (wasAccessModeFile)
+            updateAccessModeStatus(null);
 
         System.gc();
     }
@@ -2244,6 +2365,14 @@ public class HDFView implements DataViewManager {
         urlBar.requestLayout();
         clearTextButton.setFont(font);
         clearTextButton.requestLayout();
+        accessModeFileLabel.setFont(font);
+        accessModeFileLabel.requestLayout();
+        accessModeLabel.setFont(font);
+        accessModeLabel.requestLayout();
+        accessModeValueLabel.setFont(font);
+        accessModeValueLabel.requestLayout();
+        reopenReadWriteButton.setFont(font);
+        reopenReadWriteButton.requestLayout();
         status.setFont(font);
 
         // On certain platforms the url_bar items don't update their size after
