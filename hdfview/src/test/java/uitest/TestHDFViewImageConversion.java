@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 
+import hdf.view.i18n.I18n;
+
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -67,7 +69,7 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
 
             // Test metadata
 
-            SWTBotTabItem tabItem = bot.tabItem("General Object Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             tabItem.activate();
 
             val = bot.textWithLabel("Name: ").getText();
@@ -163,7 +165,7 @@ public class TestHDFViewImageConversion extends AbstractWindowTest {
             // Test metadata
             items[0].getNode(0).click();
 
-            SWTBotTabItem tabItem = bot.tabItem("General Object Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             tabItem.activate();
 
             val = bot.textWithLabel("Name: ").getText();

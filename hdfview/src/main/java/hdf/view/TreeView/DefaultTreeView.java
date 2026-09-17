@@ -59,6 +59,7 @@ import hdf.view.dialog.NewDatatypeDialog;
 import hdf.view.dialog.NewGroupDialog;
 import hdf.view.dialog.NewImageDialog;
 import hdf.view.dialog.NewLinkDialog;
+import hdf.view.i18n.I18n;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -597,7 +598,7 @@ public class DefaultTreeView implements TreeView {
         MenuItem item;
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Open");
+        I18n.bind(item, "tree.open");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -622,7 +623,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Open &As");
+        I18n.bind(item, "tree.openAs");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -648,7 +649,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         openVirtualFilesMenuItem = new MenuItem(menu, SWT.PUSH);
-        openVirtualFilesMenuItem.setText("Open Source Fi&les");
+        I18n.bind(openVirtualFilesMenuItem, "tree.openSourceFiles");
         openVirtualFilesMenuItem.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -693,13 +694,13 @@ public class DefaultTreeView implements TreeView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         MenuItem newObjectMenuItem = new MenuItem(menu, SWT.CASCADE);
-        newObjectMenuItem.setText("New");
+        I18n.bind(newObjectMenuItem, "tree.new");
         editGUIs.add(newObjectMenuItem);
 
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Cu&t");
+        I18n.bind(item, "tree.cut");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -710,7 +711,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(item);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Copy");
+        I18n.bind(item, "tree.copy");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -720,7 +721,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Paste");
+        I18n.bind(item, "tree.paste");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -731,7 +732,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(item);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Delete");
+        I18n.bind(item, "tree.delete");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -742,12 +743,12 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(item);
 
         exportDatasetMenuItem = new MenuItem(menu, SWT.CASCADE);
-        exportDatasetMenuItem.setText("Export Dataset");
+        I18n.bind(exportDatasetMenuItem, "tree.exportDataset");
 
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Save to");
+        I18n.bind(item, "tree.saveTo");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -831,7 +832,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Rename");
+        I18n.bind(item, "tree.rename");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -844,7 +845,7 @@ public class DefaultTreeView implements TreeView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         changeIndexItem = new MenuItem(menu, SWT.PUSH);
-        changeIndexItem.setText("Change file indexing");
+        I18n.bind(changeIndexItem, "tree.changeIndex");
         changeIndexItem.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -882,7 +883,7 @@ public class DefaultTreeView implements TreeView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Find");
+        I18n.bind(item, "tree.find");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -905,7 +906,7 @@ public class DefaultTreeView implements TreeView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Expand All");
+        I18n.bind(item, "tree.expandAll");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -916,7 +917,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Collapse All");
+        I18n.bind(item, "tree.collapseAll");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -929,7 +930,7 @@ public class DefaultTreeView implements TreeView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("Close Fil&e");
+        I18n.bind(item, "tree.closeFile");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -944,7 +945,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(menu, SWT.PUSH);
-        item.setText("&Reload File");
+        I18n.bind(item, "tree.reloadFile");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -962,13 +963,13 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(menu, SWT.CASCADE);
-        item.setText("Reload File As");
+        I18n.bind(item, "tree.reloadFileAs");
 
         Menu reloadFileMenu = new Menu(item);
         item.setMenu(reloadFileMenu);
 
         item = new MenuItem(reloadFileMenu, SWT.PUSH);
-        item.setText("Read-Only");
+        I18n.bind(item, "menu.file.openAs.readOnly");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -986,7 +987,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(reloadFileMenu, SWT.PUSH);
-        item.setText("SWMR Read-Only");
+        I18n.bind(item, "menu.file.openAs.swmr");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1005,7 +1006,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(reloadFileMenu, SWT.PUSH);
-        item.setText("Read/Write");
+        I18n.bind(item, "menu.file.openAs.readWrite");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1025,7 +1026,7 @@ public class DefaultTreeView implements TreeView {
         new MenuItem(menu, SWT.SEPARATOR);
 
         setLibVerBoundsItem = new MenuItem(menu, SWT.NONE);
-        setLibVerBoundsItem.setText("Set Lib version bounds");
+        I18n.bind(setLibVerBoundsItem, "tree.setLibVersionBounds");
         setLibVerBoundsItem.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1039,7 +1040,7 @@ public class DefaultTreeView implements TreeView {
         newObjectMenuItem.setMenu(newObjectMenu);
 
         item = new MenuItem(newObjectMenu, SWT.PUSH);
-        item.setText("Group");
+        I18n.bind(item, "tree.new.group");
         item.setImage(ViewProperties.getFoldercloseIcon());
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1051,7 +1052,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(item);
 
         addDatasetMenuItem = new MenuItem(newObjectMenu, SWT.PUSH);
-        addDatasetMenuItem.setText("Dataset");
+        I18n.bind(addDatasetMenuItem, "tree.new.dataset");
         addDatasetMenuItem.setImage(ViewProperties.getDatasetIcon());
         addDatasetMenuItem.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1063,7 +1064,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(addDatasetMenuItem);
 
         item = new MenuItem(newObjectMenu, SWT.PUSH);
-        item.setText("Image");
+        I18n.bind(item, "tree.new.image");
         item.setImage(ViewProperties.getImageIcon());
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1075,7 +1076,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(item);
 
         addTableMenuItem = new MenuItem(newObjectMenu, SWT.PUSH);
-        addTableMenuItem.setText("Compound DS");
+        I18n.bind(addTableMenuItem, "tree.new.compoundDataset");
         addTableMenuItem.setImage(ViewProperties.getTableIcon());
         addTableMenuItem.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1087,7 +1088,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(addTableMenuItem);
 
         addDatatypeMenuItem = new MenuItem(newObjectMenu, SWT.PUSH);
-        addDatatypeMenuItem.setText("Datatype");
+        I18n.bind(addDatatypeMenuItem, "tree.new.datatype");
         addDatatypeMenuItem.setImage(ViewProperties.getDatatypeIcon());
         addDatatypeMenuItem.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1099,7 +1100,7 @@ public class DefaultTreeView implements TreeView {
         editGUIs.add(addDatatypeMenuItem);
 
         addLinkMenuItem = new MenuItem(newObjectMenu, SWT.PUSH);
-        addLinkMenuItem.setText("Link");
+        I18n.bind(addLinkMenuItem, "tree.new.link");
         addLinkMenuItem.setImage(ViewProperties.getLinkIcon());
         addLinkMenuItem.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1115,7 +1116,7 @@ public class DefaultTreeView implements TreeView {
         exportDatasetMenuItem.setMenu(exportDatasetMenu);
 
         item = new MenuItem(exportDatasetMenu, SWT.PUSH);
-        item.setText("Export Data to Text File");
+        I18n.bind(item, "tree.exportDataset.text");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1133,7 +1134,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(exportDatasetMenu, SWT.PUSH);
-        item.setText("Export Data as Native Order");
+        I18n.bind(item, "tree.exportDataset.native");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1151,7 +1152,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(exportDatasetMenu, SWT.PUSH);
-        item.setText("Export Data as Little Endian");
+        I18n.bind(item, "tree.exportDataset.littleEndian");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1169,7 +1170,7 @@ public class DefaultTreeView implements TreeView {
         });
 
         item = new MenuItem(exportDatasetMenu, SWT.PUSH);
-        item.setText("Export Data as Big Endian");
+        I18n.bind(item, "tree.exportDataset.bigEndian");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -3333,7 +3334,7 @@ public class DefaultTreeView implements TreeView {
 
             Button cancelButton = new Button(buttonComposite, SWT.PUSH);
             cancelButton.setFont(curFont);
-            cancelButton.setText("     &Cancel     ");
+            I18n.bind(cancelButton, "button.cancel");
             cancelButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             cancelButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -3445,7 +3446,7 @@ public class DefaultTreeView implements TreeView {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(curFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -3470,7 +3471,7 @@ public class DefaultTreeView implements TreeView {
 
             Button cancelButton = new Button(buttonComposite, SWT.PUSH);
             cancelButton.setFont(curFont);
-            cancelButton.setText(" &Cancel ");
+            I18n.bind(cancelButton, "button.cancel");
             cancelButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             cancelButton.addSelectionListener(new SelectionAdapter() {
                 @Override

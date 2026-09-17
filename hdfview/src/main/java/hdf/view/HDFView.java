@@ -53,6 +53,7 @@ import hdf.view.dialog.UserOptionsGeneralPage;
 import hdf.view.dialog.UserOptionsHDFPage;
 import hdf.view.dialog.UserOptionsNode;
 import hdf.view.dialog.UserOptionsViewModulesPage;
+import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -223,6 +224,10 @@ public class HDFView implements DataViewManager {
     /** GUI component: A list of current data windows. */
     private Menu windowMenu;
 
+    /** Language radio items in the Tools menu. */
+    private MenuItem englishLanguageItem;
+    private MenuItem simplifiedChineseLanguageItem;
+
     /* GUI component: File menu on the menubar */
     // private final Menu               fileMenu;
 
@@ -300,6 +305,8 @@ public class HDFView implements DataViewManager {
         catch (Exception ex) {
             log.debug("Failed to load View Properties from {}", rootDir);
         }
+
+        I18n.initialize(props);
 
         ViewProperties.loadIcons();
 
@@ -539,7 +546,7 @@ public class HDFView implements DataViewManager {
         final Shell shell = new Shell(display);
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setFont(currentFont);
-        shell.setText("HDFView " + HDFVIEW_VERSION);
+        I18n.bind(shell, "window.title", HDFVIEW_VERSION);
         shell.setLayout(new GridLayout(3, false));
         shell.addDisposeListener(new DisposeListener() {
             @Override
@@ -597,13 +604,13 @@ public class HDFView implements DataViewManager {
         shell.setMenuBar(menu);
 
         MenuItem menuItem = new MenuItem(menu, SWT.CASCADE);
-        menuItem.setText("&File");
+        I18n.bind(menuItem, "menu.file");
 
         Menu fileMenu = new Menu(menuItem);
         menuItem.setMenu(fileMenu);
 
         MenuItem item = new MenuItem(fileMenu, SWT.PUSH);
-        item.setText("&Open\tCtrl-O");
+        I18n.bind(item, "menu.file.open");
         item.setAccelerator(SWT.MOD1 + 'O');
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -614,13 +621,13 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(fileMenu, SWT.CASCADE);
-        item.setText("Open As");
+        I18n.bind(item, "menu.file.openAs");
 
         Menu openAsMenu = new Menu(item);
         item.setMenu(openAsMenu);
 
         item = new MenuItem(openAsMenu, SWT.PUSH);
-        item.setText("Read-Only");
+        I18n.bind(item, "menu.file.openAs.readOnly");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -630,7 +637,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(openAsMenu, SWT.PUSH);
-        item.setText("SWMR Read-Only");
+        I18n.bind(item, "menu.file.openAs.swmr");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -640,7 +647,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(openAsMenu, SWT.PUSH);
-        item.setText("Read/Write");
+        I18n.bind(item, "menu.file.openAs.readWrite");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -652,13 +659,13 @@ public class HDFView implements DataViewManager {
         new MenuItem(fileMenu, SWT.SEPARATOR);
 
         MenuItem fileNewMenu = new MenuItem(fileMenu, SWT.CASCADE);
-        fileNewMenu.setText("New");
+        I18n.bind(fileNewMenu, "menu.file.new");
 
         Menu newMenu = new Menu(fileNewMenu);
         fileNewMenu.setMenu(newMenu);
 
         item = new MenuItem(newMenu, SWT.PUSH);
-        item.setText("HDF&4");
+        I18n.bind(item, "menu.file.new.hdf4");
         h4GUIs.add(item);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -728,7 +735,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(newMenu, SWT.PUSH);
-        item.setText("HDF&5");
+        I18n.bind(item, "menu.file.new.hdf5");
         h5GUIs.add(item);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -800,7 +807,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(fileMenu, SWT.SEPARATOR);
 
         item = new MenuItem(fileMenu, SWT.PUSH);
-        item.setText("&Close");
+        I18n.bind(item, "menu.file.close");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -810,7 +817,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(fileMenu, SWT.PUSH);
-        item.setText("Close &All");
+        I18n.bind(item, "menu.file.closeAll");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -842,18 +849,20 @@ public class HDFView implements DataViewManager {
         new MenuItem(fileMenu, SWT.SEPARATOR);
 
         item = new MenuItem(fileMenu, SWT.PUSH);
-        item.setText("&Save");
+        I18n.bind(item, "menu.file.save");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
                 if (treeView.getCurrentFiles().isEmpty()) {
-                    Tools.showError(mainWindow, "Save", "No files currently open.");
+                    Tools.showError(mainWindow, I18n.text("message.save.title"),
+                                    I18n.text("message.noFilesOpen"));
                     return;
                 }
 
                 if (treeView.getSelectedFile() == null) {
-                    Tools.showError(mainWindow, "Save", "No files currently selected.");
+                    Tools.showError(mainWindow, I18n.text("message.save.title"),
+                                    I18n.text("message.noFilesSelected"));
                     return;
                 }
 
@@ -863,18 +872,20 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(fileMenu, SWT.PUSH);
-        item.setText("S&ave As");
+        I18n.bind(item, "menu.file.saveAs");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
                 if (treeView.getCurrentFiles().isEmpty()) {
-                    Tools.showError(mainWindow, "Save", "No files currently open.");
+                    Tools.showError(mainWindow, I18n.text("message.save.title"),
+                                    I18n.text("message.noFilesOpen"));
                     return;
                 }
 
                 if (treeView.getSelectedFile() == null) {
-                    Tools.showError(mainWindow, "Save", "No files currently selected.");
+                    Tools.showError(mainWindow, I18n.text("message.save.title"),
+                                    I18n.text("message.noFilesSelected"));
                     return;
                 }
 
@@ -891,7 +902,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(fileMenu, SWT.SEPARATOR);
 
         item = new MenuItem(fileMenu, SWT.PUSH);
-        item.setText("E&xit\tCtrl-Q");
+        I18n.bind(item, "menu.file.exit");
         item.setAccelerator(SWT.MOD1 + 'Q');
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -902,13 +913,13 @@ public class HDFView implements DataViewManager {
         });
 
         menuItem = new MenuItem(menu, SWT.CASCADE);
-        menuItem.setText("&Window");
+        I18n.bind(menuItem, "menu.window");
 
         windowMenu = new Menu(menuItem);
         menuItem.setMenu(windowMenu);
 
         item = new MenuItem(windowMenu, SWT.PUSH);
-        item.setText("&Cascade");
+        I18n.bind(item, "menu.window.cascade");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -918,7 +929,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(windowMenu, SWT.PUSH);
-        item.setText("&Tile");
+        I18n.bind(item, "menu.window.tile");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -930,7 +941,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(windowMenu, SWT.SEPARATOR);
 
         item = new MenuItem(windowMenu, SWT.PUSH);
-        item.setText("Close &All");
+        I18n.bind(item, "menu.window.closeAll");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -942,19 +953,19 @@ public class HDFView implements DataViewManager {
         new MenuItem(windowMenu, SWT.SEPARATOR);
 
         menuItem = new MenuItem(menu, SWT.CASCADE);
-        menuItem.setText("&Tools");
+        I18n.bind(menuItem, "menu.tools");
 
         Menu toolsMenu = new Menu(menuItem);
         menuItem.setMenu(toolsMenu);
 
         MenuItem convertMenuItem = new MenuItem(toolsMenu, SWT.CASCADE);
-        convertMenuItem.setText("Convert Image To");
+        I18n.bind(convertMenuItem, "menu.tools.convertImage");
 
         Menu convertMenu = new Menu(convertMenuItem);
         convertMenuItem.setMenu(convertMenu);
 
         item = new MenuItem(convertMenu, SWT.PUSH);
-        item.setText("HDF4");
+        I18n.bind(item, "menu.tools.convertImage.hdf4");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -965,7 +976,7 @@ public class HDFView implements DataViewManager {
         h4GUIs.add(item);
 
         item = new MenuItem(convertMenu, SWT.PUSH);
-        item.setText("HDF5");
+        I18n.bind(item, "menu.tools.convertImage.hdf5");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -977,8 +988,36 @@ public class HDFView implements DataViewManager {
 
         new MenuItem(toolsMenu, SWT.SEPARATOR);
 
+        MenuItem languageMenuItem = new MenuItem(toolsMenu, SWT.CASCADE);
+        I18n.bind(languageMenuItem, "menu.tools.language");
+
+        Menu languageMenu = new Menu(languageMenuItem);
+        languageMenuItem.setMenu(languageMenu);
+
+        englishLanguageItem = new MenuItem(languageMenu, SWT.RADIO);
+        I18n.bind(englishLanguageItem, "menu.tools.language.english");
+        englishLanguageItem.setSelection(I18n.getLanguage() == I18n.Language.ENGLISH);
+        englishLanguageItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                changeLanguage(I18n.Language.ENGLISH);
+            }
+        });
+
+        simplifiedChineseLanguageItem = new MenuItem(languageMenu, SWT.RADIO);
+        I18n.bind(simplifiedChineseLanguageItem, "menu.tools.language.simplifiedChinese");
+        simplifiedChineseLanguageItem.setSelection(I18n.getLanguage() == I18n.Language.SIMPLIFIED_CHINESE);
+        simplifiedChineseLanguageItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                changeLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+            }
+        });
+
         item = new MenuItem(toolsMenu, SWT.PUSH);
-        item.setText("&Preferences...");
+        I18n.bind(item, "menu.tools.preferences");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -990,7 +1029,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(toolsMenu, SWT.SEPARATOR);
 
         item = new MenuItem(toolsMenu, SWT.PUSH);
-        item.setText("&Register File Format");
+        I18n.bind(item, "menu.tools.register");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1000,7 +1039,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(toolsMenu, SWT.PUSH);
-        item.setText("&Unregister File Format");
+        I18n.bind(item, "menu.tools.unregister");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1010,13 +1049,13 @@ public class HDFView implements DataViewManager {
         });
 
         menuItem = new MenuItem(menu, SWT.CASCADE);
-        menuItem.setText("&Help");
+        I18n.bind(menuItem, "menu.help");
 
         Menu helpMenu = new Menu(menuItem);
         menuItem.setMenu(helpMenu);
 
         item = new MenuItem(helpMenu, SWT.PUSH);
-        item.setText("&User's Guide");
+        I18n.bind(item, "menu.help.usersGuide");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1050,7 +1089,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(helpMenu, SWT.SEPARATOR);
 
         item = new MenuItem(helpMenu, SWT.PUSH);
-        item.setText("HDF&4 Library Version");
+        I18n.bind(item, "menu.help.hdf4Library");
         h4GUIs.add(item);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1061,7 +1100,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(helpMenu, SWT.PUSH);
-        item.setText("HDF&5 Library Version");
+        I18n.bind(item, "menu.help.hdf5Library");
         h5GUIs.add(item);
         item.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1072,7 +1111,7 @@ public class HDFView implements DataViewManager {
         });
 
         item = new MenuItem(helpMenu, SWT.PUSH);
-        item.setText("&Java Version");
+        I18n.bind(item, "menu.help.javaVersion");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1084,7 +1123,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(helpMenu, SWT.SEPARATOR);
 
         item = new MenuItem(helpMenu, SWT.PUSH);
-        item.setText("Supported Fi&le Formats");
+        I18n.bind(item, "menu.help.supportedFileFormats");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1096,7 +1135,7 @@ public class HDFView implements DataViewManager {
         new MenuItem(helpMenu, SWT.SEPARATOR);
 
         item = new MenuItem(helpMenu, SWT.PUSH);
-        item.setText("&About...");
+        I18n.bind(item, "menu.help.about");
         item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1147,6 +1186,41 @@ public class HDFView implements DataViewManager {
 
             log.info("System menu handlers configured");
         }
+    }
+
+    /**
+     * Apply a language selection to the current HDFView session and persist it
+     * through the existing user preference store.
+     *
+     * <p>The widget tree is refreshed in place. No file, TreeItem, Dataset, or
+     * DataView is recreated as part of a language change.</p>
+     *
+     * @param language the selected UI language
+     */
+    private void changeLanguage(I18n.Language language)
+    {
+        I18n.setLanguage(language);
+        props.setValue(ViewProperties.LANGUAGE_PROPERTY, language.getPropertyValue());
+
+        try {
+            props.save();
+        }
+        catch (Exception ex) {
+            log.warn("Unable to persist HDFView language preference", ex);
+            showError("Unable to save language preference: " + ex.getMessage());
+        }
+
+        I18n.refreshDisplay(display);
+
+        if (englishLanguageItem != null && !englishLanguageItem.isDisposed())
+            englishLanguageItem.setSelection(language == I18n.Language.ENGLISH);
+        if (simplifiedChineseLanguageItem != null && !simplifiedChineseLanguageItem.isDisposed())
+            simplifiedChineseLanguageItem.setSelection(language == I18n.Language.SIMPLIFIED_CHINESE);
+
+        String languageLabelKey = language == I18n.Language.ENGLISH
+            ? "menu.tools.language.english"
+            : "menu.tools.language.simplifiedChinese";
+        showStatus(I18n.text("status.languageChanged", I18n.text(languageLabelKey)));
     }
 
     /**
@@ -1215,7 +1289,7 @@ public class HDFView implements DataViewManager {
         toolBar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 3, 1));
 
         ToolItem openItem = new ToolItem(toolBar, SWT.PUSH);
-        openItem.setToolTipText("Open");
+        I18n.bindToolTip(openItem, "toolbar.open");
         openItem.setImage(ViewProperties.getFileopenIcon());
         openItem.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1229,7 +1303,7 @@ public class HDFView implements DataViewManager {
 
         ToolItem closeItem = new ToolItem(toolBar, SWT.PUSH);
         closeItem.setImage(ViewProperties.getFilecloseIcon());
-        closeItem.setToolTipText("Close");
+        I18n.bindToolTip(closeItem, "toolbar.close");
         closeItem.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1242,7 +1316,7 @@ public class HDFView implements DataViewManager {
 
         ToolItem helpItem = new ToolItem(toolBar, SWT.PUSH);
         helpItem.setImage(ViewProperties.getHelpIcon());
-        helpItem.setToolTipText("Help");
+        I18n.bindToolTip(helpItem, "toolbar.help");
         helpItem.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1277,7 +1351,7 @@ public class HDFView implements DataViewManager {
 
         ToolItem hdf4Item = new ToolItem(toolBar, SWT.PUSH);
         hdf4Item.setImage(ViewProperties.getH4Icon());
-        hdf4Item.setToolTipText("HDF4 Library Version");
+        I18n.bindToolTip(hdf4Item, "toolbar.hdf4Library");
         hdf4Item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1293,7 +1367,7 @@ public class HDFView implements DataViewManager {
 
         ToolItem hdf5Item = new ToolItem(toolBar, SWT.PUSH);
         hdf5Item.setImage(ViewProperties.getH5Icon());
-        hdf5Item.setToolTipText("HDF5 Library Version");
+        I18n.bindToolTip(hdf5Item, "toolbar.hdf5Library");
         hdf5Item.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
@@ -1318,8 +1392,8 @@ public class HDFView implements DataViewManager {
         // Recent Files button
         recentFilesButton = new Button(shell, SWT.PUSH);
         recentFilesButton.setFont(currentFont);
-        recentFilesButton.setText("Recent Files");
-        recentFilesButton.setToolTipText("List of recent files");
+        I18n.bind(recentFilesButton, "button.recentFiles");
+        I18n.bindToolTip(recentFilesButton, "tooltip.recentFiles");
         recentFilesButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         recentFilesButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1381,9 +1455,9 @@ public class HDFView implements DataViewManager {
         });
 
         clearTextButton = new Button(shell, SWT.PUSH);
-        clearTextButton.setToolTipText("Clear current selection");
+        I18n.bindToolTip(clearTextButton, "tooltip.clearText");
         clearTextButton.setFont(currentFont);
-        clearTextButton.setText("Clear Text");
+        I18n.bind(clearTextButton, "button.clearText");
         clearTextButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
         clearTextButton.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -1788,7 +1862,7 @@ public class HDFView implements DataViewManager {
 
         Composite dataParent = new Composite(rightTabFolder, SWT.NONE);
         dataContentTab    = new TabItem(rightTabFolder, SWT.NONE, 0);
-        dataContentTab.setText("Data Content");
+        I18n.bind(dataContentTab, "tab.dataContent");
         dataContentTab.setControl(dataParent);
 
         try {
@@ -2716,7 +2790,7 @@ public class HDFView implements DataViewManager {
         {
             Shell dialog = new Shell(getParent(), getStyle());
             dialog.setFont(currentFont);
-            dialog.setText("HDF Library Version");
+            I18n.bind(dialog, "dialog.libraryVersion.title");
 
             createContents(dialog);
 
@@ -2767,7 +2841,7 @@ public class HDFView implements DataViewManager {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(currentFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             shell.setDefaultButton(okButton);
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -2786,7 +2860,7 @@ public class HDFView implements DataViewManager {
         {
             final Shell dialog = new Shell(getParent(), getStyle());
             dialog.setFont(currentFont);
-            dialog.setText("HDFView Java Version");
+            I18n.bind(dialog, "dialog.javaVersion.title");
             dialog.setLayout(new GridLayout(2, false));
 
             Image hdfImage = ViewProperties.getHDFViewIcon();
@@ -2810,7 +2884,7 @@ public class HDFView implements DataViewManager {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(currentFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             dialog.setDefaultButton(okButton);
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -2849,7 +2923,7 @@ public class HDFView implements DataViewManager {
         {
             final Shell dialog = new Shell(getParent(), getStyle());
             dialog.setFont(currentFont);
-            dialog.setText("Supported File Formats");
+            I18n.bind(dialog, "dialog.supportedFileFormats.title");
             dialog.setLayout(new GridLayout(2, false));
 
             Image hdfImage = ViewProperties.getHDFViewIcon();
@@ -2880,7 +2954,7 @@ public class HDFView implements DataViewManager {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(currentFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             dialog.setDefaultButton(okButton);
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -2919,7 +2993,7 @@ public class HDFView implements DataViewManager {
         {
             final Shell dialog = new Shell(getParent(), getStyle());
             dialog.setFont(currentFont);
-            dialog.setText("About HDFView");
+            I18n.bind(dialog, "dialog.about.title");
             dialog.setLayout(new GridLayout(2, false));
 
             Image hdfImage = ViewProperties.getHDFViewIcon();
@@ -2943,7 +3017,7 @@ public class HDFView implements DataViewManager {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(currentFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             dialog.setDefaultButton(okButton);
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -2991,7 +3065,7 @@ public class HDFView implements DataViewManager {
             Shell parent      = getParent();
             final Shell shell = new Shell(parent, SWT.APPLICATION_MODAL | SWT.DIALOG_TRIM);
             shell.setFont(currentFont);
-            shell.setText("Unregister a file format");
+            I18n.bind(shell, "dialog.unregister.title");
             shell.setLayout(new GridLayout(2, false));
 
             Image hdfImage = ViewProperties.getHDFViewIcon();
@@ -3019,7 +3093,7 @@ public class HDFView implements DataViewManager {
 
             Button okButton = new Button(buttonComposite, SWT.PUSH);
             okButton.setFont(currentFont);
-            okButton.setText("   &OK   ");
+            I18n.bind(okButton, "button.ok");
             okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
             okButton.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -3031,7 +3105,7 @@ public class HDFView implements DataViewManager {
 
             Button cancelButton = new Button(buttonComposite, SWT.PUSH);
             cancelButton.setFont(currentFont);
-            cancelButton.setText(" &Cancel ");
+            I18n.bind(cancelButton, "button.cancel");
             cancelButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
             cancelButton.addSelectionListener(new SelectionAdapter() {
                 @Override

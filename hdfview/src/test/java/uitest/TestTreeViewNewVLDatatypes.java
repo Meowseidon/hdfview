@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 
+import hdf.view.i18n.I18n;
+
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -238,7 +240,7 @@ public class TestTreeViewNewVLDatatypes extends AbstractWindowTest {
 
             items[0].click();
 
-            SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+            SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
             tabItem.activate();
 
             bot.button("Add Attribute").click();

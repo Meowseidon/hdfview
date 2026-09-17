@@ -32,6 +32,7 @@ import java.util.concurrent.CyclicBarrier;
 
 import hdf.HDFVersions;
 import hdf.view.HDFView;
+import hdf.view.i18n.I18n;
 
 import org.hamcrest.Matcher;
 import org.junit.jupiter.api.AfterAll;
@@ -236,14 +237,14 @@ public abstract class AbstractWindowTest {
         log.trace("openFile workDir is {}, name is {}", workDir, name);
 
         try {
-            SWTBotMenu fileMenuItem   = bot.menu().menu("File");
-            SWTBotMenu openasMenuItem = fileMenuItem.menu("Open As");
+            SWTBotMenu fileMenuItem   = bot.menu().menu(I18n.text("menu.file"));
+            SWTBotMenu openasMenuItem = fileMenuItem.menu(I18n.text("menu.file.openAs"));
             if (openMode == FILE_MODE.MULTI_READ_ONLY)
-                openasMenuItem.menu("SWMR Read-Only").click();
+                openasMenuItem.menu(I18n.text("menu.file.openAs.swmr")).click();
             else if (openMode == FILE_MODE.READ_ONLY)
-                openasMenuItem.menu("Read-Only").click();
+                openasMenuItem.menu(I18n.text("menu.file.openAs.readOnly")).click();
             else
-                openasMenuItem.menu("Read/Write").click();
+                openasMenuItem.menu(I18n.text("menu.file.openAs.readWrite")).click();
 
             fileNameShell = bot.shell("Enter a file name");
             fileNameShell.activate();
@@ -256,7 +257,7 @@ public abstract class AbstractWindowTest {
             assertTrue(val.equals(hdf_file.getName()), "openFile() wrong file name: expected '" +
                                                            hdf_file.getName() + "' but was '" + val + "'");
 
-            fileNameShell.bot().button("   &OK   ").click();
+            fileNameShell.bot().button(I18n.text("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(fileNameShell));
 
             SWTBotTree filetree = bot.tree();
@@ -304,12 +305,12 @@ public abstract class AbstractWindowTest {
             hdfFile.delete();
 
         try {
-            SWTBotMenu fileMenuItem    = bot.menu().menu("File");
-            SWTBotMenu fileNewMenuItem = fileMenuItem.menu("New");
+            SWTBotMenu fileMenuItem    = bot.menu().menu(I18n.text("menu.file"));
+            SWTBotMenu fileNewMenuItem = fileMenuItem.menu(I18n.text("menu.file.new"));
             if (hdf4Type)
-                fileNewMenuItem.menu("HDF4").click();
+                fileNewMenuItem.menu(I18n.text("menu.file.new.hdf4")).click();
             else if (hdf5Type)
-                fileNewMenuItem.menu("HDF5").click();
+                fileNewMenuItem.menu(I18n.text("menu.file.new.hdf5")).click();
             else
                 throw new IllegalArgumentException("unknown file type");
 
@@ -324,7 +325,7 @@ public abstract class AbstractWindowTest {
             assertTrue(val.equals(name),
                        "createFile() wrong file name: expected '" + name + "' but was '" + val + "'");
 
-            shell.bot().button("   &OK   ").click();
+            shell.bot().button(I18n.text("button.ok")).click();
             bot.waitUntil(Conditions.shellCloses(shell));
 
             assertTrue(hdfFile.exists(), "createFile() File '" + hdfFile + "' not created");
@@ -353,8 +354,8 @@ public abstract class AbstractWindowTest {
             bot.shells()[0].activate();
             bot.waitUntil(Conditions.shellIsActive(bot.shells()[0].getText()));
 
-            SWTBotMenu fileMenuItem = bot.menu().menu("File");
-            fileMenuItem.menu("Close").click();
+            SWTBotMenu fileMenuItem = bot.menu().menu(I18n.text("menu.file"));
+            fileMenuItem.menu(I18n.text("menu.file.close")).click();
 
             if (deleteFile) {
                 if (hdfFile.exists()) {
@@ -454,7 +455,7 @@ public abstract class AbstractWindowTest {
         SWTBotTreeItem foundObject = locateItemByPath(fileItem, objectName);
         foundObject.click();
 
-        SWTBotTabItem tabItem = bot.tabItem("Object Attribute Info");
+        SWTBotTabItem tabItem = bot.tabItem(I18n.text("tab.objectAttributeInfo"));
         tabItem.activate();
 
         return new SWTBotTable(bot.widget(widgetOfType(Table.class)));
@@ -468,7 +469,19 @@ public abstract class AbstractWindowTest {
         SWTBotTreeItem foundObject = locateItemByPath(fileItem, objectName);
         foundObject.click();
 
-        return bot.tabItem(tabName);
+        return bot.tabItem(localizeCoreTabName(tabName));
+    }
+
+    /** Resolve legacy test labels through the current language resources. */
+    private String localizeCoreTabName(String tabName)
+    {
+        if ("Data Content".equals(tabName))
+            return I18n.text("tab.dataContent");
+        if ("Object Attribute Info".equals(tabName))
+            return I18n.text("tab.objectAttributeInfo");
+        if ("General Object Info".equals(tabName))
+            return I18n.text("tab.generalObjectInfo");
+        return tabName;
     }
 
     protected SWTBotShell openAttributeObject(SWTBotTable attrTable, String objectName, int rowIndex)
@@ -492,7 +505,7 @@ public abstract class AbstractWindowTest {
 
         SWTBotTreeItem foundObject = locateItemByPath(fileItem, objectName);
         foundObject.click();
-        foundObject.contextMenu().contextMenu("Open").click();
+        foundObject.contextMenu().contextMenu(I18n.text("tree.open")).click();
 
         return openDataObject(objectName);
     }

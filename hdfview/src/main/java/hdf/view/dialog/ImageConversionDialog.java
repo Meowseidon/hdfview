@@ -22,6 +22,7 @@ import hdf.object.FileFormat;
 import hdf.view.DefaultFileFilter;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
+import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.DisposeEvent;
@@ -218,7 +219,7 @@ public class ImageConversionDialog extends Dialog {
 
         Button okButton = new Button(buttonComposite, SWT.PUSH);
         okButton.setFont(curFont);
-        okButton.setText("   &OK   ");
+        I18n.bind(okButton, "button.ok");
         okButton.setLayoutData(new GridData(SWT.END, SWT.FILL, true, false));
         okButton.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e)
@@ -233,7 +234,7 @@ public class ImageConversionDialog extends Dialog {
 
         Button cancelButton = new Button(buttonComposite, SWT.PUSH);
         cancelButton.setFont(curFont);
-        cancelButton.setText(" &Cancel ");
+        I18n.bind(cancelButton, "button.cancel");
         cancelButton.setLayoutData(new GridData(SWT.BEGINNING, SWT.FILL, true, false));
         cancelButton.addSelectionListener(new SelectionAdapter() {
             public void widgetSelected(SelectionEvent e)

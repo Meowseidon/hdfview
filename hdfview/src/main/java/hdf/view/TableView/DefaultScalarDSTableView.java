@@ -43,6 +43,7 @@ import hdf.view.HDFView;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
 import hdf.view.dialog.InputDialog;
+import hdf.view.i18n.I18n;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -243,7 +244,7 @@ public class DefaultScalarDSTableView extends DefaultBaseTableView implements Ta
         // Add in a few MenuItems for importing/exporting data from/to binary files. *
         MenuItem importExportMenuItem = null;
         for (int i = 0; i < baseMenuItems.length; i++)
-            if (baseMenuItems[i].getText().equals("&Import/Export Data"))
+            if ("table.importExport".equals(I18n.getKey(baseMenuItems[i])))
                 importExportMenuItem = baseMenuItems[i];
 
         if (importExportMenuItem != null) {
@@ -251,7 +252,7 @@ public class DefaultScalarDSTableView extends DefaultBaseTableView implements Ta
             MenuItem[] importExportMenuItems = importExportMenu.getItems();
 
             for (int i = 0; i < importExportMenuItems.length; i++)
-                if (importExportMenuItems[i].getText().equals("Export Data to"))
+                if ("table.exportDataTo".equals(I18n.getKey(importExportMenuItems[i])))
                     item = importExportMenuItems[i];
 
             if (item != null) {
@@ -320,7 +321,7 @@ public class DefaultScalarDSTableView extends DefaultBaseTableView implements Ta
 
             item = null;
             for (int i = 0; i < importExportMenuItems.length; i++)
-                if (importExportMenuItems[i].getText().equals("Import Data from"))
+                if ("table.importDataFrom".equals(I18n.getKey(importExportMenuItems[i])))
                     item = importExportMenuItems[i];
 
             if (item != null) {
