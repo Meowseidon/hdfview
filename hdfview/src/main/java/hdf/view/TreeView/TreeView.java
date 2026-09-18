@@ -86,6 +86,14 @@ public interface TreeView {
     FileFormat reopenFile(FileFormat theFile, int newFileAccessMode) throws Exception;
 
     /**
+     * Returns the effective access flags currently used for an open file.
+     *
+     * @param file the open file
+     * @return the remembered access flags, or -1 when the file is not open
+     */
+    int getFileAccessMode(FileFormat file);
+
+    /**
      * close a file.
      *
      * @param file the file to close
