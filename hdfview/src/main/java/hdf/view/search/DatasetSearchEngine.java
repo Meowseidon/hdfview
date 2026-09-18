@@ -1,0 +1,823 @@
+/*****************************************************************************
+ * Copyright by The HDF Group.                                               *
+ * Copyright by the Board of Trustees of the University of Illinois.         *
+ * All rights reserved.                                                       *
+ *****************************************************************************/
+
+package hdf.view.search;
+
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import hdf.object.Dataset;
+import hdf.object.Datatype;
+import hdf.object.FileFormat;
+import hdf.object.Group;
+import hdf.object.HObject;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Background-friendly search engine for Dataset names and Dataset values.
+ *
+ * <p>The engine deliberately lives in the GUI module.  It uses the existing
+ * Object API subset contract ({@code start}, {@code stride}, and
+ * {@code selected}) and does not add another data cache or alter the object
+ * module.  Each scan creates a fresh Dataset object attached to the already
+ * open FileFormat.  This is important: reading a block must not overwrite the
+ * buffer belonging to the Dataset currently shown in a TableView.</p>
+ */
+public final class DatasetSearchEngine {
+    private static final Logger log = LoggerFactory.getLogger(DatasetSearchEngine.class);
+
+    /** Bound the maximum number of values handed to one native read call. */
+    public static final long SEARCH_BLOCK_ELEMENTS = 65536L;
+
+    /** Bound the number of result rows retained by the result window. */
+    public static final int MAX_SHOWN_RESULTS = 5000;
+
+    private static final int RESULT_BATCH_SIZE = 100;
+
+    /**
+     * Native HDF operations used by a search are serialized through this lock.
+     * HDFView never starts a second search concurrently, and close/navigation
+     * paths use the same lock for the short native operation that invalidates a
+     * search target.
+     */
+    public static final Object NATIVE_IO_LOCK = new Object();
+
+    /** Search modes exposed by the Dataset search window. */
+    public enum SearchMode {
+        /** Search Dataset names case-insensitively by substring. */
+        DATASET_NAME,
+        /** Search numeric values exactly and string/char values by substring. */
+        DATA_VALUE
+    }
+
+    /** Listener called by the worker thread; SWT callers must marshal updates. */
+    public interface Listener {
+        default void onResults(List<DatasetSearchResult> results) {}
+
+        default void onProgress(long processedElements, long totalElements, String datasetPath) {}
+
+        default void onError(String datasetPath, String message, Throwable error) {}
+    }
+
+    /** Immutable search summary returned after the scan stops or completes. */
+    public static final class SearchSummary {
+        private final long totalMatches;
+        private final int shownMatches;
+        private final long totalElements;
+        private final long processedElements;
+        private final List<String> errors;
+        private final boolean cancelled;
+
+        private SearchSummary(long totalMatches, int shownMatches, long totalElements,
+                              long processedElements, List<String> errors, boolean cancelled)
+        {
+            this.totalMatches     = totalMatches;
+            this.shownMatches     = shownMatches;
+            this.totalElements    = totalElements;
+            this.processedElements = processedElements;
+            this.errors           = Collections.unmodifiableList(new ArrayList<>(errors));
+            this.cancelled        = cancelled;
+        }
+
+        public long getTotalMatches() { return totalMatches; }
+
+        public int getShownMatches() { return shownMatches; }
+
+        public long getTotalElements() { return totalElements; }
+
+        public long getProcessedElements() { return processedElements; }
+
+        public List<String> getErrors() { return errors; }
+
+        public boolean isCancelled() { return cancelled; }
+    }
+
+    /** A bounded rectangular selection passed to one Dataset.read() call. */
+    public static final class Block {
+        private final long[] start;
+        private final long[] count;
+
+        private Block(long[] start, long[] count)
+        {
+            this.start = start.clone();
+            this.count = count.clone();
+        }
+
+        public long[] getStart() { return start.clone(); }
+
+        public long[] getCount() { return count.clone(); }
+
+        public long getElementCount()
+        {
+            long result = 1;
+            for (long value : count)
+                result = Math.multiplyExact(result, value);
+            return result;
+        }
+    }
+
+    private static final class DatasetTarget {
+        private final FileFormat file;
+        private final Dataset dataset;
+
+        private DatasetTarget(FileFormat file, Dataset dataset)
+        {
+            this.file    = file;
+            this.dataset = dataset;
+        }
+    }
+
+    private static final class RunState {
+        private final Listener listener;
+        private final List<DatasetSearchResult> batch = new ArrayList<>(RESULT_BATCH_SIZE);
+        private final List<String> errors = new ArrayList<>();
+        private long totalMatches;
+        private int shownMatches;
+        private long totalElements;
+        private long processedElements;
+
+        private RunState(Listener listener) { this.listener = listener; }
+
+        private void emit(DatasetSearchResult result)
+        {
+            totalMatches++;
+            if (shownMatches >= MAX_SHOWN_RESULTS)
+                return;
+
+            shownMatches++;
+            batch.add(result);
+            if (batch.size() >= RESULT_BATCH_SIZE)
+                flush();
+        }
+
+        private void flush()
+        {
+            if (batch.isEmpty())
+                return;
+
+            List<DatasetSearchResult> copy = new ArrayList<>(batch);
+            batch.clear();
+            try {
+                listener.onResults(copy);
+            }
+            catch (RuntimeException ex) {
+                log.debug("Dataset search result listener failed", ex);
+            }
+        }
+
+        private void progress(String datasetPath)
+        {
+            try {
+                listener.onProgress(processedElements, totalElements, datasetPath);
+            }
+            catch (RuntimeException ex) {
+                log.debug("Dataset search progress listener failed", ex);
+            }
+        }
+
+        private void error(String datasetPath, String message, Throwable error)
+        {
+            String text = datasetPath + ": " + message;
+            errors.add(text);
+            try {
+                listener.onError(datasetPath, message, error);
+            }
+            catch (RuntimeException ex) {
+                log.debug("Dataset search error listener failed", ex);
+            }
+        }
+    }
+
+    /**
+     * Search every Dataset reachable from the supplied open files.
+     *
+     * @param files       snapshot of the currently open files
+     * @param query       user query; an empty query produces an empty summary
+     * @param mode        name or value mode
+     * @param cancelled   cooperative cancellation flag
+     * @param listener    worker-thread callbacks; may be null
+     * @return summary of all matches, displayed matches, errors, and progress
+     */
+    public SearchSummary search(List<FileFormat> files, String query, SearchMode mode,
+                                AtomicBoolean cancelled, Listener listener)
+    {
+        return search(files, query, mode, cancelled, listener, Collections.emptyList());
+    }
+
+    /**
+     * Search with transient dirty-buffer snapshots captured by existing
+     * TableViews.  A matching snapshot replaces the on-disk read for that
+     * Dataset; it is never written back by the search.
+     */
+    public SearchSummary search(List<FileFormat> files, String query, SearchMode mode,
+                                AtomicBoolean cancelled, Listener listener,
+                                List<DatasetSearchSnapshot> dirtySnapshots)
+    {
+        Listener callback = listener == null ? new Listener() {} : listener;
+        AtomicBoolean stop = cancelled == null ? new AtomicBoolean(false) : cancelled;
+        RunState state = new RunState(callback);
+
+        String phrase = query == null ? "" : query.trim();
+        if (phrase.isEmpty() || mode == null)
+            return finish(state, stop);
+
+        List<DatasetTarget> targets = collectDatasets(files, state, stop);
+        if (mode == SearchMode.DATASET_NAME) {
+            searchNames(targets, phrase, state, stop);
+        }
+        else {
+            searchValues(targets, phrase, state, stop, dirtySnapshots);
+        }
+
+        state.flush();
+        return finish(state, stop);
+    }
+
+    private SearchSummary finish(RunState state, AtomicBoolean cancelled)
+    {
+        state.flush();
+        return new SearchSummary(state.totalMatches, state.shownMatches, state.totalElements,
+                                 state.processedElements, state.errors, cancelled.get());
+    }
+
+    private List<DatasetTarget> collectDatasets(List<FileFormat> files, RunState state,
+                                                AtomicBoolean cancelled)
+    {
+        if (files == null || files.isEmpty())
+            return Collections.emptyList();
+
+        List<DatasetTarget> targets = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+
+        for (FileFormat file : files) {
+            if (cancelled.get() || file == null)
+                break;
+
+            try {
+                synchronized (NATIVE_IO_LOCK) {
+                    HObject root = file.getRootObject();
+                    if (!(root instanceof Group))
+                        continue;
+
+                    for (HObject object : ((Group)root).depthFirstMemberList()) {
+                        if (cancelled.get())
+                            break;
+                        if (!(object instanceof Dataset))
+                            continue;
+
+                        Dataset dataset = (Dataset)object;
+                        String key = safeFilePath(file) + "\n" + fullPath(dataset);
+                        if (seen.add(key))
+                            targets.add(new DatasetTarget(file, dataset));
+                    }
+                }
+            }
+            catch (Exception ex) {
+                state.error(safeFilePath(file), "Unable to enumerate Datasets", ex);
+            }
+        }
+
+        return targets;
+    }
+
+    private void searchNames(List<DatasetTarget> targets, String phrase, RunState state,
+                             AtomicBoolean cancelled)
+    {
+        String folded = phrase.toLowerCase(Locale.ROOT);
+        state.totalElements = targets.size();
+        for (DatasetTarget target : targets) {
+            if (cancelled.get())
+                break;
+
+            String name = target.dataset.getName();
+            if (name != null && name.toLowerCase(Locale.ROOT).contains(folded)) {
+                state.emit(new DatasetSearchResult(safeFilePath(target.file), fullPath(target.dataset), name,
+                                                    new long[0], DatasetSearchResult.MatchType.DATASET_NAME));
+            }
+
+            state.processedElements++;
+            state.progress(fullPath(target.dataset));
+        }
+    }
+
+    private void searchValues(List<DatasetTarget> targets, String phrase, RunState state,
+                              AtomicBoolean cancelled, List<DatasetSearchSnapshot> dirtySnapshots)
+    {
+        for (DatasetTarget target : targets) {
+            if (cancelled.get())
+                break;
+
+            DatasetSearchSnapshot snapshot = findSnapshot(dirtySnapshots, target);
+            if (snapshot != null) {
+                searchSnapshot(snapshot, phrase, target, state, cancelled);
+                continue;
+            }
+
+            Dataset scanner = null;
+            try {
+                scanner = newFreshDataset(target.dataset);
+                long[] dims;
+                Datatype rawDatatype;
+                synchronized (NATIVE_IO_LOCK) {
+                    scanner.init();
+                    dims     = copy(scanner.getDims());
+                    rawDatatype = scanner.getDatatype();
+                }
+
+                Datatype datatype = scalarDatatype(rawDatatype);
+
+                if (dims == null)
+                    throw new IllegalStateException("Dataset dimensions are unavailable");
+
+                if (!isSupportedValueType(datatype)) {
+                    String description = datatype == null ? "Unknown datatype" : datatype.getDescription();
+                    state.error(fullPath(target.dataset), description,
+                                new UnsupportedOperationException(description));
+                    continue;
+                }
+
+                List<Block> blocks = buildBlocks(dims, SEARCH_BLOCK_ELEMENTS);
+                for (Block block : blocks)
+                    state.totalElements = safeAdd(state.totalElements, block.getElementCount());
+                for (Block block : blocks) {
+                    if (cancelled.get())
+                        break;
+
+                    Object data = readBlock(scanner, block);
+                    if (data == null)
+                        throw new IllegalStateException("Dataset block read returned no data");
+
+                    long blockElements = block.getElementCount();
+                    processBlock(data, block, datatype, rawDatatype, phrase, target, state);
+                    state.processedElements = safeAdd(state.processedElements, blockElements);
+                    state.progress(fullPath(target.dataset));
+                }
+            }
+            catch (OutOfMemoryError error) {
+                state.error(fullPath(target.dataset), "Dataset block could not be read", error);
+            }
+            catch (Exception ex) {
+                state.error(fullPath(target.dataset), ex.getMessage() == null
+                                                            ? "Dataset could not be searched" : ex.getMessage(), ex);
+            }
+            finally {
+                if (scanner != null) {
+                    try {
+                        scanner.clear();
+                    }
+                    catch (RuntimeException ex) {
+                        log.debug("Unable to clear Dataset search object", ex);
+                    }
+                }
+            }
+        }
+    }
+
+    private DatasetSearchSnapshot findSnapshot(List<DatasetSearchSnapshot> snapshots,
+                                               DatasetTarget target)
+    {
+        if (snapshots == null || snapshots.isEmpty())
+            return null;
+
+        String filePath = safeFilePath(target.file);
+        String datasetPath = fullPath(target.dataset);
+        for (DatasetSearchSnapshot snapshot : snapshots) {
+            if (snapshot != null && snapshot.matches(filePath, datasetPath))
+                return snapshot;
+        }
+        return null;
+    }
+
+    private void searchSnapshot(DatasetSearchSnapshot snapshot, String phrase,
+                                DatasetTarget target, RunState state, AtomicBoolean cancelled)
+    {
+        Object data = snapshot.getData();
+        Datatype rawDatatype = snapshot.getDatatype();
+        Datatype datatype = scalarDatatype(rawDatatype);
+        if (!isSupportedValueType(datatype)) {
+            String description = datatype == null ? "Unknown datatype" : datatype.getDescription();
+            state.error(fullPath(target.dataset), description,
+                        new UnsupportedOperationException(description));
+            return;
+        }
+
+        int length = valueLength(data);
+        state.totalElements = safeAdd(state.totalElements, snapshot.getElementCount());
+        int valuesPerCell = valuesPerCell(rawDatatype);
+        NumericQuery numeric = (datatype.isInteger() || datatype.isFloat())
+            ? NumericQuery.parse(phrase, datatype.isInteger()) : null;
+        String folded = phrase.toLowerCase(Locale.ROOT);
+        for (int offset = 0; offset < length; offset++) {
+            if (cancelled.get())
+                break;
+
+            Object value = valueAt(data, offset);
+            boolean matched;
+            if (numeric != null)
+                matched = numeric.valid && numeric.matches(value);
+            else {
+                String text = datatype.isChar() ? charScalarToText(value) : scalarToText(value);
+                matched = text.toLowerCase(Locale.ROOT).contains(folded);
+            }
+
+            if (matched) {
+                String text = datatype.isChar() ? charScalarToText(value) : scalarToText(value);
+                DatasetSearchResult.MatchType matchType = numeric != null
+                    ? DatasetSearchResult.MatchType.NUMERIC_VALUE
+                    : (datatype.isChar() ? DatasetSearchResult.MatchType.CHAR_VALUE
+                                          : DatasetSearchResult.MatchType.STRING_VALUE);
+                state.emit(new DatasetSearchResult(safeFilePath(target.file), fullPath(target.dataset), text,
+                                                   snapshot.coordinateForValue(offset, valuesPerCell), matchType));
+            }
+
+            state.processedElements = safeAdd(state.processedElements,
+                                              offset + 1 == length ? snapshot.getElementCount() : 0);
+        }
+        state.progress(fullPath(target.dataset));
+    }
+
+    private Object readBlock(Dataset scanner, Block block) throws Exception
+    {
+        synchronized (NATIVE_IO_LOCK) {
+            long[] start  = scanner.getStartDims();
+            long[] count  = scanner.getSelectedDims();
+            long[] stride = scanner.getStride();
+            long[] blockStart = block.start;
+            long[] blockCount = block.count;
+
+            if (start == null || count == null || stride == null)
+                throw new IllegalStateException("Dataset subset selection is unavailable");
+            if (start.length != blockStart.length || count.length != blockCount.length)
+                throw new IllegalStateException("Dataset subset rank changed while searching");
+
+            for (int i = 0; i < blockStart.length; i++) {
+                start[i]  = blockStart[i];
+                count[i]  = blockCount[i];
+                stride[i] = 1;
+            }
+
+            /* read() returns the block without installing it in the Dataset buffer. */
+            return scanner.read();
+        }
+    }
+
+    private void processBlock(Object data, Block block, Datatype datatype, Datatype rawDatatype,
+                              String phrase, DatasetTarget target, RunState state)
+    {
+        int valuesPerCell = valuesPerCell(rawDatatype);
+        if (datatype.isInteger() || datatype.isFloat()) {
+            NumericQuery numeric = NumericQuery.parse(phrase, datatype.isInteger());
+            if (!numeric.valid)
+                return;
+
+            int length = valueLength(data);
+            for (int i = 0; i < length; i++) {
+                Object value = valueAt(data, i);
+                if (numeric.matches(value)) {
+                    state.emit(new DatasetSearchResult(safeFilePath(target.file), fullPath(target.dataset),
+                                                        scalarToText(value),
+                                                        coordinate(block, i / valuesPerCell),
+                                                        DatasetSearchResult.MatchType.NUMERIC_VALUE));
+                }
+            }
+            return;
+        }
+
+        String folded = phrase.toLowerCase(Locale.ROOT);
+        int length = valueLength(data);
+        for (int i = 0; i < length; i++) {
+            Object value = valueAt(data, i);
+            String text = datatype.isChar() ? charScalarToText(value) : scalarToText(value);
+            if (text.toLowerCase(Locale.ROOT).contains(folded)) {
+                state.emit(new DatasetSearchResult(safeFilePath(target.file), fullPath(target.dataset), text,
+                                                   coordinate(block, i / valuesPerCell),
+                                                   datatype.isChar()
+                                                       ? DatasetSearchResult.MatchType.CHAR_VALUE
+                                                       : DatasetSearchResult.MatchType.STRING_VALUE));
+            }
+        }
+    }
+
+    private static String charScalarToText(Object value)
+    {
+        if (value instanceof Character)
+            return String.valueOf(value);
+        if (value instanceof Number)
+            return String.valueOf((char)(((Number)value).intValue() & 0xffff));
+        return scalarToText(value);
+    }
+
+    private static boolean isSupportedValueType(Datatype datatype)
+    {
+        return datatype != null && (datatype.isInteger() || datatype.isFloat() || datatype.isString() ||
+                                     datatype.isChar());
+    }
+
+    /**
+     * HDF5 array datatypes expose their scalar base datatype separately from
+     * the Dataset shape.  The Object API returns the flattened primitive array
+     * for such a Dataset, so content search must classify it by that base type
+     * instead of incorrectly reporting it as an unsupported complex type.
+     */
+    private static Datatype scalarDatatype(Datatype datatype)
+    {
+        Datatype current = datatype;
+        while (current != null && current.isArray() && current.getDatatypeBase() != null)
+            current = current.getDatatypeBase();
+        return current;
+    }
+
+    private static int valuesPerCell(Datatype datatype)
+    {
+        int result = 1;
+        Datatype current = datatype;
+        while (current != null && current.isArray() && current.getDatatypeBase() != null) {
+            long[] dims = current.getArrayDims();
+            if (dims != null) {
+                for (long dim : dims) {
+                    if (dim <= 0 || result > Integer.MAX_VALUE / dim)
+                        return Integer.MAX_VALUE;
+                    result *= (int)dim;
+                }
+            }
+            current = current.getDatatypeBase();
+        }
+        return Math.max(1, result);
+    }
+
+    private static Dataset newFreshDataset(Dataset source) throws Exception
+    {
+        if (source == null)
+            throw new IllegalArgumentException("Dataset is null");
+
+        try {
+            @SuppressWarnings("unchecked")
+            Constructor<? extends Dataset> constructor =
+                (Constructor<? extends Dataset>)source.getClass().getConstructor(
+                    FileFormat.class, String.class, String.class);
+            return constructor.newInstance(source.getFileFormat(), source.getName(), source.getPath());
+        }
+        catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Dataset type cannot create an independent scan object: " +
+                                            source.getClass().getName(), ex);
+        }
+    }
+
+    private static int valueLength(Object data)
+    {
+        if (data == null)
+            return 0;
+        if (data instanceof List<?>)
+            return ((List<?>)data).size();
+        return data.getClass().isArray() ? Array.getLength(data) : 1;
+    }
+
+    private static Object valueAt(Object data, int index)
+    {
+        if (data == null)
+            return null;
+        if (data instanceof List<?>)
+            return index >= 0 && index < ((List<?>)data).size() ? ((List<?>)data).get(index) : null;
+        if (data.getClass().isArray())
+            return Array.get(data, index);
+        return index == 0 ? data : null;
+    }
+
+    private static long[] coordinate(Block block, int linearIndex)
+    {
+        if (block.count.length == 0)
+            return new long[0];
+
+        long[] coordinate = new long[block.count.length];
+        long remaining = linearIndex;
+        for (int i = block.count.length - 1; i >= 0; i--) {
+            long size = block.count[i];
+            coordinate[i] = block.start[i] + (remaining % size);
+            remaining /= size;
+        }
+        return coordinate;
+    }
+
+    /**
+     * Build bounded row-major blocks for a Dataset shape.  This method is public
+     * so a regression test can prove that a large Dataset is not represented by
+     * one whole-array read.
+     */
+    public static List<Block> buildBlocks(long[] dims, long maxElements)
+    {
+        if (dims == null)
+            return Collections.emptyList();
+        if (dims.length == 0)
+            return Collections.singletonList(new Block(new long[0], new long[0]));
+        if (maxElements <= 0)
+            throw new IllegalArgumentException("maxElements must be positive");
+
+        for (long dim : dims) {
+            if (dim < 0)
+                throw new IllegalArgumentException("Dataset dimensions cannot be negative");
+            if (dim == 0)
+                return Collections.emptyList();
+        }
+
+        long[] tile = dims.clone();
+        while (productExceeds(tile, maxElements)) {
+            int split = 0;
+            for (int i = 1; i < tile.length; i++) {
+                if (tile[i] > tile[split])
+                    split = i;
+            }
+            if (tile[split] <= 1)
+                break;
+            tile[split] = Math.max(1, (tile[split] + 1) / 2);
+        }
+
+        List<Block> blocks = new ArrayList<>();
+        long[] start = new long[dims.length];
+        while (true) {
+            long[] count = new long[dims.length];
+            for (int i = 0; i < dims.length; i++)
+                count[i] = Math.min(tile[i], dims[i] - start[i]);
+            blocks.add(new Block(start, count));
+
+            int dimension = dims.length - 1;
+            while (dimension >= 0) {
+                start[dimension] += tile[dimension];
+                if (start[dimension] < dims[dimension])
+                    break;
+                start[dimension] = 0;
+                dimension--;
+            }
+            if (dimension < 0)
+                break;
+        }
+
+        return blocks;
+    }
+
+    private static boolean productExceeds(long[] values, long limit)
+    {
+        long product = 1;
+        for (long value : values) {
+            if (value <= 0)
+                return false;
+            if (product > limit / value)
+                return true;
+            product *= value;
+        }
+        return product > limit;
+    }
+
+    private static String fullPath(HObject object)
+    {
+        if (object == null)
+            return "";
+        String fullName = object.getFullName();
+        if (fullName != null && !fullName.isEmpty())
+            return fullName;
+        String path = object.getPath() == null ? "" : object.getPath();
+        String name = object.getName() == null ? "" : object.getName();
+        String result = path + name;
+        return result.isEmpty() ? "/" : result;
+    }
+
+    private static String safeFilePath(FileFormat file)
+    {
+        return file == null || file.getFilePath() == null ? "" : file.getFilePath();
+    }
+
+    private static long[] copy(long[] values) { return values == null ? null : values.clone(); }
+
+    private static long safeAdd(long first, long second)
+    {
+        if (second < 0 || Long.MAX_VALUE - first < second)
+            return Long.MAX_VALUE;
+        return first + second;
+    }
+
+    /** Convert one Object API scalar into the text shown in a result row. */
+    public static String scalarToText(Object value)
+    {
+        if (value == null)
+            return "null";
+        if (value instanceof byte[])
+            return new String((byte[])value, StandardCharsets.UTF_8);
+        if (value instanceof char[])
+            return new String((char[])value);
+        if (value instanceof Character)
+            return String.valueOf(value);
+        if (value instanceof Byte)
+            return String.valueOf(((Byte)value).byteValue());
+        if (value instanceof Short)
+            return String.valueOf(((Short)value).shortValue());
+        if (value instanceof Integer)
+            return String.valueOf(((Integer)value).intValue());
+        if (value instanceof Long)
+            return String.valueOf(((Long)value).longValue());
+        return String.valueOf(value);
+    }
+
+    private static final class NumericQuery {
+        private final boolean integer;
+        private final boolean valid;
+        private final BigInteger integerValue;
+        private final BigDecimal decimalValue;
+        private final double doubleValue;
+
+        private NumericQuery(boolean integer, boolean valid, BigInteger integerValue,
+                             BigDecimal decimalValue, double doubleValue)
+        {
+            this.integer      = integer;
+            this.valid        = valid;
+            this.integerValue = integerValue;
+            this.decimalValue = decimalValue;
+            this.doubleValue  = doubleValue;
+        }
+
+        private static NumericQuery parse(String text, boolean integer)
+        {
+            try {
+                if (integer)
+                    return new NumericQuery(true, true, new BigInteger(text.trim()), null, 0.0);
+
+                double doubleValue = Double.parseDouble(text.trim());
+                BigDecimal decimal = null;
+                if (Double.isFinite(doubleValue))
+                    decimal = new BigDecimal(text.trim());
+                return new NumericQuery(false, true, null, decimal, doubleValue);
+            }
+            catch (NumberFormatException ex) {
+                return new NumericQuery(integer, false, null, null, 0.0);
+            }
+        }
+
+        private boolean matches(Object value)
+        {
+            if (!(value instanceof Number) && !(value instanceof BigInteger) &&
+                !(value instanceof BigDecimal))
+                return false;
+
+            if (integer) {
+                if (value instanceof BigInteger)
+                    return integerValue.equals(value);
+                if (value instanceof BigDecimal)
+                    try {
+                        return integerValue.equals(((BigDecimal)value).toBigIntegerExact());
+                    }
+                    catch (ArithmeticException ex) {
+                        return false;
+                    }
+                return integerValue.equals(BigInteger.valueOf(((Number)value).longValue()));
+            }
+
+            if (decimalValue != null) {
+                BigDecimal actualDecimal = decimalValue(value);
+                if (actualDecimal != null)
+                    return decimalValue.compareTo(actualDecimal) == 0;
+            }
+
+            double actual = ((Number)value).doubleValue();
+            return Double.compare(actual, doubleValue) == 0;
+        }
+
+        private static BigDecimal decimalValue(Object value)
+        {
+            if (value instanceof BigDecimal)
+                return (BigDecimal)value;
+            if (value instanceof BigInteger)
+                return new BigDecimal((BigInteger)value);
+            if (!(value instanceof Number))
+                return null;
+
+            /*
+             * Use Number.toString() for finite floating-point values.  This
+             * preserves the value users see and type into the search box;
+             * converting Float 0.1f to double first would compare against
+             * 0.10000000149011612 instead of the displayed 0.1.
+             */
+            try {
+                return new BigDecimal(value.toString());
+            }
+            catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+    }
+}

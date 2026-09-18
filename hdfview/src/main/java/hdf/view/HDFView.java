@@ -27,6 +27,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import hdf.HDFVersions;
 import hdf.object.Attribute;
@@ -55,6 +56,10 @@ import hdf.view.dialog.UserOptionsHDFPage;
 import hdf.view.dialog.UserOptionsNode;
 import hdf.view.dialog.UserOptionsViewModulesPage;
 import hdf.view.i18n.I18n;
+import hdf.view.search.DatasetSearchDialog;
+import hdf.view.search.DatasetSearchEngine;
+import hdf.view.search.DatasetSearchResult;
+import hdf.view.search.DatasetSearchSnapshot;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,6 +235,14 @@ public class HDFView implements DataViewManager {
     /** Language radio items in the Tools menu. */
     private MenuItem englishLanguageItem;
     private MenuItem simplifiedChineseLanguageItem;
+
+    /** The modeless Dataset content search window, if it is open. */
+    private DatasetSearchDialog datasetSearchDialog;
+
+    /** Current worker and cooperative cancellation flag for Dataset search. */
+    private Thread datasetSearchThread;
+    private AtomicBoolean datasetSearchCancel;
+    private long datasetSearchGeneration;
 
     /* GUI component: File menu on the menubar */
     // private final Menu               fileMenu;
@@ -567,27 +580,31 @@ public class HDFView implements DataViewManager {
                 catch (Exception ex) {
                 }
 
-                disposeInlineDataView();
-                closeAllWindows();
+                cancelDatasetSearch();
 
-                // Close all open files
-                try {
-                    List<FileFormat> filelist = treeView.getCurrentFiles();
+                synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
+                    disposeInlineDataView();
+                    closeAllWindows();
 
-                    if ((filelist != null) && !filelist.isEmpty()) {
-                        Object[] files = filelist.toArray();
+                    // Close all open files
+                    try {
+                        List<FileFormat> filelist = treeView.getCurrentFiles();
 
-                        for (int i = 0; i < files.length; i++) {
-                            try {
-                                treeView.closeFile((FileFormat)files[i]);
-                            }
-                            catch (Exception ex) {
-                                continue;
+                        if ((filelist != null) && !filelist.isEmpty()) {
+                            Object[] files = filelist.toArray();
+
+                            for (int i = 0; i < files.length; i++) {
+                                try {
+                                    treeView.closeFile((FileFormat)files[i]);
+                                }
+                                catch (Exception ex) {
+                                    continue;
+                                }
                             }
                         }
                     }
-                }
-                catch (Exception ex) {
+                    catch (Exception ex) {
+                    }
                 }
 
                 if (currentFont != null)
@@ -833,12 +850,15 @@ public class HDFView implements DataViewManager {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
+                cancelDatasetSearch();
                 closeAllWindows();
 
                 List<FileFormat> files = treeView.getCurrentFiles();
                 while (!files.isEmpty()) {
                     try {
-                        treeView.closeFile(files.get(0));
+                        synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
+                            treeView.closeFile(files.get(0));
+                        }
                     }
                     catch (Exception ex) {
                         log.trace("unable to close {} in treeView", files.get(0));
@@ -1025,6 +1045,16 @@ public class HDFView implements DataViewManager {
             public void widgetSelected(SelectionEvent e)
             {
                 changeLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+            }
+        });
+
+        item = new MenuItem(toolsMenu, SWT.PUSH);
+        I18n.bind(item, "menu.tools.searchDatasetContent");
+        item.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                openDatasetSearchDialog();
             }
         });
 
@@ -1236,6 +1266,227 @@ public class HDFView implements DataViewManager {
             ? "menu.tools.language.english"
             : "menu.tools.language.simplifiedChinese";
         showStatus(I18n.text("status.languageChanged", I18n.text(languageLabelKey)));
+    }
+
+    /** Open the global Dataset name/value search window. */
+    public void openDatasetSearchDialog()
+    {
+        if (datasetSearchDialog != null && datasetSearchDialog.getShell() != null &&
+            !datasetSearchDialog.getShell().isDisposed()) {
+            datasetSearchDialog.getShell().forceActive();
+            return;
+        }
+
+        datasetSearchDialog = new DatasetSearchDialog(this, mainWindow);
+        datasetSearchDialog.open();
+    }
+
+    /**
+     * Start one Dataset search on a worker thread.  All callbacks are marshalled
+     * back to the SWT display before they touch the search window.
+     */
+    public void startDatasetSearch(final DatasetSearchDialog dialog, final String query,
+                                   final DatasetSearchEngine.SearchMode mode)
+    {
+        if (dialog == null || dialog.getShell() == null || dialog.getShell().isDisposed())
+            return;
+
+        cancelDatasetSearch();
+        final long generation = ++datasetSearchGeneration;
+        final AtomicBoolean cancellation = new AtomicBoolean(false);
+        datasetSearchCancel = cancellation;
+
+        final List<FileFormat> files = treeView == null
+            ? new ArrayList<>() : new ArrayList<>(treeView.getCurrentFiles());
+        final List<DatasetSearchSnapshot> dirtySnapshots = captureDirtySearchSnapshots();
+        if (files.isEmpty()) {
+            dialog.addError(I18n.text("common.file"), I18n.text("message.noFilesOpen"));
+            dialog.finish(null);
+            return;
+        }
+
+        DatasetSearchEngine.Listener listener = new DatasetSearchEngine.Listener() {
+            @Override
+            public void onResults(List<DatasetSearchResult> results)
+            {
+                postDatasetSearchUpdate(generation, dialog, () -> dialog.addResults(results));
+            }
+
+            @Override
+            public void onProgress(long processedElements, long totalElements, String datasetPath)
+            {
+                postDatasetSearchUpdate(generation, dialog,
+                                        () -> dialog.updateProgress(processedElements, totalElements,
+                                                                     datasetPath));
+            }
+
+            @Override
+            public void onError(String datasetPath, String message, Throwable error)
+            {
+                String displayMessage = error instanceof UnsupportedOperationException
+                    ? I18n.text("search.unsupportedDatatype", message) : message;
+                postDatasetSearchUpdate(generation, dialog,
+                                        () -> dialog.addError(datasetPath, displayMessage));
+            }
+        };
+
+        DatasetSearchEngine engine = new DatasetSearchEngine();
+        datasetSearchThread = new Thread(() -> {
+            DatasetSearchEngine.SearchSummary summary;
+            try {
+                summary = engine.search(files, query, mode, cancellation, listener, dirtySnapshots);
+            }
+            catch (Throwable error) {
+                log.warn("Dataset content search failed", error);
+                final String message = error.getMessage() == null
+                    ? error.getClass().getSimpleName() : error.getMessage();
+                postDatasetSearchUpdate(generation, dialog,
+                                        () -> dialog.addError(I18n.text("common.file"), message));
+                summary = null;
+            }
+
+            final DatasetSearchEngine.SearchSummary completed = summary;
+            postDatasetSearchUpdate(generation, dialog, () -> dialog.finish(completed));
+        }, "HDFView-DatasetSearch");
+        datasetSearchThread.setDaemon(true);
+        datasetSearchThread.start();
+    }
+
+    /**
+     * Capture only the already-open TableView buffers that are dirty.  The
+     * active editor is committed into the existing buffer, but no save is
+     * performed and the user keeps the normal dirty/save-confirmation state.
+     */
+    private List<DatasetSearchSnapshot> captureDirtySearchSnapshots()
+    {
+        List<DatasetSearchSnapshot> snapshots = new ArrayList<>();
+        List<TableView> views = new ArrayList<>();
+        if (inlineTableView != null && !inlineTableView.isViewDisposed())
+            views.add(inlineTableView);
+
+        if (display != null && !display.isDisposed()) {
+            for (Shell shell : display.getShells()) {
+                Object data = shell.getData();
+                if (data instanceof TableView && !((TableView)data).isViewDisposed())
+                    views.add((TableView)data);
+            }
+        }
+
+        for (TableView view : views) {
+            try {
+                view.commitActiveCellEditor();
+                DatasetSearchSnapshot snapshot = view.getSearchSnapshot();
+                if (snapshot != null)
+                    snapshots.add(snapshot);
+            }
+            catch (RuntimeException ex) {
+                log.debug("Unable to capture dirty Dataset search buffer", ex);
+            }
+        }
+        return snapshots;
+    }
+
+    /** Cancel the active search without destroying already displayed results. */
+    public void cancelDatasetSearch()
+    {
+        if (datasetSearchCancel != null)
+            datasetSearchCancel.set(true);
+    }
+
+    /** Called when the modeless search window is closed by the user. */
+    public void datasetSearchDialogClosed(DatasetSearchDialog dialog)
+    {
+        if (datasetSearchDialog == dialog)
+            datasetSearchDialog = null;
+        cancelDatasetSearch();
+    }
+
+    private void postDatasetSearchUpdate(long generation, DatasetSearchDialog dialog, Runnable update)
+    {
+        if (display == null || display.isDisposed())
+            return;
+
+        display.asyncExec(() -> {
+            if (generation != datasetSearchGeneration || datasetSearchDialog != dialog ||
+                dialog.getShell() == null || dialog.getShell().isDisposed())
+                return;
+            update.run();
+        });
+    }
+
+    /**
+     * Activate a result by its stable file path, Dataset path, and coordinate.
+     * No TreeItem label or result-table text is parsed to locate the object.
+     */
+    public void navigateDatasetSearchResult(DatasetSearchResult result)
+    {
+        if (result == null || treeView == null)
+            return;
+
+        FileFormat openFile = null;
+        for (FileFormat file : treeView.getCurrentFiles()) {
+            if (sameFilePath(file == null ? null : file.getFilePath(), result.getFilePath())) {
+                openFile = file;
+                break;
+            }
+        }
+
+        if (openFile == null) {
+            Tools.showError(mainWindow, I18n.text("dialog.datasetSearch.title"),
+                            I18n.text("search.staleResult"));
+            return;
+        }
+
+        HObject object;
+        try {
+            synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
+                object = openFile.get(result.getDatasetPath());
+            }
+        }
+        catch (Exception ex) {
+            log.debug("Unable to resolve Dataset search result {}", result.getDatasetPath(), ex);
+            Tools.showError(mainWindow, I18n.text("dialog.datasetSearch.title"),
+                            I18n.text("search.staleResult"));
+            return;
+        }
+
+        if (!(object instanceof Dataset)) {
+            Tools.showError(mainWindow, I18n.text("dialog.datasetSearch.title"),
+                            I18n.text("search.staleResult"));
+            return;
+        }
+
+        try {
+            if (!treeView.selectObject(object)) {
+                Tools.showError(mainWindow, I18n.text("dialog.datasetSearch.title"),
+                                I18n.text("search.staleResult"));
+                return;
+            }
+
+            TableView tableView = showInlineDataContent(object);
+            if (tableView != null)
+                tableView.navigateToIndex(result.getCoordinate());
+            else
+                /* Images and other advanced Dataset views keep their existing
+                 * dedicated-window behavior. */
+                treeView.showDataContent(object);
+        }
+        catch (Exception ex) {
+            log.debug("Unable to navigate to Dataset search result", ex);
+            Tools.showError(mainWindow, I18n.text("dialog.datasetSearch.title"), ex.getMessage());
+        }
+    }
+
+    private boolean sameFilePath(String first, String second)
+    {
+        if (first == null || second == null)
+            return false;
+        try {
+            return new File(first).getCanonicalFile().equals(new File(second).getCanonicalFile());
+        }
+        catch (Exception ex) {
+            return first.equalsIgnoreCase(second);
+        }
     }
 
     /**
@@ -1610,6 +1861,7 @@ public class HDFView implements DataViewManager {
 
         accessModeSelector.setEnabled(false);
         try {
+            cancelDatasetSearch();
             FileFormat reopened = treeView.reopenFile(file, requestedAccessMode);
             if (reopened == null)
                 throw new java.io.IOException(I18n.text("message.reopenFileFailed", filename));
@@ -2186,6 +2438,10 @@ public class HDFView implements DataViewManager {
             return;
         }
 
+        cancelDatasetSearch();
+
+        synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
+
         boolean wasAccessModeFile = accessModeFile != null && accessModeFile.equals(theFile);
 
         if (inlineTableView != null) {
@@ -2227,7 +2483,9 @@ public class HDFView implements DataViewManager {
         }
 
         try {
-            treeView.closeFile(theFile);
+            synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
+                treeView.closeFile(theFile);
+            }
         }
         catch (Exception ex) {
             // Intentional
@@ -2242,6 +2500,7 @@ public class HDFView implements DataViewManager {
             updateAccessModeStatus(null);
 
         System.gc();
+        }
     }
 
     /**

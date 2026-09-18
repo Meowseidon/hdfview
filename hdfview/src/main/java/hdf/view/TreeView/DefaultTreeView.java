@@ -60,6 +60,7 @@ import hdf.view.dialog.NewGroupDialog;
 import hdf.view.dialog.NewImageDialog;
 import hdf.view.dialog.NewLinkDialog;
 import hdf.view.i18n.I18n;
+import hdf.view.search.DatasetSearchEngine;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -2698,8 +2699,12 @@ public class DefaultTreeView implements TreeView {
     @Override
     public FileFormat reopenFile(FileFormat fileFormat, int newFileAccessMode) throws Exception
     {
-        if (fileFormat == null)
-            throw new IllegalArgumentException(I18n.text("message.reopenNoFile"));
+        if (viewer instanceof HDFView)
+            ((HDFView)viewer).cancelDatasetSearch();
+
+        synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
+            if (fileFormat == null)
+                throw new IllegalArgumentException(I18n.text("message.reopenNoFile"));
 
         String fileFormatName = fileFormat.getAbsolutePath();
         int previousAccessMode = getRememberedAccessMode(fileFormat);
@@ -2759,6 +2764,7 @@ public class DefaultTreeView implements TreeView {
             }
 
             throw reopenFailure;
+        }
         }
     }
 
@@ -2979,6 +2985,71 @@ public class DefaultTreeView implements TreeView {
         }
 
         return null;
+    }
+
+    /**
+     * Select an HDF object by its identity, expanding lazy ancestors as needed.
+     * Search results use this path rather than parsing the displayed Tree text.
+     */
+    @Override
+    public boolean selectObject(HObject obj)
+    {
+        if (obj == null || obj.getFileFormat() == null)
+            return false;
+
+        TreeItem theItem = findTreeItem(obj);
+        if (theItem == null) {
+            TreeItem rootItem = findTreeItem(obj.getFileFormat().getRootObject());
+            if (rootItem != null) {
+                String fullName = obj.getFullName();
+                String[] parts = fullName == null ? new String[0] : fullName.split("/");
+                TreeItem current = rootItem;
+
+                for (String part : parts) {
+                    if (part == null || part.isEmpty())
+                        continue;
+
+                    if (current == null || !(current.getData() instanceof Group))
+                        break;
+
+                    current.setExpanded(true);
+                    TreeItem next = null;
+                    for (TreeItem child : current.getItems()) {
+                        Object childData = child.getData();
+                        if (!(childData instanceof HObject))
+                            continue;
+
+                        HObject childObject = (HObject)childData;
+                        if (part.equals(childObject.getName())) {
+                            next = child;
+                            break;
+                        }
+                    }
+                    current = next;
+                    if (current == null)
+                        break;
+                }
+
+                if (current != null && current.getData() instanceof HObject) {
+                    HObject currentObject = (HObject)current.getData();
+                    if (currentObject.equals(obj) ||
+                        (fullName != null && fullName.equals(currentObject.getFullName())))
+                        theItem = current;
+                }
+            }
+        }
+
+        if (theItem == null || theItem.isDisposed())
+            return false;
+
+        selectedItem   = theItem;
+        selectedObject = (HObject)theItem.getData();
+        selectedFile   = selectedObject.getFileFormat();
+        tree.deselectAll();
+        tree.setSelection(theItem);
+        tree.showItem(theItem);
+        ((HDFView)viewer).showMetaData(selectedObject);
+        return true;
     }
 
     /**

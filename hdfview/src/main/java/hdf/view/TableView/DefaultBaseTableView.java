@@ -64,6 +64,7 @@ import hdf.view.dialog.InputDialog;
 import hdf.view.dialog.MathConversionDialog;
 import hdf.view.dialog.NewDatasetDialog;
 import hdf.view.i18n.I18n;
+import hdf.view.search.DatasetSearchSnapshot;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -103,6 +104,7 @@ import org.eclipse.nebula.widgets.nattable.painter.cell.decorator.BeveledBorderD
 import org.eclipse.nebula.widgets.nattable.painter.cell.decorator.LineBorderDecorator;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
 import org.eclipse.nebula.widgets.nattable.selection.command.SelectAllCommand;
+import org.eclipse.nebula.widgets.nattable.selection.command.SelectCellCommand;
 import org.eclipse.nebula.widgets.nattable.style.CellStyleAttributes;
 import org.eclipse.nebula.widgets.nattable.style.DisplayMode;
 import org.eclipse.nebula.widgets.nattable.style.HorizontalAlignmentEnum;
@@ -115,6 +117,7 @@ import org.eclipse.nebula.widgets.nattable.ui.matcher.MouseEventMatcher;
 import org.eclipse.nebula.widgets.nattable.ui.menu.PopupMenuAction;
 import org.eclipse.nebula.widgets.nattable.ui.menu.PopupMenuBuilder;
 import org.eclipse.nebula.widgets.nattable.viewport.ViewportLayer;
+import org.eclipse.nebula.widgets.nattable.viewport.command.ShowCellInViewportCommand;
 import org.eclipse.nebula.widgets.nattable.viewport.command.ShowRowInViewportCommand;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.SashForm;
@@ -1424,6 +1427,26 @@ public abstract class DefaultBaseTableView implements TableView {
         return (HObject)dataObject;
     }
 
+    /**
+     * Capture the existing dirty TableView buffer for content search.  The
+     * caller commits only the active editor before asking for this snapshot;
+     * this method never writes the Dataset to disk or clears its dirty flag.
+     */
+    @Override
+    public DatasetSearchSnapshot getSearchSnapshot()
+    {
+        if (dataObject == null || dataValue == null || dataProvider == null ||
+            !dataProvider.getIsValueChanged() || !(dataObject instanceof Dataset))
+            return null;
+
+        HObject object = (HObject)dataObject;
+        FileFormat file = object.getFileFormat();
+        return new DatasetSearchSnapshot(file == null ? null : file.getFilePath(), object.getFullName(),
+                                         dataValue, dataObject.getStartDims(),
+                                         dataObject.getSelectedDims(), dataObject.getStride(),
+                                         dataObject.getDims(), dataObject.getDatatype());
+    }
+
     @Override
     public Object getTable()
     {
@@ -1479,6 +1502,116 @@ public abstract class DefaultBaseTableView implements TableView {
         final ViewportLayer viewportLayer = new ViewportLayer(selectionLayer);
         dataTable.doCommand(new ShowRowInViewportCommand(dataProvider.getRowCount() - 1));
         log.trace("refreshDataTable() finish");
+    }
+
+    /**
+     * Navigate the existing NatTable to a full zero-based Dataset coordinate.
+     * The Dataset selection arrays are reused so multidimensional navigation
+     * follows the same frame/slice model as the normal TableView controls.
+     */
+    @Override
+    public void navigateToIndex(long[] coordinate)
+    {
+        if (dataObject == null || dataTable == null || selectionLayer == null)
+            return;
+
+        int rank = dataObject.getRank();
+        long[] dims = dataObject.getDims();
+        if (dims == null)
+            return;
+
+        if (dataProvider != null && dataProvider.getIsValueChanged()) {
+            commitActiveCellEditor();
+            if (!Tools.showConfirm(shell, I18n.text("message.changesDetected.title"),
+                                   I18n.text("message.changesDetected.text",
+                                             ((HObject)dataObject).getName())))
+                return;
+            updateValueInFile();
+        }
+
+        if (coordinate == null || coordinate.length == 0) {
+            if (rank == 0)
+                selectAndRevealCell(1, 1);
+            return;
+        }
+        if (coordinate.length != rank) {
+            Tools.showError(shell, I18n.text("action.select"),
+                            I18n.text("search.invalidCoordinate"));
+            return;
+        }
+        for (int i = 0; i < rank; i++) {
+            if (coordinate[i] < 0 || coordinate[i] >= dims[i]) {
+                Tools.showError(shell, I18n.text("action.select"),
+                                I18n.text("search.invalidCoordinate"));
+                return;
+            }
+        }
+
+        long[] start  = dataObject.getStartDims();
+        long[] count  = dataObject.getSelectedDims();
+        long[] stride = dataObject.getStride();
+        int[] selectedIndex = dataObject.getSelectedIndex();
+        if (start == null || count == null || stride == null || selectedIndex == null)
+            return;
+
+        for (int i = 0; i < rank; i++) {
+            start[i]  = coordinate[i];
+            count[i]  = 1;
+            stride[i] = 1;
+        }
+
+        int rowDimension = rank > 1 ? selectedIndex[0] : 0;
+        int columnDimension = rank > 1 ? selectedIndex[1] : -1;
+        int frameDimension = rank > 2 ? selectedIndex[2] : -1;
+
+        if (rank == 1) {
+            start[0] = 0;
+            count[0] = dims[0];
+        }
+        else if (rank == 2) {
+            start[rowDimension] = 0;
+            count[rowDimension] = dims[rowDimension];
+            start[columnDimension] = 0;
+            count[columnDimension] = dims[columnDimension];
+        }
+        else {
+            start[rowDimension] = 0;
+            count[rowDimension] = dims[rowDimension];
+            start[columnDimension] = 0;
+            count[columnDimension] = dims[columnDimension];
+            start[frameDimension] = coordinate[frameDimension];
+            count[frameDimension] = 1;
+            curDataFrame = coordinate[frameDimension] + indexBase;
+            if (frameField != null && !frameField.isDisposed())
+                frameField.setText(String.valueOf(curDataFrame));
+        }
+
+        dataObject.clearData();
+        try {
+            dataValue = dataObject.getData();
+            if (!(dataObject instanceof CompoundDS))
+                dataObject.convertFromUnsignedC();
+            dataValue = dataObject.getData();
+            dataProvider.updateDataBuffer(dataValue);
+            dataTable.doCommand(new VisualRefreshCommand());
+
+            int row = rank == 1 ? (int)coordinate[0] + 1
+                                : (int)(coordinate[rowDimension] - start[rowDimension]) + 1;
+            int column = rank == 1 ? 1
+                                   : (int)(coordinate[columnDimension] - start[columnDimension]) + 1;
+            selectAndRevealCell(column, row);
+        }
+        catch (Exception ex) {
+            shell.getDisplay().beep();
+            Tools.showError(shell, I18n.text("message.errorLoadingData"), ex.getMessage());
+            log.debug("navigateToIndex(): unable to load Dataset coordinate", ex);
+        }
+    }
+
+    private void selectAndRevealCell(int column, int row)
+    {
+        dataTable.doCommand(new SelectCellCommand(selectionLayer, column, row, false, false));
+        dataTable.doCommand(new ShowCellInViewportCommand(column, row));
     }
 
     // Flip to previous 'frame' of Table data
