@@ -15,6 +15,7 @@
 package hdf.view.TableView;
 
 import hdf.view.DataView.DataView;
+import hdf.view.search.DatasetSearchSnapshot;
 
 /**
  *
@@ -84,4 +85,19 @@ public interface TableView extends DataView {
      * @return {@code true} when the view is no longer usable
      */
     default boolean isViewDisposed() { return false; }
+
+    /**
+     * Navigate the existing table to a zero-based Dataset coordinate.  The
+     * built-in TableView also selects and scrolls the corresponding cell; the
+     * default keeps external TableView implementations source-compatible.
+     *
+     * @param coordinate the full Dataset coordinate
+     */
+    default void navigateToIndex(long[] coordinate) {}
+
+    /**
+     * Return a transient snapshot of this view's unsaved Dataset buffer for a
+     * content search, or {@code null} when the view is clean/unsupported.
+     */
+    default DatasetSearchSnapshot getSearchSnapshot() { return null; }
 }

@@ -181,4 +181,25 @@ public interface TreeView {
      * @return the tree item that contains the given data object.
      */
     TreeItem findTreeItem(HObject obj);
+
+    /**
+     * Select an object using its HDF identity and make its TreeItem visible.
+     * Implementations with lazy tree population may expand the required
+     * ancestors.  The default keeps third-party TreeView implementations
+     * source-compatible.
+     *
+     * @param obj the object to select
+     * @return true when the object was located and selected
+     */
+    default boolean selectObject(HObject obj)
+    {
+        TreeItem item = findTreeItem(obj);
+        if (item == null || item.isDisposed())
+            return false;
+        Tree tree = getTree();
+        tree.deselectAll();
+        tree.setSelection(item);
+        tree.showItem(item);
+        return true;
+    }
 }
