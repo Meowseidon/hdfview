@@ -321,6 +321,7 @@ public class HDFView implements DataViewManager {
         catch (Exception ex) {
             log.debug("Failed to load View Properties from {}", rootDir);
         }
+        ensureDefaultViewModules();
 
         I18n.initialize(props);
 
@@ -356,6 +357,25 @@ public class HDFView implements DataViewManager {
         helpViews     = ViewProperties.getHelpViewList();
 
         log.debug("Constructor exit");
+    }
+
+    /**
+     * Keep a usable built-in view selection when a new or unreadable user
+     * properties file prevents ViewProperties.load() from finishing.  The
+     * normal properties path already installs these entries; this only
+     * restores the invariant required by DataViewFactoryProducer.
+     */
+    private void ensureDefaultViewModules()
+    {
+        List<List<String>> moduleLists = Arrays.asList(ViewProperties.getTreeViewList(),
+                                                        ViewProperties.getMetaDataViewList(),
+                                                        ViewProperties.getTableViewList(),
+                                                        ViewProperties.getImageViewList(),
+                                                        ViewProperties.getPaletteViewList());
+        for (List<String> moduleList : moduleLists) {
+            if (moduleList != null && moduleList.isEmpty())
+                moduleList.add(ViewProperties.DEFAULT_MODULE_TEXT);
+        }
     }
 
     /**
@@ -1672,7 +1692,23 @@ public class HDFView implements DataViewManager {
         // Recent files combo box
         urlBar = new Combo(shell, SWT.BORDER | SWT.SINGLE);
         urlBar.setFont(currentFont);
-        urlBar.setItems(ViewProperties.getMRF().toArray(new String[0]));
+        /*
+         * The first URL-combo entry is the working directory.  A freshly
+         * created or unavailable user-properties file can leave the in-memory
+         * recent-file list empty, but the open-file paths below still insert a
+         * file at index 1.  Restore that invariant here instead of allowing a
+         * normal Open/Open As action to fail with an SWT index error.
+         */
+        ArrayList<String> recentFiles = new ArrayList<>(ViewProperties.getMRF());
+        if (recentFiles.isEmpty()) {
+            String workDir = currentDir;
+            if (workDir == null || workDir.isEmpty())
+                workDir = System.getProperty("user.dir");
+            if (workDir != null && !workDir.isEmpty())
+                recentFiles.add(workDir);
+            ViewProperties.setRecentFiles(recentFiles);
+        }
+        urlBar.setItems(recentFiles.toArray(new String[0]));
         urlBar.setVisibleItemCount(ViewProperties.MAX_RECENT_FILES);
         urlBar.deselectAll();
         urlBar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
