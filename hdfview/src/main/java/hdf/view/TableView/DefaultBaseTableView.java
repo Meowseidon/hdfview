@@ -34,11 +34,13 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import hdf.object.CompoundDS;
 import hdf.object.DataFormat;
@@ -65,6 +67,8 @@ import hdf.view.dialog.MathConversionDialog;
 import hdf.view.dialog.NewDatasetDialog;
 import hdf.view.i18n.I18n;
 import hdf.view.search.DatasetSearchSnapshot;
+import hdf.view.statistics.DatasetStatisticsDialog;
+import hdf.view.statistics.DatasetStatisticsEngine;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -95,6 +99,8 @@ import org.eclipse.nebula.widgets.nattable.grid.layer.RowHeaderLayer;
 import org.eclipse.nebula.widgets.nattable.layer.DataLayer;
 import org.eclipse.nebula.widgets.nattable.layer.ILayer;
 import org.eclipse.nebula.widgets.nattable.layer.IUniqueIndexLayer;
+import org.eclipse.nebula.widgets.nattable.layer.LabelStack;
+import org.eclipse.nebula.widgets.nattable.layer.cell.IConfigLabelAccumulator;
 import org.eclipse.nebula.widgets.nattable.layer.config.DefaultColumnHeaderLayerConfiguration;
 import org.eclipse.nebula.widgets.nattable.layer.config.DefaultColumnHeaderStyleConfiguration;
 import org.eclipse.nebula.widgets.nattable.layer.config.DefaultRowHeaderLayerConfiguration;
@@ -160,7 +166,7 @@ import org.eclipse.swt.widgets.ToolItem;
  * @author jhenderson
  * @version 1.0 4/13/2018
  */
-public abstract class DefaultBaseTableView implements TableView {
+public abstract class DefaultBaseTableView implements TableView, DatasetStatisticsDialog.Host {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultBaseTableView.class);
 
@@ -272,6 +278,18 @@ public abstract class DefaultBaseTableView implements TableView {
     protected HDFDataProvider dataProvider;
     /** reference to the display converter. */
     protected HDFDisplayConverter dataDisplayConverter;
+
+    /** Stable NatTable label used for current-page statistics highlighting. */
+    private static final String STATISTICS_HIGHLIGHT_LABEL =
+        "HDFVIEW_STATISTICS_HIGHLIGHT";
+
+    /** Body-cell positions highlighted by the current statistics result. */
+    private final Set<Long> statisticsHighlightCells = new HashSet<>();
+
+    /** Current statistics dialog and its cooperative worker state. */
+    private DatasetStatisticsDialog statisticsDialog;
+    private AtomicBoolean statisticsCancel;
+    private long statisticsGeneration;
 
     /** Checkbox menu item for Fixed Data Length default. */
     protected MenuItem checkFixedDataLength = null;
@@ -799,6 +817,8 @@ public abstract class DefaultBaseTableView implements TableView {
         if (viewDisposed)
             return;
 
+        stopStatistics();
+
         // This is also a fallback for callers which dispose the parent directly
         // instead of going through disposeView() or a Shell close event.
         prepareForCleanup();
@@ -818,6 +838,20 @@ public abstract class DefaultBaseTableView implements TableView {
 
         if (!isEmbedded && viewer != null)
             viewer.removeDataView(DefaultBaseTableView.this);
+    }
+
+    /** Stop a worker before the Dataset or its TableView controls disappear. */
+    private void stopStatistics()
+    {
+        statisticsGeneration++;
+        if (statisticsCancel != null)
+            statisticsCancel.set(true);
+        statisticsCancel = null;
+
+        DatasetStatisticsDialog dialog = statisticsDialog;
+        statisticsDialog = null;
+        if (dialog != null)
+            dialog.dispose();
     }
 
     /**
@@ -1094,36 +1128,7 @@ public abstract class DefaultBaseTableView implements TableView {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                try {
-                    Object theData = getSelectedData();
-
-                    if (dataObject instanceof CompoundDS) {
-                        int cols = selectionLayer.getFullySelectedColumnPositions().length;
-                        if (cols != 1) {
-                            Tools.showError(theShell, I18n.text("action.statistics"),
-                                            I18n.text("message.statisticsOneColumn"));
-                            return;
-                        }
-                    }
-                    else if (theData == null) {
-                        theData = dataValue;
-                    }
-
-                    double[] minmax = new double[2];
-                    double[] stat   = new double[2];
-
-                    Tools.findMinMax(theData, minmax, fillValue);
-                    if (Tools.computeStatistics(theData, stat, fillValue) > 0) {
-                        String stats = I18n.text("message.statistics", minmax[0], minmax[1], stat[0], stat[1]);
-                        Tools.showInformation(theShell, I18n.text("action.statistics"), stats);
-                    }
-
-                    System.gc();
-                }
-                catch (Exception ex) {
-                    theShell.getDisplay().beep();
-                    Tools.showError(shell, I18n.text("action.statistics"), ex.getMessage());
-                }
+                showStatistics(theShell);
             }
         });
 
@@ -1266,6 +1271,57 @@ public abstract class DefaultBaseTableView implements TableView {
         });
 
         return menuBar;
+    }
+
+    /**
+     * Open the unified Dataset statistics view while retaining the historical
+     * CompoundDS one-column dialog path.
+     */
+    private void showStatistics(Shell theShell)
+    {
+        try {
+            if (dataObject instanceof CompoundDS) {
+                showLegacyStatistics(theShell);
+                return;
+            }
+
+            if (!(dataObject instanceof Dataset) || dataValue == null) {
+                Tools.showError(theShell, I18n.text("action.statistics"),
+                                I18n.text("statistics.noData"));
+                return;
+            }
+
+            if (statisticsDialog == null || !statisticsDialog.isOpen())
+                statisticsDialog = new DatasetStatisticsDialog(theShell, this);
+            statisticsDialog.open();
+            startStatistics(statisticsDialog, DatasetStatisticsEngine.Scope.CURRENT_PAGE);
+        }
+        catch (Exception ex) {
+            theShell.getDisplay().beep();
+            Tools.showError(theShell, I18n.text("action.statistics"), ex.getMessage());
+        }
+    }
+
+    /** Preserve the existing min/max/mean/sample-standard-deviation behavior. */
+    private void showLegacyStatistics(Shell theShell)
+    {
+        Object theData = getSelectedData();
+        int cols = selectionLayer.getFullySelectedColumnPositions().length;
+        if (cols != 1) {
+            Tools.showError(theShell, I18n.text("action.statistics"),
+                            I18n.text("message.statisticsOneColumn"));
+            return;
+        }
+        if (theData == null)
+            theData = dataValue;
+
+        double[] minmax = new double[2];
+        double[] stat   = new double[2];
+        Tools.findMinMax(theData, minmax, fillValue);
+        if (Tools.computeStatistics(theData, stat, fillValue) > 0) {
+            String stats = I18n.text("message.statistics", minmax[0], minmax[1], stat[0], stat[1]);
+            Tools.showInformation(theShell, I18n.text("action.statistics"), stats);
+        }
     }
 
     /**
@@ -1448,6 +1504,162 @@ public abstract class DefaultBaseTableView implements TableView {
     }
 
     @Override
+    public String getStatisticsDatasetLabel()
+    {
+        return dataObject == null ? "" : ((HObject)dataObject).getFullName();
+    }
+
+    @Override
+    public String getStatisticsPageLabel()
+    {
+        if (dataObject == null)
+            return "";
+
+        int[] selectedIndex = dataObject.getSelectedIndex();
+        long[] start = dataObject.getStartDims();
+        if (dataObject.getRank() < 3 || selectedIndex == null || start == null)
+            return I18n.text("statistics.currentPage");
+
+        StringBuilder indices = new StringBuilder();
+        for (int i = 2; i < selectedIndex.length; i++) {
+            if (indices.length() > 0)
+                indices.append(", ");
+            int dimension = selectedIndex[i];
+            indices.append(dimension < start.length ? start[dimension] : 0);
+        }
+        return I18n.text("statistics.page", indices.toString());
+    }
+
+    @Override
+    public void startStatistics(DatasetStatisticsDialog dialog, DatasetStatisticsEngine.Scope scope)
+    {
+        if (dialog == null || dataObject == null || !(dataObject instanceof Dataset))
+            return;
+
+        if (statisticsCancel != null)
+            statisticsCancel.set(true);
+        final long generation = ++statisticsGeneration;
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+        statisticsCancel = cancelled;
+        statisticsDialog = dialog;
+        dialog.showRunning(scope);
+
+        final DatasetStatisticsEngine.Request request;
+        try {
+            request = captureStatisticsRequest();
+        }
+        catch (Exception ex) {
+            dialog.showError(statisticsError(ex));
+            return;
+        }
+
+        Thread worker = new Thread(() -> {
+            try {
+                DatasetStatisticsEngine.Result result =
+                    DatasetStatisticsEngine.compute(request, scope, cancelled,
+                        (processed, total, phase) -> display.asyncExec(() -> {
+                            if (isStatisticsActive(dialog, generation))
+                                dialog.updateProgress(processed, total);
+                        }));
+                display.asyncExec(() -> {
+                    if (isStatisticsActive(dialog, generation))
+                        dialog.showResult(result);
+                });
+            }
+            catch (DatasetStatisticsEngine.StatisticsCancelled ex) {
+                display.asyncExec(() -> {
+                    if (isStatisticsActive(dialog, generation))
+                        dialog.showCancelled();
+                });
+            }
+            catch (Exception ex) {
+                display.asyncExec(() -> {
+                    if (isStatisticsActive(dialog, generation))
+                        dialog.showError(statisticsError(ex));
+                });
+            }
+        }, "hdfview-dataset-statistics");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    @Override
+    public void cancelStatistics(DatasetStatisticsDialog dialog)
+    {
+        if (dialog == statisticsDialog && statisticsCancel != null)
+            statisticsCancel.set(true);
+    }
+
+    @Override
+    public void highlightStatistics(DatasetStatisticsEngine.Kind kind)
+    {
+        if (dataTable == null || dataLayer == null || dataProvider == null)
+            return;
+
+        commitActiveCellEditor();
+        statisticsHighlightCells.clear();
+        try {
+            int rows = dataProvider.getRowCount();
+            int columns = dataProvider.getColumnCount();
+            for (int row = 0; row < rows; row++) {
+                for (int column = 0; column < columns; column++) {
+                    Object value = dataLayer.getDataValueByPosition(column, row);
+                    if (value != null && DatasetStatisticsEngine.matches(value, kind))
+                        statisticsHighlightCells.add(cellKey(column, row));
+                }
+            }
+        }
+        catch (RuntimeException ex) {
+            log.debug("highlightStatistics(): unsupported table value", ex);
+            statisticsHighlightCells.clear();
+        }
+        dataTable.doCommand(new VisualRefreshCommand());
+    }
+
+    @Override
+    public void clearStatisticsHighlight()
+    {
+        statisticsHighlightCells.clear();
+        if (dataTable != null && !dataTable.isDisposed())
+            dataTable.doCommand(new VisualRefreshCommand());
+    }
+
+    private DatasetStatisticsEngine.Request captureStatisticsRequest()
+    {
+        commitActiveCellEditor();
+        if (!(dataObject instanceof Dataset) || dataValue == null)
+            throw new IllegalStateException(I18n.text("statistics.noData"));
+
+        HObject object = (HObject)dataObject;
+        FileFormat file = object.getFileFormat();
+        DatasetSearchSnapshot currentPage = new DatasetSearchSnapshot(
+            file == null ? null : file.getFilePath(), object.getFullName(), dataValue,
+            dataObject.getStartDims(), dataObject.getSelectedDims(), dataObject.getStride(),
+            dataObject.getDims(), dataObject.getDatatype());
+        DatasetSearchSnapshot dirtyPage = getSearchSnapshot();
+        return new DatasetStatisticsEngine.Request((Dataset)dataObject, currentPage, dirtyPage, fillValue);
+    }
+
+    private boolean isStatisticsActive(DatasetStatisticsDialog dialog, long generation)
+    {
+        return generation == statisticsGeneration && dialog == statisticsDialog &&
+               dialog.isOpen() && !display.isDisposed();
+    }
+
+    private String statisticsError(Exception ex)
+    {
+        String message = ex == null ? "" : ex.getMessage();
+        if (ex instanceof UnsupportedOperationException)
+            return I18n.text("statistics.unsupported", message == null ? "" : message);
+        return message == null || message.length() == 0 ? ex.getClass().getSimpleName() : message;
+    }
+
+    private static long cellKey(int column, int row)
+    {
+        return (((long)row) << 32) ^ (column & 0xffffffffL);
+    }
+
+    @Override
     public Object getTable()
     {
         return dataTable;
@@ -1480,12 +1692,37 @@ public abstract class DefaultBaseTableView implements TableView {
     public DataLayer getDataLayer() { return dataLayer; }
 
     /**
+     * Add current-page statistics highlighting without replacing NatTable's
+     * existing data-layer label accumulator.
+     */
+    protected final void configureStatisticsHighlighting()
+    {
+        if (dataLayer == null)
+            return;
+
+        final IConfigLabelAccumulator previous = dataLayer.getConfigLabelAccumulator();
+        dataLayer.setConfigLabelAccumulator(new IConfigLabelAccumulator() {
+            @Override
+            public void accumulateConfigLabels(LabelStack configLabels,
+                                                int columnPosition, int rowPosition)
+            {
+                if (previous != null)
+                    previous.accumulateConfigLabels(configLabels, columnPosition, rowPosition);
+                if (statisticsHighlightCells.contains(cellKey(columnPosition, rowPosition)))
+                    configLabels.addLabelOnTop(STATISTICS_HIGHLIGHT_LABEL);
+            }
+        });
+    }
+
+    /**
      * refresh the data table.
      */
     @Override
     public void refreshDataTable()
     {
         log.trace("refreshDataTable()");
+
+        clearStatisticsHighlight();
 
         shell.setCursor(display.getSystemCursor(SWT.CURSOR_WAIT));
         dataValue = dataObject.refreshData();
@@ -1514,6 +1751,8 @@ public abstract class DefaultBaseTableView implements TableView {
     {
         if (dataObject == null || dataTable == null || selectionLayer == null)
             return;
+
+        clearStatisticsHighlight();
 
         int rank = dataObject.getRank();
         long[] dims = dataObject.getDims();
@@ -1690,6 +1929,8 @@ public abstract class DefaultBaseTableView implements TableView {
         // Only valid operation if data object has 3 or more dimensions
         if (dataObject.getRank() < 3 || idx == (curDataFrame - indexBase))
             return;
+
+        clearStatisticsHighlight();
 
         // Make sure to save any changes to this frame of data before changing frames
         if (dataProvider.getIsValueChanged())
@@ -2690,6 +2931,22 @@ public abstract class DefaultBaseTableView implements TableView {
 
                     configRegistry.registerConfigAttribute(CellConfigAttributes.CELL_STYLE, cellStyle,
                                                            DisplayMode.SELECT, GridRegion.BODY);
+
+                    Style statisticsStyle = new Style();
+                    statisticsStyle.setAttributeValue(CellStyleAttributes.HORIZONTAL_ALIGNMENT,
+                                                       HorizontalAlignmentEnum.LEFT);
+                    statisticsStyle.setAttributeValue(CellStyleAttributes.BACKGROUND_COLOR,
+                                                       Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW));
+                    statisticsStyle.setAttributeValue(CellStyleAttributes.FOREGROUND_COLOR,
+                                                       Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
+                    if (curFont != null)
+                        statisticsStyle.setAttributeValue(CellStyleAttributes.FONT, curFont);
+                    configRegistry.registerConfigAttribute(CellConfigAttributes.CELL_STYLE,
+                                                           statisticsStyle, DisplayMode.NORMAL,
+                                                           STATISTICS_HIGHLIGHT_LABEL);
+                    configRegistry.registerConfigAttribute(CellConfigAttributes.CELL_STYLE,
+                                                           statisticsStyle, DisplayMode.SELECT,
+                                                           STATISTICS_HIGHLIGHT_LABEL);
 
                     // Add data display conversion capability
                     try {

@@ -170,6 +170,7 @@ public class DefaultCompoundDSTableView extends DefaultBaseTableView implements 
                       dataProvider.getColumnCount());
 
             dataLayer = new DataLayer(dataProvider);
+            configureStatisticsHighlighting();
         }
         catch (Exception ex) {
             log.debug("createTable(): failed to retrieve DataProvider for table: ", ex);
