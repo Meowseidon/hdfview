@@ -32,7 +32,7 @@ REM ============================================================================
 set "PROPS_FILE=build.properties"
 if not exist "%PROPS_FILE%" (
     echo [ERROR] build.properties file not found!
-    exit /b 1
+    goto :failure
 )
 
 echo [INFO] Loading build.properties...
@@ -63,11 +63,11 @@ REM ============================================================================
 echo [INFO] Checking project structure...
 if not exist "pom.xml" (
     echo [ERROR] Not in HDFView project root directory
-    exit /b 1
+    goto :failure
 )
 if not exist "%PROPS_FILE%" (
     echo [ERROR] build.properties not found
-    exit /b 1
+    goto :failure
 )
 echo [OK] Found project files
 echo.
@@ -111,7 +111,7 @@ java -version >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Java not found in PATH
     echo [ERROR] Please install Java 21 or later
-    exit /b 1
+    goto :failure
 )
 
 REM Get and parse Java version. Java 8-style versions such as 1.8.0_XXX
@@ -121,7 +121,7 @@ for /f "tokens=3" %%v in ('java -version 2^>^&1 ^| findstr /i /c:"version"') do 
 if not defined JAVA_VERSION (
     echo [ERROR] Could not parse the Java version reported by java -version
     echo [ERROR] Java 21 or later is required
-    exit /b 1
+    goto :failure
 )
 set "JAVA_MAJOR="
 set "JAVA_MINOR="
@@ -133,19 +133,19 @@ if "!JAVA_MAJOR!"=="1" set "JAVA_MAJOR=!JAVA_MINOR!"
 if not defined JAVA_MAJOR (
     echo [ERROR] Could not parse the Java major version from !JAVA_VERSION!
     echo [ERROR] Java 21 or later is required
-    exit /b 1
+    goto :failure
 )
 set "JAVA_MAJOR_INVALID="
 for /f "delims=0123456789" %%x in ("!JAVA_MAJOR!") do set "JAVA_MAJOR_INVALID=1"
 if defined JAVA_MAJOR_INVALID (
     echo [ERROR] Could not parse the Java major version from !JAVA_VERSION!
     echo [ERROR] Java 21 or later is required
-    exit /b 1
+    goto :failure
 )
 set /a JAVA_MAJOR_NUM=!JAVA_MAJOR! >nul 2>&1
 if !JAVA_MAJOR_NUM! LSS 21 (
     echo [ERROR] Java !JAVA_VERSION! detected ^(major !JAVA_MAJOR_NUM!^); Java 21 or later is required
-    exit /b 1
+    goto :failure
 )
 echo [OK] Java !JAVA_VERSION! detected ^(major !JAVA_MAJOR_NUM!^; Java 21+ requirement satisfied^)
 echo.
@@ -154,12 +154,12 @@ REM Check HDF5 libraries
 echo [INFO] Checking HDF5 libraries...
 if "!hdf5_lib_dir!"=="" (
     echo [ERROR] hdf5.lib.dir not configured in build.properties
-    exit /b 1
+    goto :failure
 )
 if not exist "!hdf5_lib_dir!" (
     echo [ERROR] HDF5 library directory not found: !hdf5_lib_dir!
     echo [ERROR] Set hdf5.lib.dir in build.properties
-    exit /b 1
+    goto :failure
 )
 echo [OK] HDF5 library directory found: !hdf5_lib_dir!
 
@@ -199,7 +199,7 @@ if /i "!LAUNCH_MODE!"=="choose" (
     if "!CHOICE!"=="3" set "LAUNCH_MODE=validate"
     if not "!CHOICE!"=="1" if not "!CHOICE!"=="2" if not "!CHOICE!"=="3" (
         echo [ERROR] Invalid choice. Exiting.
-        exit /b 1
+        goto :failure
     )
     echo.
 )
@@ -223,14 +223,14 @@ for %%f in (libs\hdfview-*.jar) do (
 if "!HDFVIEW_JAR!"=="" (
     echo [ERROR] HDFView JAR not found: libs\hdfview-*.jar
     echo [ERROR] Build the project first: mvn -pl hdfview -am package -DskipTests -B
-    exit /b 1
+    goto :failure
 )
 for %%f in (!HDFVIEW_JAR!) do set "HDFVIEW_JAR_NAME=%%~nxf"
 echo [OK] HDFView JAR found: !HDFVIEW_JAR_NAME!
 if not exist "hdfview\target\lib" (
     echo [ERROR] Dependencies not found: hdfview\target\lib
     echo [ERROR] Build the project first: mvn -pl hdfview -am package -DskipTests -B
-    exit /b 1
+    goto :failure
 )
 echo [OK] HDFView runtime dependencies found: hdfview\target\lib
 echo.
@@ -282,7 +282,7 @@ call mvn -version >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Maven not found in PATH
     echo [ERROR] Please install Maven 3.6 or later for --maven mode
-    exit /b 1
+    goto :failure
 )
 set "MVN_VERSION="
 for /f "tokens=3" %%v in ('call mvn -version 2^>^&1 ^| findstr /i /c:"Apache Maven"') do if not defined MVN_VERSION set "MVN_VERSION=%%v"
@@ -292,19 +292,24 @@ echo [INFO] Launching HDFView via Maven...
 echo Command: mvn exec:java -Dexec.mainClass="hdf.view.HDFView" -pl hdfview
 echo.
 call mvn exec:java -Dexec.mainClass="hdf.view.HDFView" -pl hdfview
+set "LAUNCH_EXIT_CODE=!ERRORLEVEL!"
+if not "!LAUNCH_EXIT_CODE!"=="0" (
+    echo [ERROR] Maven launch exited with code !LAUNCH_EXIT_CODE!.
+    goto :failure
+)
 goto :end
 
 :jar_exec
 echo [INFO] Launching HDFView via direct JAR execution...
 if "!HDFVIEW_JAR!"=="" (
     echo [ERROR] JAR file not found. Build the project first.
-    exit /b 1
+    goto :failure
 )
 
 if not exist "hdfview\target\lib" (
     echo [ERROR] Dependencies not found: hdfview\target\lib
     echo [ERROR] Build the project first: mvn -pl hdfview -am package -DskipTests -B
-    exit /b 1
+    goto :failure
 )
 
 REM Build classpath, excluding slf4j-nop or slf4j-simple based on debug mode
@@ -325,6 +330,11 @@ for %%j in (hdfview\target\lib\*.jar) do (
 echo Command: java %JVM_ARGS% -cp "..." hdf.view.HDFView
 echo.
 java %JVM_ARGS% -cp "%CLASSPATH%" hdf.view.HDFView
+set "LAUNCH_EXIT_CODE=!ERRORLEVEL!"
+if not "!LAUNCH_EXIT_CODE!"=="0" (
+    echo [ERROR] Direct JAR launch exited with code !LAUNCH_EXIT_CODE!.
+    goto :failure
+)
 goto :end
 
 :validate
@@ -340,4 +350,13 @@ goto :end
 :end
 echo.
 echo [OK] Script completed!
-endlocal
+endlocal & exit /b 0
+
+:failure
+echo.
+echo [ERROR] HDFView launcher stopped because the preceding check or launch failed.
+if /i not "%HDFVIEW_NO_PAUSE%"=="1" (
+    echo [INFO] Press any key to close this window.
+    pause >nul
+)
+endlocal & exit /b 1
