@@ -304,6 +304,21 @@
                       <flattenmapper/>
                     </copy>
 
+                    <!-- SWT keeps its platform library inside the SWT dependency JAR. -->
+                    <!-- Extract it to a stable app-local directory because the packaged -->
+                    <!-- launcher cannot rely on SWT's development-time temp extraction. -->
+                    <echo message="Extracting SWT native libraries from ${swt.artifactId}-${swt.version}.jar..."/>
+                    <unzip src="${project.build.directory}/lib/${swt.artifactId}-${swt.version}.jar"
+                           dest="${jpackage.input}/native">
+                      <patternset>
+                        <include name="*.dll"/>
+                        <include name="*.so"/>
+                        <include name="*.so.*"/>
+                        <include name="*.dylib"/>
+                      </patternset>
+                      <flattenmapper/>
+                    </unzip>
+
                     <!-- Copy HDF native libraries if available -->
                     <!-- Extension patterns set by OS-specific profiles (platform-linux, platform-mac, platform-windows) -->
                     <echo message="Copying HDF5 native libraries from ${hdf5.lib.dir}..."/>
@@ -312,6 +327,35 @@
                         <include name="${native.lib.extension}"/>
                         <include name="${native.lib.extension.versioned}"/>
                         <include name="*.jar"/>
+                      </fileset>
+                    </copy>
+
+                    <!-- The object module prepares the JNI wrappers in target/bin. -->
+                    <!-- Copy all platform native files there so the app-image contains -->
+                    <!-- the same HDF runtime that the development launcher uses. -->
+                    <echo message="Copying prepared HDF native libraries from ${project.basedir}/../target/bin..."/>
+                    <copy todir="${jpackage.input}" failonerror="false" flatten="true">
+                      <fileset dir="${project.basedir}/../target/bin" erroronmissingdir="false">
+                        <include name="${native.lib.extension}"/>
+                        <include name="${native.lib.extension.versioned}"/>
+                      </fileset>
+                    </copy>
+
+                    <!-- Also collect dependent runtime DLLs from the vendor bin folders. -->
+                    <!-- hdf*.lib.dir normally points to lib; ../bin also works when a -->
+                    <!-- Windows installation is configured directly at its bin folder. -->
+                    <echo message="Copying HDF5 runtime dependencies from ${hdf5.lib.dir}/../bin..."/>
+                    <copy todir="${jpackage.input}" failonerror="false" flatten="true">
+                      <fileset dir="${hdf5.lib.dir}/../bin" erroronmissingdir="false">
+                        <include name="${native.lib.extension}"/>
+                        <include name="${native.lib.extension.versioned}"/>
+                      </fileset>
+                    </copy>
+                    <echo message="Copying HDF4 runtime dependencies from ${hdf.lib.dir}/../bin..."/>
+                    <copy todir="${jpackage.input}" failonerror="false" flatten="true">
+                      <fileset dir="${hdf.lib.dir}/../bin" erroronmissingdir="false">
+                        <include name="${native.lib.extension}"/>
+                        <include name="${native.lib.extension.versioned}"/>
                       </fileset>
                     </copy>
 
@@ -440,6 +484,8 @@
                     <argument>-Xmx1024M</argument>
                     <argument>--java-options</argument>
                     <argument>-Djava.library.path=$APPDIR</argument>
+                    <argument>--java-options</argument>
+                    <argument>-Dswt.library.path=$APPDIR/native</argument>
                     <argument>--java-options</argument>
                     <argument>-Dhdfview.root=$APPDIR</argument>
                   </arguments>

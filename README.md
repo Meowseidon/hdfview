@@ -75,6 +75,9 @@ mvn -pl object,hdfview -am verify -Pjpackage-app-image,jpackage-win-base -DskipT
 ```
 
 The verified app-image is the directory `hdfview\target\dist\HDFView`, with launcher `hdfview\target\dist\HDFView\HDFView.exe` and bundled `runtime` directory. It is portable and already contains a jpackage runtime.
+The app-image also carries the SWT Windows native libraries under `app\native` and the HDF5/HDF4 native runtime DLLs beside the launcher, so starting `HDFView.exe` from this directory does not depend on the source checkout's native-library paths.
+
+When `run-hdfview.bat` is started by double-click and a validation or launch step fails, it keeps the console open and waits for a key so the real error remains visible. Set `HDFVIEW_NO_PAUSE=1` when invoking it from automation or another console and a failure returns a non-zero exit code without waiting.
 
 Generate the Windows MSI only after the app-image exists:
 
