@@ -64,6 +64,7 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Dialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
@@ -110,10 +111,10 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
     protected final TabFolder contentTabFolder;
 
     /** The attribute metadata pane. */
-    protected final Composite attributeInfoPane;
+    protected Composite attributeInfoPane;
 
     /** The general metadata pane. */
-    protected final Composite generalObjectInfoPane;
+    protected Composite generalObjectInfoPane;
 
     /** The current font. */
     protected Font curFont;
@@ -142,6 +143,10 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
 
     private static final int ATTR_TAB_INDEX    = 0;
     private static final int GENERAL_TAB_INDEX = 1;
+
+    /** Top-level tabs which can be reused when the selected object changes. */
+    private TabItem attributeInfoItem;
+    private TabItem generalInfoItem;
 
     /** Whether the caller supplied the long-lived host TabFolder. */
     private final boolean usesParentTabFolder;
@@ -227,23 +232,19 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             });
         }
 
-        attributeInfoPane = createAttributeInfoPane(contentTabFolder, dataObject);
-        if (attributeInfoPane != null) {
-            TabItem attributeInfoItem = usesParentTabFolder
-                ? new TabItem(contentTabFolder, SWT.NONE)
-                : new TabItem(contentTabFolder, SWT.NONE, ATTR_TAB_INDEX);
-            I18n.bind(attributeInfoItem, "tab.objectAttributeInfo");
-            attributeInfoItem.setControl(attributeInfoPane);
-        }
+        attributeInfoItem = getOrCreateTabItem(MetaDataView.TAB_ROLE_ATTRIBUTE_INFO,
+                                                ATTR_TAB_INDEX, "tab.objectAttributeInfo");
+        attributeInfoPane = getOrCreatePageComposite(attributeInfoItem);
+        clearPageContents(attributeInfoPane);
+        if (attributeInfoPane != null)
+            createAttributeInfoPane(attributeInfoPane, dataObject);
 
-        generalObjectInfoPane = createGeneralObjectInfoPane(contentTabFolder, dataObject);
-        if (generalObjectInfoPane != null) {
-            TabItem generalInfoItem = usesParentTabFolder
-                ? new TabItem(contentTabFolder, SWT.NONE)
-                : new TabItem(contentTabFolder, SWT.NONE, GENERAL_TAB_INDEX);
-            I18n.bind(generalInfoItem, "tab.generalObjectInfo");
-            generalInfoItem.setControl(generalObjectInfoPane);
-        }
+        generalInfoItem = getOrCreateTabItem(MetaDataView.TAB_ROLE_GENERAL_INFO,
+                                              GENERAL_TAB_INDEX, "tab.generalObjectInfo");
+        generalObjectInfoPane = getOrCreatePageComposite(generalInfoItem);
+        clearPageContents(generalObjectInfoPane);
+        if (generalObjectInfoPane != null)
+            createGeneralObjectInfoPane(generalObjectInfoPane, dataObject);
 
         /* Add any extra information depending on the object type */
         try {
@@ -265,6 +266,64 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             if (lastTabObject != null) {
                 contentTabFolder.setSelection((int)lastTabObject);
             }
+        }
+    }
+
+    /**
+     * Find an existing top-level metadata tab or create it for a standalone
+     * metadata view. The TabItem itself remains owned by the main window.
+     */
+    private TabItem getOrCreateTabItem(String role, int standaloneIndex, String titleKey)
+    {
+        TabItem tab = null;
+        if (usesParentTabFolder) {
+            for (TabItem item : contentTabFolder.getItems()) {
+                if (role.equals(item.getData(MetaDataView.TAB_ROLE_KEY))) {
+                    tab = item;
+                    break;
+                }
+            }
+        }
+
+        if (tab == null) {
+            tab = usesParentTabFolder
+                ? new TabItem(contentTabFolder, SWT.NONE)
+                : new TabItem(contentTabFolder, SWT.NONE, standaloneIndex);
+            tab.setData(MetaDataView.TAB_ROLE_KEY, role);
+        }
+
+        I18n.bind(tab, titleKey);
+        return tab;
+    }
+
+    /** Return the persistent page Composite used by a metadata TabItem. */
+    private Composite getOrCreatePageComposite(TabItem tab)
+    {
+        if (tab == null)
+            return null;
+
+        Control control = tab.getControl();
+        if (control instanceof Composite && !control.isDisposed())
+            return (Composite)control;
+
+        if (control != null && !control.isDisposed())
+            control.dispose();
+
+        Composite page = new Composite(contentTabFolder, SWT.NONE);
+        page.setLayout(new GridLayout(1, false));
+        tab.setControl(page);
+        return page;
+    }
+
+    /** Remove only the object-specific children from a persistent page. */
+    private void clearPageContents(Composite page)
+    {
+        if (page == null || page.isDisposed())
+            return;
+
+        for (Control child : page.getChildren()) {
+            if (!child.isDisposed())
+                child.dispose();
         }
     }
 
@@ -495,6 +554,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
         generalInfoGroup.setFont(curFont);
         generalInfoGroup.setLayout(new GridLayout(2, false));
         generalInfoGroup.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+        generalInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         /* Object name section */
         label = new Label(generalInfoGroup, SWT.LEFT);

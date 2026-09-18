@@ -26,6 +26,18 @@ import hdf.view.DataView.DataView;
  * @version 2.4 9/6/2007
  */
 public interface MetaDataView extends DataView {
+    /** Data key used to identify a reusable top-level metadata tab. */
+    String TAB_ROLE_KEY = "hdfview.metadata.tabRole";
+
+    /** Stable role for the Object Attribute Info tab. */
+    String TAB_ROLE_ATTRIBUTE_INFO = "objectAttributeInfo";
+
+    /** Stable role for the General Object Info tab. */
+    String TAB_ROLE_GENERAL_INFO = "generalObjectInfo";
+
+    /** Stable role for the optional inline Data Content tab. */
+    String TAB_ROLE_DATA_CONTENT = "dataContent";
+
     /**
      * Add an attribute to a data object.
      *

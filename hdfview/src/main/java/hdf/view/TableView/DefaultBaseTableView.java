@@ -136,6 +136,7 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Dialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
@@ -172,6 +173,10 @@ public abstract class DefaultBaseTableView implements TableView {
 
     /** Whether the TableView has released its data and GUI resources. */
     private boolean viewDisposed = false;
+    /** Whether active editing and pending changes have been handled. */
+    private boolean cleanupPrepared = false;
+    /** Listener installed on an embedded host for its final disposal. */
+    private DisposeListener parentDisposeListener;
     /** The current font. */
     protected Font curFont;
 
@@ -343,13 +348,14 @@ public abstract class DefaultBaseTableView implements TableView {
          * When the table is closed, make sure to prompt the user about saving their
          * changes, then do any pending cleanup work.
          */
-        viewParent.addDisposeListener(new DisposeListener() {
+        parentDisposeListener = new DisposeListener() {
             @Override
             public void widgetDisposed(DisposeEvent e)
             {
                 cleanupView();
             }
-        });
+        };
+        viewParent.addDisposeListener(parentDisposeListener);
 
         /* Grab the current font to be used for all GUI components */
         try {
@@ -683,8 +689,9 @@ public abstract class DefaultBaseTableView implements TableView {
     /**
      * Dispose this TableView in either standalone or embedded mode.
      *
-     * <p>For embedded views this disposes only the TableView-owned root Composite;
-     * the host HDFView window and its TabFolder remain alive.</p>
+     * <p>For embedded views this disposes only the TableView-owned child controls;
+     * the host Composite, HDFView window, and TabFolder remain alive so the page
+     * can be rebound to another Dataset.</p>
      */
     @Override
     public void disposeView()
@@ -692,12 +699,14 @@ public abstract class DefaultBaseTableView implements TableView {
         if (viewDisposed)
             return;
 
-        commitActiveCellEditor();
-
-        if (viewParent.isDisposed())
+        if (isEmbedded)
+            disposeEmbeddedControls();
+        else if (viewParent.isDisposed())
             cleanupView();
-        else
+        else {
+            prepareForCleanup();
             viewParent.dispose();
+        }
     }
 
     @Override
@@ -741,14 +750,13 @@ public abstract class DefaultBaseTableView implements TableView {
         }
     }
 
-    /** Perform the common close/dispose cleanup exactly once. */
-    private void cleanupView()
+    /** Prepare active editing and pending changes exactly once. */
+    private void prepareForCleanup()
     {
-        if (viewDisposed)
+        if (cleanupPrepared)
             return;
 
-        // This is also a fallback for callers which dispose the parent directly
-        // instead of going through disposeView() or a Shell close event.
+        cleanupPrepared = true;
         commitActiveCellEditor();
 
         if (dataProvider != null && dataProvider.getIsValueChanged() && !isReadOnly && dataObject != null) {
@@ -758,12 +766,50 @@ public abstract class DefaultBaseTableView implements TableView {
             else
                 dataObject.clearData();
         }
+    }
+
+    /** Dispose embedded TableView controls while retaining their host Composite. */
+    private void disposeEmbeddedControls()
+    {
+        if (viewParent.isDisposed()) {
+            cleanupView();
+            return;
+        }
+
+        prepareForCleanup();
+
+        Menu viewMenu = viewParent.getMenu();
+        if (viewMenu != null && !viewMenu.isDisposed())
+            viewMenu.dispose();
+
+        for (Control child : viewParent.getChildren()) {
+            if (!child.isDisposed())
+                child.dispose();
+        }
+
+        cleanupView();
+    }
+
+    /** Perform the common close/dispose cleanup exactly once. */
+    private void cleanupView()
+    {
+        if (viewDisposed)
+            return;
+
+        // This is also a fallback for callers which dispose the parent directly
+        // instead of going through disposeView() or a Shell close event.
+        prepareForCleanup();
 
         dataValue = null;
         dataTable = null;
 
         if (curFont != null && !curFont.isDisposed())
             curFont.dispose();
+
+        if (parentDisposeListener != null && !viewParent.isDisposed()) {
+            viewParent.removeDisposeListener(parentDisposeListener);
+            parentDisposeListener = null;
+        }
 
         viewDisposed = true;
 
