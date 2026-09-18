@@ -118,6 +118,8 @@ class DatasetStatisticsEngineTest {
             assertThrows(UnsupportedOperationException.class,
                          () -> DatasetStatisticsEngine.computeCurrentPage(
                              new String[] {"text"}, text.getDatatype(), null, new AtomicBoolean()));
+            assertThrows(UnsupportedOperationException.class,
+                         () -> DatasetStatisticsEngine.matches("text", DatasetStatisticsEngine.Kind.ZERO));
         }
     }
 

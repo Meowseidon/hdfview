@@ -53,6 +53,9 @@ public final class DatasetStatisticsDialog {
         /** Highlight one classification in the current displayed page. */
         void highlightStatistics(DatasetStatisticsEngine.Kind kind);
 
+        /** Return the classification currently highlighted in the TableView. */
+        DatasetStatisticsEngine.Kind getStatisticsHighlightKind();
+
         /** Clear current-page statistics highlighting. */
         void clearStatisticsHighlight();
     }
@@ -89,8 +92,11 @@ public final class DatasetStatisticsDialog {
     private Button calculateButton;
     private Button cancelButton;
     private Button closeButton;
+    private Label activeHighlightLabel;
+    private Button[] highlightButtons;
     private Table resultTable;
     private boolean running;
+    private boolean hasSuccessfulResult;
     private String statusKey = "statistics.status.ready";
     private Object[] statusArgs = new Object[0];
 
@@ -197,9 +203,17 @@ public final class DatasetStatisticsDialog {
         Label hint = new Label(highlightGroup, SWT.WRAP);
         I18n.bind(hint, "statistics.highlightHint");
         hint.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 5, 1));
+
+        activeHighlightLabel = new Label(highlightGroup, SWT.WRAP);
+        activeHighlightLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 5, 1));
+        I18n.bindDynamic(activeHighlightLabel, this::activeHighlightText);
+
+        highlightButtons = new Button[HIGHLIGHT_KEYS.length];
         for (int i = 0; i < HIGHLIGHT_KEYS.length; i++) {
             Button button = new Button(highlightGroup, SWT.PUSH);
+            highlightButtons[i] = button;
             I18n.bind(button, HIGHLIGHT_KEYS[i]);
+            button.setEnabled(false);
             final DatasetStatisticsEngine.Kind kind = highlightKind(i);
             button.addSelectionListener(new SelectionAdapter() {
                 @Override
@@ -207,6 +221,7 @@ public final class DatasetStatisticsDialog {
                 {
                     if (host != null)
                         host.highlightStatistics(kind);
+                    refreshHighlightState();
                 }
             });
         }
@@ -219,6 +234,7 @@ public final class DatasetStatisticsDialog {
             {
                 if (host != null)
                     host.clearStatisticsHighlight();
+                refreshHighlightState();
             }
         });
 
@@ -238,6 +254,7 @@ public final class DatasetStatisticsDialog {
         shell.setSize(new Point(560, 600));
         shell.open();
         shell.layout(true, true);
+        refreshHighlightState();
     }
 
     /** @return whether the window currently exists and is open. */
@@ -262,6 +279,7 @@ public final class DatasetStatisticsDialog {
         if (scopeCombo != null)
             scopeCombo.select(scope == DatasetStatisticsEngine.Scope.ENTIRE_DATASET ? 1 : 0);
         running = true;
+        setHighlightButtonsEnabled(false);
         setStatus("statistics.status.running");
         progressBar.setSelection(0);
         calculateButton.setEnabled(false);
@@ -285,6 +303,8 @@ public final class DatasetStatisticsDialog {
         if (!isOpen())
             return;
         running = false;
+        hasSuccessfulResult = true;
+        setHighlightButtonsEnabled(true);
         long[] values = {
             result.getTotal(), result.getZero(), result.getNonZero(), result.getPositive(),
             result.getNegative(), result.getNonNegative()
@@ -302,6 +322,7 @@ public final class DatasetStatisticsDialog {
         calculateButton.setEnabled(true);
         cancelButton.setEnabled(false);
         closeButton.setEnabled(true);
+        refreshHighlightState();
         shell.layout(true, true);
     }
 
@@ -311,6 +332,7 @@ public final class DatasetStatisticsDialog {
         if (!isOpen())
             return;
         running = false;
+        setHighlightButtonsEnabled(hasSuccessfulResult);
         setStatus("statistics.status.cancelled");
         calculateButton.setEnabled(true);
         cancelButton.setEnabled(false);
@@ -323,6 +345,8 @@ public final class DatasetStatisticsDialog {
         if (!isOpen())
             return;
         running = false;
+        hasSuccessfulResult = false;
+        setHighlightButtonsEnabled(false);
         setStatus("statistics.status.error", message == null ? "" : message);
         calculateButton.setEnabled(true);
         cancelButton.setEnabled(false);
@@ -350,12 +374,37 @@ public final class DatasetStatisticsDialog {
             statusLabel.setText(statusText());
     }
 
+    private void setHighlightButtonsEnabled(boolean enabled)
+    {
+        if (highlightButtons == null)
+            return;
+        for (Button button : highlightButtons) {
+            if (button != null && !button.isDisposed())
+                button.setEnabled(enabled);
+        }
+    }
+
     private String statusText()
     {
         String base = I18n.text(statusKey, statusArgs);
         if ("statistics.status.running".equals(statusKey) && statusArgs.length == 1)
             return base + " " + String.valueOf(statusArgs[0]) + "%";
         return base;
+    }
+
+    /** Refresh the visible indication without changing the owning TableView. */
+    public void refreshHighlightState()
+    {
+        if (activeHighlightLabel != null && !activeHighlightLabel.isDisposed())
+            activeHighlightLabel.setText(activeHighlightText());
+    }
+
+    private String activeHighlightText()
+    {
+        DatasetStatisticsEngine.Kind kind = host == null ? null : host.getStatisticsHighlightKind();
+        if (kind == null)
+            return I18n.text("statistics.activeHighlight.none");
+        return I18n.text("statistics.activeHighlight", I18n.text(highlightKey(kind)));
     }
 
     private static DatasetStatisticsEngine.Kind highlightKind(int index)
@@ -366,6 +415,17 @@ public final class DatasetStatisticsDialog {
         case 2: return DatasetStatisticsEngine.Kind.POSITIVE;
         case 3: return DatasetStatisticsEngine.Kind.NEGATIVE;
         default: throw new IllegalArgumentException("Unknown highlight index " + index);
+        }
+    }
+
+    private static String highlightKey(DatasetStatisticsEngine.Kind kind)
+    {
+        switch (kind) {
+        case ZERO: return "statistics.zero";
+        case NON_ZERO: return "statistics.nonZero";
+        case POSITIVE: return "statistics.positive";
+        case NEGATIVE: return "statistics.negative";
+        default: return "statistics.activeHighlight.none";
         }
     }
 

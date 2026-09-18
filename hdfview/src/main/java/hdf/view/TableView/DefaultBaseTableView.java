@@ -92,6 +92,7 @@ import org.eclipse.nebula.widgets.nattable.edit.action.MouseEditAction;
 import org.eclipse.nebula.widgets.nattable.edit.config.DefaultEditConfiguration;
 import org.eclipse.nebula.widgets.nattable.edit.config.DialogErrorHandling;
 import org.eclipse.nebula.widgets.nattable.edit.editor.ICellEditor;
+import org.eclipse.nebula.widgets.nattable.edit.event.DataUpdateEvent;
 import org.eclipse.nebula.widgets.nattable.grid.GridRegion;
 import org.eclipse.nebula.widgets.nattable.grid.layer.ColumnHeaderLayer;
 import org.eclipse.nebula.widgets.nattable.grid.layer.GridLayer;
@@ -101,6 +102,7 @@ import org.eclipse.nebula.widgets.nattable.layer.ILayer;
 import org.eclipse.nebula.widgets.nattable.layer.IUniqueIndexLayer;
 import org.eclipse.nebula.widgets.nattable.layer.LabelStack;
 import org.eclipse.nebula.widgets.nattable.layer.cell.IConfigLabelAccumulator;
+import org.eclipse.nebula.widgets.nattable.layer.event.ILayerEvent;
 import org.eclipse.nebula.widgets.nattable.layer.config.DefaultColumnHeaderLayerConfiguration;
 import org.eclipse.nebula.widgets.nattable.layer.config.DefaultColumnHeaderStyleConfiguration;
 import org.eclipse.nebula.widgets.nattable.layer.config.DefaultRowHeaderLayerConfiguration;
@@ -285,6 +287,9 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
 
     /** Body-cell positions highlighted by the current statistics result. */
     private final Set<Long> statisticsHighlightCells = new HashSet<>();
+
+    /** The active comparison rule, retained while the displayed page changes. */
+    private DatasetStatisticsEngine.Kind statisticsHighlightKind;
 
     /** Current statistics dialog and its cooperative worker state. */
     private DatasetStatisticsDialog statisticsDialog;
@@ -636,6 +641,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                                 I18n.text("message.tableCreationObjectFailed"));
                 return;
             }
+            dataTable.addLayerListener(this::handleStatisticsLayerEvent);
         }
         catch (UnsupportedOperationException ex) {
             log.debug("Subclass does not implement createTable()");
@@ -750,6 +756,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     @Override
     public void commitActiveCellEditor()
     {
+        boolean committed = false;
         try {
             if (dataTable == null) {
                 log.debug("commitActiveCellEditor(): No active cell editor");
@@ -764,11 +771,21 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
 
             log.debug("commitActiveCellEditor(): Active cell editor detected - committing before disposal");
             activeCellEditor.commit(SelectionLayer.MoveDirectionEnum.NONE, true, true);
+            committed = true;
             log.debug("commitActiveCellEditor(): Cell editor committed successfully");
         }
         catch (Exception ex) {
             log.warn("commitActiveCellEditor(): Failed to commit active editor", ex);
         }
+
+        /*
+         * NatTable normally emits a DataUpdateEvent for this operation.  Keep
+         * this explicit refresh as well because a few TableView editor paths
+         * commit through the editor without propagating that event through the
+         * top-level layer.
+         */
+        if (committed && statisticsHighlightKind != null)
+            refreshStatisticsHighlight();
     }
 
     /** Prepare active editing and pending changes exactly once. */
@@ -824,6 +841,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         prepareForCleanup();
 
         dataValue = null;
+        statisticsHighlightKind = null;
+        statisticsHighlightCells.clear();
         dataTable = null;
 
         if (curFont != null && !curFont.isDisposed())
@@ -1593,32 +1612,68 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     @Override
     public void highlightStatistics(DatasetStatisticsEngine.Kind kind)
     {
-        if (dataTable == null || dataLayer == null || dataProvider == null)
+        if (kind == null || dataTable == null || dataLayer == null || dataProvider == null)
             return;
 
+        statisticsHighlightKind = kind;
         commitActiveCellEditor();
+        refreshStatisticsHighlight();
+    }
+
+    /** Return the rule currently applied to the displayed page, if any. */
+    @Override
+    public DatasetStatisticsEngine.Kind getStatisticsHighlightKind()
+    {
+        return statisticsHighlightKind;
+    }
+
+    /** Recompute the current-page mask from the values currently in NatTable. */
+    private void refreshStatisticsHighlight()
+    {
+        if (dataTable == null || dataTable.isDisposed() || dataLayer == null || dataProvider == null)
+            return;
+
         statisticsHighlightCells.clear();
+        if (statisticsHighlightKind == null) {
+            dataTable.doCommand(new VisualRefreshCommand());
+            return;
+        }
+
         try {
             int rows = dataProvider.getRowCount();
             int columns = dataProvider.getColumnCount();
             for (int row = 0; row < rows; row++) {
                 for (int column = 0; column < columns; column++) {
                     Object value = dataLayer.getDataValueByPosition(column, row);
-                    if (value != null && DatasetStatisticsEngine.matches(value, kind))
+                    if (value != null && DatasetStatisticsEngine.matches(value, statisticsHighlightKind))
                         statisticsHighlightCells.add(cellKey(column, row));
                 }
             }
         }
-        catch (RuntimeException ex) {
+        catch (UnsupportedOperationException ex) {
             log.debug("highlightStatistics(): unsupported table value", ex);
+            statisticsHighlightKind = null;
+            statisticsHighlightCells.clear();
+        }
+        catch (RuntimeException ex) {
+            log.warn("highlightStatistics(): unable to refresh current-page mask", ex);
+            statisticsHighlightKind = null;
             statisticsHighlightCells.clear();
         }
         dataTable.doCommand(new VisualRefreshCommand());
     }
 
+    /** Reapply an active rule after NatTable has committed an edit. */
+    private void handleStatisticsLayerEvent(ILayerEvent event)
+    {
+        if (event instanceof DataUpdateEvent && statisticsHighlightKind != null)
+            refreshStatisticsHighlight();
+    }
+
     @Override
     public void clearStatisticsHighlight()
     {
+        statisticsHighlightKind = null;
         statisticsHighlightCells.clear();
         if (dataTable != null && !dataTable.isDisposed())
             dataTable.doCommand(new VisualRefreshCommand());
@@ -1722,8 +1777,6 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     {
         log.trace("refreshDataTable()");
 
-        clearStatisticsHighlight();
-
         shell.setCursor(display.getSystemCursor(SWT.CURSOR_WAIT));
         dataValue = dataObject.refreshData();
         shell.setCursor(null);
@@ -1738,6 +1791,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         dataTable.doCommand(new StructuralRefreshCommand());
         final ViewportLayer viewportLayer = new ViewportLayer(selectionLayer);
         dataTable.doCommand(new ShowRowInViewportCommand(dataProvider.getRowCount() - 1));
+        refreshStatisticsHighlight();
         log.trace("refreshDataTable() finish");
     }
 
@@ -1751,8 +1805,6 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     {
         if (dataObject == null || dataTable == null || selectionLayer == null)
             return;
-
-        clearStatisticsHighlight();
 
         int rank = dataObject.getRank();
         long[] dims = dataObject.getDims();
@@ -1833,6 +1885,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             dataValue = dataObject.getData();
             dataProvider.updateDataBuffer(dataValue);
             dataTable.doCommand(new VisualRefreshCommand());
+            refreshStatisticsHighlight();
 
             int row = rank == 1 ? (int)coordinate[0] + 1
                                 : (int)(coordinate[rowDimension] - start[rowDimension]) + 1;
@@ -1930,8 +1983,6 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         if (dataObject.getRank() < 3 || idx == (curDataFrame - indexBase))
             return;
 
-        clearStatisticsHighlight();
-
         // Make sure to save any changes to this frame of data before changing frames
         if (dataProvider.getIsValueChanged())
             updateValueInFile();
@@ -1986,6 +2037,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         dataProvider.updateDataBuffer(dataValue);
 
         dataTable.doCommand(new VisualRefreshCommand());
+        refreshStatisticsHighlight();
     }
 
     /**
