@@ -213,14 +213,15 @@ public class HDFView implements DataViewManager {
     private Button recentFilesButton;
     private Button clearTextButton;
 
-    /** Persistent status bar showing the access mode of the selected file. */
-    private Composite accessModeBar;
-    private Label accessModeFileLabel;
-    private Label accessModeLabel;
-    private Label accessModeValueLabel;
-    private Button reopenReadWriteButton;
+    /** Inline selector showing and changing the access mode of the selected file. */
+    private Combo accessModeSelector;
+    private boolean updatingAccessModeSelector;
 
-    /** File represented by the persistent access-mode status bar. */
+    private static final int ACCESS_MODE_READ_ONLY_INDEX  = 0;
+    private static final int ACCESS_MODE_READ_WRITE_INDEX = 1;
+    private static final String ACCESS_MODE_SELECTOR_ID   = "accessModeSelector";
+
+    /** File represented by the inline access-mode selector. */
     private FileFormat accessModeFile;
 
     /** GUI component: A list of current data windows. */
@@ -549,7 +550,7 @@ public class HDFView implements DataViewManager {
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setFont(currentFont);
         I18n.bind(shell, "window.title", HDFVIEW_VERSION);
-        shell.setLayout(new GridLayout(3, false));
+        shell.setLayout(new GridLayout(4, false));
         shell.addListener(SWT.Close, event -> {
             if (inlineTableView != null && !inlineTableView.isViewDisposed())
                 inlineTableView.commitActiveCellEditor();
@@ -1300,7 +1301,7 @@ public class HDFView implements DataViewManager {
     {
         toolBar = new ToolBar(shell, SWT.HORIZONTAL | SWT.RIGHT);
         toolBar.setFont(Display.getCurrent().getSystemFont());
-        toolBar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 3, 1));
+        toolBar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 4, 1));
 
         ToolItem openItem = new ToolItem(toolBar, SWT.PUSH);
         I18n.bindToolTip(openItem, "toolbar.open");
@@ -1468,6 +1469,8 @@ public class HDFView implements DataViewManager {
             }
         });
 
+        createAccessModeSelector(shell);
+
         clearTextButton = new Button(shell, SWT.PUSH);
         I18n.bindToolTip(clearTextButton, "tooltip.clearText");
         clearTextButton.setFont(currentFont);
@@ -1482,109 +1485,145 @@ public class HDFView implements DataViewManager {
             }
         });
 
-        createAccessModeBar(shell);
-
         log.info("URL Toolbar created");
     }
 
-    /** Create the long-lived access-mode status and recovery controls. */
-    private void createAccessModeBar(final Shell shell)
+    /** Create the access-mode selector inline with the URL toolbar. */
+    private void createAccessModeSelector(final Shell shell)
     {
-        accessModeBar = new Composite(shell, SWT.BORDER);
-        accessModeBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1));
-        accessModeBar.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_INFO_BACKGROUND));
-
-        GridLayout accessLayout = new GridLayout(4, false);
-        accessLayout.marginWidth  = 6;
-        accessLayout.marginHeight = 3;
-        accessLayout.horizontalSpacing = 6;
-        accessModeBar.setLayout(accessLayout);
-
-        accessModeFileLabel = new Label(accessModeBar, SWT.NONE);
-        accessModeFileLabel.setFont(currentFont);
-        accessModeFileLabel.setBackground(accessModeBar.getBackground());
-        accessModeFileLabel.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        I18n.bindDynamic(accessModeFileLabel, () -> {
-            if (accessModeFile == null)
-                return I18n.text("fileAccessMode.noFile");
-            return I18n.text("fileAccessMode.file", accessModeFile.getName());
-        });
-
-        accessModeLabel = new Label(accessModeBar, SWT.NONE);
-        accessModeLabel.setFont(currentFont);
-        accessModeLabel.setBackground(accessModeBar.getBackground());
-        I18n.bind(accessModeLabel, "fileAccessMode.label");
-
-        accessModeValueLabel = new Label(accessModeBar, SWT.NONE);
-        accessModeValueLabel.setFont(currentFont);
-        accessModeValueLabel.setBackground(accessModeBar.getBackground());
-        I18n.bindDynamic(accessModeValueLabel, () -> {
-            if (accessModeFile == null)
-                return I18n.text("fileAccessMode.noFile");
-            return accessModeFile.isReadOnly()
-                ? I18n.text("fileAccessMode.readOnly")
-                : I18n.text("fileAccessMode.readWrite");
-        });
-
-        reopenReadWriteButton = new Button(accessModeBar, SWT.PUSH);
-        reopenReadWriteButton.setFont(currentFont);
-        I18n.bind(reopenReadWriteButton, "button.reopenReadWrite");
-        I18n.bindToolTip(reopenReadWriteButton, "tooltip.reopenReadWrite");
-        reopenReadWriteButton.setEnabled(false);
-        reopenReadWriteButton.addSelectionListener(new SelectionAdapter() {
+        accessModeSelector = new Combo(shell, SWT.DROP_DOWN | SWT.READ_ONLY);
+        accessModeSelector.setFont(currentFont);
+        accessModeSelector.setVisibleItemCount(2);
+        accessModeSelector.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
+        accessModeSelector.setData(I18n.WIDGET_KEY, ACCESS_MODE_SELECTOR_ID);
+        I18n.bindToolTip(accessModeSelector, "tooltip.accessModeSelector");
+        accessModeSelector.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                reopenCurrentFileReadWrite();
+                if (!updatingAccessModeSelector)
+                    changeSelectedFileAccessMode();
             }
         });
+
+        updateAccessModeStatus(null);
     }
 
-    /** Update the persistent access-mode status for a newly opened file. */
+    /** Update the inline access-mode selector for a newly opened file. */
     public void fileOpened(FileFormat file)
     {
         updateAccessModeStatus(file);
     }
 
-    /** Update the persistent access-mode status without rebuilding any views. */
+    /** Update the inline access-mode selector without rebuilding any views. */
     private void updateAccessModeStatus(FileFormat file)
     {
         accessModeFile = file;
-
-        if (accessModeFileLabel != null && !accessModeFileLabel.isDisposed())
-            I18n.refresh(accessModeFileLabel);
-        if (accessModeLabel != null && !accessModeLabel.isDisposed())
-            I18n.refresh(accessModeLabel);
-        if (accessModeValueLabel != null && !accessModeValueLabel.isDisposed())
-            I18n.refresh(accessModeValueLabel);
-
-        if (reopenReadWriteButton != null && !reopenReadWriteButton.isDisposed())
-            reopenReadWriteButton.setEnabled(accessModeFile != null && accessModeFile.isReadOnly());
+        refreshAccessModeSelector();
     }
 
-    /** Reopen the file shown in the status bar through the existing TreeView path. */
-    private void reopenCurrentFileReadWrite()
+    /** Refresh selector items and selection without using translated text for behavior. */
+    private void refreshAccessModeSelector()
+    {
+        if (accessModeSelector == null || accessModeSelector.isDisposed())
+            return;
+
+        boolean hasFile = accessModeFile != null;
+        int accessMode = hasFile ? getFileAccessMode(accessModeFile) : -1;
+        boolean swmr = isSwmrAccessMode(accessMode);
+        String[] itemKeys;
+        if (!hasFile)
+            itemKeys = new String[] {"fileAccessMode.noFile"};
+        else if (swmr)
+            itemKeys = new String[] {"fileAccessMode.swmrRead"};
+        else
+            itemKeys = new String[] {"fileAccessMode.readOnly", "fileAccessMode.readWrite"};
+
+        updatingAccessModeSelector = true;
+        try {
+            I18n.bindItems(accessModeSelector, itemKeys);
+            if (!hasFile || swmr) {
+                accessModeSelector.select(0);
+                accessModeSelector.setEnabled(false);
+            }
+            else {
+                accessModeSelector.select(accessModeFile.isReadOnly()
+                                              ? ACCESS_MODE_READ_ONLY_INDEX
+                                              : ACCESS_MODE_READ_WRITE_INDEX);
+                accessModeSelector.setEnabled(true);
+            }
+        }
+        finally {
+            updatingAccessModeSelector = false;
+        }
+        accessModeSelector.requestLayout();
+    }
+
+    /** Return the effective access flags remembered by the active TreeView. */
+    private int getFileAccessMode(FileFormat file)
+    {
+        if (file == null)
+            return -1;
+
+        if (treeView != null)
+            return treeView.getFileAccessMode(file);
+
+        return file.isReadOnly() ? FileFormat.READ : FileFormat.WRITE;
+    }
+
+    private boolean isSwmrAccessMode(int accessMode)
+    {
+        return accessMode >= 0 && (accessMode & FileFormat.MULTIREAD) == FileFormat.MULTIREAD;
+    }
+
+    /** Reopen the selected file through the existing TreeView path. */
+    private void changeSelectedFileAccessMode()
     {
         FileFormat file = accessModeFile;
         if (file == null) {
-            display.beep();
-            Tools.showError(mainWindow, I18n.text("action.reopenReadWrite"),
-                            I18n.text("message.reopenNoFile"));
+            refreshAccessModeSelector();
             return;
         }
 
+        int currentAccessMode = getFileAccessMode(file);
+        if (isSwmrAccessMode(currentAccessMode)) {
+            refreshAccessModeSelector();
+            return;
+        }
+
+        int selectedIndex = accessModeSelector.getSelectionIndex();
+        int currentIndex = file.isReadOnly()
+            ? ACCESS_MODE_READ_ONLY_INDEX
+            : ACCESS_MODE_READ_WRITE_INDEX;
+        if (selectedIndex < 0 || selectedIndex == currentIndex) {
+            refreshAccessModeSelector();
+            return;
+        }
+
+        int requestedAccessMode = selectedIndex == ACCESS_MODE_READ_WRITE_INDEX
+            ? FileFormat.WRITE
+            : FileFormat.READ;
         String filename = file.getAbsolutePath();
+        String requestedMode = requestedAccessMode == FileFormat.WRITE
+            ? I18n.text("fileAccessMode.readWrite")
+            : I18n.text("fileAccessMode.readOnly");
+
+        accessModeSelector.setEnabled(false);
         try {
-            FileFormat reopened = treeView.reopenFile(file, FileFormat.WRITE);
-            if (reopened == null || reopened.isReadOnly())
-                throw new java.io.IOException(I18n.text("message.reopenReadWriteNotWritable", filename));
+            FileFormat reopened = treeView.reopenFile(file, requestedAccessMode);
+            if (reopened == null)
+                throw new java.io.IOException(I18n.text("message.reopenFileFailed", filename));
 
             updateAccessModeStatus(reopened);
         }
         catch (Exception ex) {
+            /* reopenFile restores the original FileFormat when possible. Refresh
+             * from the TreeView so a failed switch never leaves a stale selector. */
+            updateAccessModeStatus(treeView.getSelectedFile());
             display.beep();
-            Tools.showError(mainWindow, I18n.text("action.reopenReadWrite"),
-                            I18n.text("message.reopenReadWriteFailed", filename, ex.getMessage()));
+            String detail = ex.getMessage() == null ? ex.toString() : ex.getMessage();
+            Tools.showError(mainWindow, I18n.text("action.changeAccessMode"),
+                            I18n.text("message.changeAccessModeFailed", filename, requestedMode, detail));
         }
     }
 
@@ -1592,7 +1631,7 @@ public class HDFView implements DataViewManager {
     {
         SashForm content = new SashForm(shell, SWT.VERTICAL);
         content.setSashWidth(10);
-        content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 3, 1));
+        content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 4, 1));
 
         // Add Data content area and Status Area to main window
         Composite container = new Composite(content, SWT.NONE);
@@ -2369,14 +2408,8 @@ public class HDFView implements DataViewManager {
         urlBar.requestLayout();
         clearTextButton.setFont(font);
         clearTextButton.requestLayout();
-        accessModeFileLabel.setFont(font);
-        accessModeFileLabel.requestLayout();
-        accessModeLabel.setFont(font);
-        accessModeLabel.requestLayout();
-        accessModeValueLabel.setFont(font);
-        accessModeValueLabel.requestLayout();
-        reopenReadWriteButton.setFont(font);
-        reopenReadWriteButton.requestLayout();
+        accessModeSelector.setFont(font);
+        accessModeSelector.requestLayout();
         status.setFont(font);
 
         // On certain platforms the url_bar items don't update their size after

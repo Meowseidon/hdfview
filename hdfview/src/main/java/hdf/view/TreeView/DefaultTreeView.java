@@ -2729,11 +2729,15 @@ public class DefaultTreeView implements TreeView {
             if (reopened == null)
                 throw new java.io.IOException(I18n.text("message.reopenFileFailed", fileFormatName));
 
-            if (isWriteAccessRequested(requestedAccessMode) && reopened.isReadOnly()) {
+            boolean requestedReadWrite = isWriteAccessRequested(requestedAccessMode);
+            boolean requestedReadOnly = isReadOnlyAccessRequested(requestedAccessMode);
+            if ((requestedReadWrite && reopened.isReadOnly()) ||
+                (requestedReadOnly && !reopened.isReadOnly())) {
                 closeFile(reopened);
                 ((HDFView)viewer).showMetaData(null);
-                throw new java.io.IOException(
-                    I18n.text("message.reopenReadWriteNotWritable", fileFormatName));
+                    throw new java.io.IOException(
+                        I18n.text("message.changeAccessModeNotApplied", fileFormatName,
+                              accessModeDisplayName(requestedAccessMode)));
             }
 
             restoreSelection(reopened, selectedObjectName);
@@ -2768,10 +2772,36 @@ public class DefaultTreeView implements TreeView {
         return fileFormat.isReadOnly() ? FileFormat.READ : FileFormat.WRITE;
     }
 
+    @Override
+    public int getFileAccessMode(FileFormat fileFormat)
+    {
+        if (fileFormat == null || !fileList.contains(fileFormat))
+            return -1;
+
+        return getRememberedAccessMode(fileFormat);
+    }
+
     /** Return whether an access request requires a writable FileFormat. */
     private boolean isWriteAccessRequested(int accessMode)
     {
         return accessMode == FileFormat.WRITE || accessMode == FileFormat.CREATE;
+    }
+
+    /** Return whether the requested mode is one of the read-only modes. */
+    private boolean isReadOnlyAccessRequested(int accessMode)
+    {
+        return accessMode == FileFormat.READ ||
+               (accessMode & FileFormat.MULTIREAD) == FileFormat.MULTIREAD;
+    }
+
+    /** Resolve the user-visible name for an existing access flag. */
+    private String accessModeDisplayName(int accessMode)
+    {
+        if ((accessMode & FileFormat.MULTIREAD) == FileFormat.MULTIREAD)
+            return I18n.text("fileAccessMode.swmrRead");
+        if (isWriteAccessRequested(accessMode))
+            return I18n.text("fileAccessMode.readWrite");
+        return I18n.text("fileAccessMode.readOnly");
     }
 
     /** Restore the old Tree selection when its object is available after reopen. */
