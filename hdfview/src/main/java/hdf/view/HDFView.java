@@ -1887,12 +1887,17 @@ public class HDFView implements DataViewManager {
 
         rightTabFolder.setRedraw(false);
         try {
-            disposeInlineDataView();
-            clearRightTabs();
+            if (obj == null || !isInlineTableDataset(obj))
+                disposeInlineDataView();
+            else
+                disposeInlineTableViewForSelection();
             displayedMetadataObject = obj;
 
             if (obj == null)
+            {
+                clearRightTabs();
                 return;
+            }
 
             DataViewFactory metaDataViewFactory = null;
             try {
@@ -2013,17 +2018,27 @@ public class HDFView implements DataViewManager {
         return true;
     }
 
-    /** Create the Data Content tab and mount the normal TableView into it. */
+    /** Create or reuse the Data Content tab and mount the normal TableView into it. */
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void createInlineDataContent(HObject obj)
     {
         if (inlineTableView != null && !inlineTableView.isViewDisposed())
             return;
 
-        Composite dataParent = new Composite(rightTabFolder, SWT.NONE);
-        dataContentTab    = new TabItem(rightTabFolder, SWT.NONE, 0);
-        I18n.bind(dataContentTab, "tab.dataContent");
-        dataContentTab.setControl(dataParent);
+        Composite dataParent = null;
+        if (dataContentTab != null && !dataContentTab.isDisposed()) {
+            Control existingControl = dataContentTab.getControl();
+            if (existingControl instanceof Composite && !existingControl.isDisposed())
+                dataParent = (Composite)existingControl;
+        }
+
+        if (dataParent == null) {
+            dataParent = new Composite(rightTabFolder, SWT.NONE);
+            dataContentTab = new TabItem(rightTabFolder, SWT.NONE, 0);
+            I18n.bind(dataContentTab, "tab.dataContent");
+            dataContentTab.setData(MetaDataView.TAB_ROLE_KEY, MetaDataView.TAB_ROLE_DATA_CONTENT);
+            dataContentTab.setControl(dataParent);
+        }
 
         try {
             DataViewFactory tableViewFactory = DataViewFactoryProducer.getFactory(DataViewType.TABLE);
@@ -2062,14 +2077,20 @@ public class HDFView implements DataViewManager {
         }
     }
 
-    /** Dispose the current inline TableView without disposing the host window. */
-    private void disposeInlineDataView()
+    /** Dispose only the current inline TableView while retaining its Data Content page. */
+    private void disposeInlineTableViewForSelection()
     {
         TableView view = inlineTableView;
         inlineTableView = null;
 
         if (view != null && !view.isViewDisposed())
             view.disposeView();
+    }
+
+    /** Dispose the current inline TableView and its Data Content page. */
+    private void disposeInlineDataView()
+    {
+        disposeInlineTableViewForSelection();
 
         if (dataContentTab != null && !dataContentTab.isDisposed()) {
             Control control = dataContentTab.getControl();
@@ -2084,10 +2105,11 @@ public class HDFView implements DataViewManager {
      * Clear the embedded Data Content tab after its TableView close action has
      * disposed the TableView-owned controls.
      *
-     * <p>This is intentionally separate from {@link #disposeInlineDataView()}:
-     * the latter owns the normal Dataset-switch path and disposes the view
-     * itself, while this callback handles a user closing the embedded view from
-     * its Table menu.</p>
+     * <p>This is intentionally separate from the Dataset-selection cleanup:
+     * selection changes dispose only the TableView-owned controls and retain
+     * the page Composite, while this callback handles a user closing the
+     * embedded view from its Table menu and removes the whole Data Content page.
+     * </p>
      *
      * @param view the embedded TableView that was closed
      */

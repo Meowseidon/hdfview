@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,10 +27,12 @@ import hdf.view.i18n.I18n;
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.TabItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
 import org.eclipse.swtbot.swt.finder.exceptions.WidgetNotFoundException;
@@ -65,6 +68,12 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
             firstDataset.click();
 
             SWTBotTabItem dataTab = waitForTab("tab.dataContent");
+            TabItem dataTabWidget = dataTab.widget;
+            TabItem attributeTabWidget = bot.tabItem(I18n.text("tab.objectAttributeInfo")).widget;
+            TabItem generalTabWidget = bot.tabItem(I18n.text("tab.generalObjectInfo")).widget;
+            Control dataPageControl = controlOf(dataTabWidget);
+            Control attributePageControl = controlOf(attributeTabWidget);
+            Control generalPageControl = controlOf(generalTabWidget);
             assertTrue(dataTab.isActive(), "single-clicking a Dataset must select Data Content");
             assertNotNull(bot.tabItem(I18n.text("tab.objectAttributeInfo")));
             assertNotNull(bot.tabItem(I18n.text("tab.generalObjectInfo")));
@@ -81,8 +90,23 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
 
             SWTBotTreeItem secondDataset = fileItem.getNode("DU64BITS");
             secondDataset.click();
-            assertTrue(waitForTab("tab.dataContent").isActive(),
+            SWTBotTabItem secondDataTab = waitForTab("tab.dataContent");
+            assertTrue(secondDataTab.isActive(),
                        "switching Dataset must select its own Data Content tab");
+            assertSame(dataTabWidget, secondDataTab.widget,
+                       "Dataset A -> B must retain the Data Content TabItem");
+            assertSame(attributeTabWidget, bot.tabItem(I18n.text("tab.objectAttributeInfo")).widget,
+                       "Dataset A -> B must retain the Object Attribute Info TabItem");
+            assertSame(generalTabWidget, bot.tabItem(I18n.text("tab.generalObjectInfo")).widget,
+                       "Dataset A -> B must retain the General Object Info TabItem");
+            assertSame(dataPageControl, controlOf(secondDataTab.widget),
+                       "Dataset A -> B must retain the Data Content page Composite");
+            assertSame(attributePageControl,
+                       controlOf(bot.tabItem(I18n.text("tab.objectAttributeInfo")).widget),
+                       "Dataset A -> B must retain the Object Attribute Info page Composite");
+            assertSame(generalPageControl,
+                       controlOf(bot.tabItem(I18n.text("tab.generalObjectInfo")).widget),
+                       "Dataset A -> B must retain the General Object Info page Composite");
             SWTBotTabItem generalTab = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             generalTab.activate();
             assertEquals("DU64BITS", bot.textWithLabel(I18n.text("meta.objectName")).getText(),
@@ -554,6 +578,13 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
         });
 
         return bot.tabItem(tabName);
+    }
+
+    private Control controlOf(final TabItem tab)
+    {
+        final Control[] control = new Control[1];
+        Display.getDefault().syncExec(() -> control[0] = tab.getControl());
+        return control[0];
     }
 
     private Path copyFixture(String sourceName, String workingName)
