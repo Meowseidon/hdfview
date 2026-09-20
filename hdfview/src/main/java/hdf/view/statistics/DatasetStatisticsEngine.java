@@ -23,8 +23,10 @@ import hdf.view.search.DatasetSearchSnapshot;
  * the original Python viewer. In particular, NaN is non-zero but is neither
  * positive nor negative, and positive/negative are strict comparisons. The
  * legacy min/max/mean/standard-deviation values use the existing HDFView fill
- * value convention: a fill value is excluded from those four reductions but
- * remains part of the six classification counts.</p>
+ * value convention: fill values are skipped by the legacy reduction loops but
+ * remain part of the six classification counts. The first-value seed and
+ * special-value handling of Tools.findMinMax() and Tools.computeStatistics()
+ * are retained.</p>
  */
 public final class DatasetStatisticsEngine {
     /** Keep every native read bounded to the same budget as the old viewer. */
@@ -152,10 +154,12 @@ public final class DatasetStatisticsEngine {
         private long nonNegative;
         private long numericCount;
         private double sum;
-        /* Match Tools.findMinMax(): Java comparisons ignore NaN but retain infinities. */
-        private double minimum = Float.MAX_VALUE;
-        private double maximum = -Float.MAX_VALUE;
-        private double mean = Double.NaN;
+        /* Tools.findMinMax() seeds both extrema from the first raw value. */
+        private double minimum = Double.MAX_VALUE;
+        private double maximum = -Double.MAX_VALUE;
+        private boolean extremaInitialized;
+        /* Tools.computeStatistics() receives a zero-initialized avgstd array. */
+        private double mean;
         private double standardDeviation;
         private double variance;
 
@@ -177,11 +181,20 @@ public final class DatasetStatisticsEngine {
             if (numeric >= 0.0)
                 nonNegative++;
 
+            if (!extremaInitialized) {
+                minimum           = numeric;
+                maximum           = numeric;
+                extremaInitialized = true;
+            }
+
             if (isFillValue(value))
                 return;
 
             numericCount++;
             sum += numeric;
+            /* findMinMax() excludes NaN and infinities from later comparisons. */
+            if (isNaNINF(numeric))
+                return;
             if (numeric < minimum)
                 minimum = numeric;
             if (numeric > maximum)
@@ -190,9 +203,9 @@ public final class DatasetStatisticsEngine {
 
         private void finishMean()
         {
-            if (numericCount <= 0)
+            if (numericCount == 0)
                 mean = fillAsDouble();
-            else
+            else if (numericCount > 1)
                 mean = sum / numericCount;
         }
 
@@ -214,16 +227,22 @@ public final class DatasetStatisticsEngine {
 
         private boolean isFillValue(Object value)
         {
-            if (fillValue == null)
-                return false;
-            Double fill = numericOrNull(fillValue);
+            Double fill = effectiveFillValue();
             return fill != null && toDouble(value) == fill.doubleValue();
         }
 
         private double fillAsDouble()
         {
-            Double fill = numericOrNull(fillValue);
+            Double fill = effectiveFillValue();
             return fill == null ? 0.0 : fill.doubleValue();
+        }
+
+        private Double effectiveFillValue()
+        {
+            if (fillValue == null || !fillValue.getClass().isArray() ||
+                Array.getLength(fillValue) == 0)
+                return null;
+            return numericOrNull(Array.get(fillValue, 0));
         }
     }
 
@@ -542,6 +561,14 @@ public final class DatasetStatisticsEngine {
         if (value instanceof Number)
             return ((Number)value).doubleValue();
         return null;
+    }
+
+    /** Keep the legacy floating-point reduction filter in sync with Tools.isNaNINF(). */
+    private static boolean isNaNINF(double value)
+    {
+        return Double.isNaN(value) || value == Float.NEGATIVE_INFINITY ||
+               value == Float.POSITIVE_INFINITY || value == Double.NEGATIVE_INFINITY ||
+               value == Double.POSITIVE_INFINITY;
     }
 
     private static int valuesPerCell(Datatype datatype)

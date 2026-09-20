@@ -46,8 +46,10 @@ class DatasetStatisticsEngineTest {
             assertEquals(2, result.getPositive());
             assertEquals(2, result.getNegative());
             assertEquals(3, result.getNonNegative());
-            assertEquals(Double.NEGATIVE_INFINITY, result.getMinimum());
-            assertEquals(Double.POSITIVE_INFINITY, result.getMaximum());
+            assertEquals(-2.0, result.getMinimum(),
+                         "findMinMax ignores NaN and infinities for floating extrema");
+            assertEquals(3.0, result.getMaximum(),
+                         "findMinMax ignores NaN and infinities for floating extrema");
             assertTrue(Double.isNaN(result.getMean()), "NaN remains part of the legacy mean reduction");
             assertTrue(Double.isNaN(result.getStandardDeviation()),
                        "NaN remains part of the legacy standard-deviation reduction");
@@ -77,7 +79,7 @@ class DatasetStatisticsEngineTest {
         try (OpenedFile opened = openFixture("tscalarintsize.h5")) {
             Datatype datatype = firstNumeric(opened.file).getDatatype();
             DatasetStatisticsEngine.Result result = DatasetStatisticsEngine.computeCurrentPage(
-                new int[] {0, 2, 4}, datatype, new int[] {0}, new AtomicBoolean());
+                new int[] {2, 0, 4}, datatype, new int[] {0}, new AtomicBoolean());
 
             assertEquals(3, result.getTotal());
             assertEquals(1, result.getZero(), "fill values still participate in classification counts");
@@ -86,6 +88,87 @@ class DatasetStatisticsEngineTest {
             assertEquals(4.0, result.getMaximum());
             assertEquals(3.0, result.getMean());
             assertEquals(Math.sqrt(2.0), result.getStandardDeviation());
+        }
+    }
+
+    @Test
+    void doubleExtremaAreNotLimitedByFloatSentinels() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tldouble.h5")) {
+            Dataset dataset = firstFloating(opened.file);
+            assertTrue(dataset != null, "the double fixture must contain a floating Dataset");
+            Datatype datatype = dataset.getDatatype();
+
+            DatasetStatisticsEngine.Result positive = DatasetStatisticsEngine.computeCurrentPage(
+                new double[] {1e200, 1e300}, datatype, null, new AtomicBoolean());
+            assertEquals(1e200, positive.getMinimum());
+            assertEquals(1e300, positive.getMaximum());
+
+            DatasetStatisticsEngine.Result negative = DatasetStatisticsEngine.computeCurrentPage(
+                new double[] {-1e200, -1e300}, datatype, null, new AtomicBoolean());
+            assertEquals(-1e300, negative.getMinimum());
+            assertEquals(-1e200, negative.getMaximum());
+
+            DatasetStatisticsEngine.Result mixed = DatasetStatisticsEngine.computeCurrentPage(
+                new double[] {-1e300, 1e300, -1e200, 1e200}, datatype, null,
+                new AtomicBoolean());
+            assertEquals(-1e300, mixed.getMinimum());
+            assertEquals(1e300, mixed.getMaximum());
+        }
+    }
+
+    @Test
+    void allFillValuesKeepToolsMinMaxMeanAndStandardDeviationResults() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tldouble.h5")) {
+            Dataset dataset = firstFloating(opened.file);
+            assertTrue(dataset != null, "the double fixture must contain a floating Dataset");
+            DatasetStatisticsEngine.Result result = DatasetStatisticsEngine.computeCurrentPage(
+                new double[] {42.0, 42.0, 42.0}, dataset.getDatatype(), new double[] {42.0},
+                new AtomicBoolean());
+
+            assertEquals(3, result.getTotal());
+            assertEquals(0, result.getNumericCount());
+            assertEquals(42.0, result.getMinimum());
+            assertEquals(42.0, result.getMaximum());
+            assertEquals(42.0, result.getMean());
+            assertEquals(0.0, result.getStandardDeviation());
+        }
+    }
+
+    @Test
+    void floatingSpecialValuesMatchToolsLegacyReductions() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tldouble.h5")) {
+            Dataset dataset = firstFloating(opened.file);
+            assertTrue(dataset != null, "the double fixture must contain a floating Dataset");
+            Datatype datatype = dataset.getDatatype();
+
+            assertLegacyReductions(
+                new double[] {-2.0, Double.NaN, 3.0, Double.POSITIVE_INFINITY,
+                             Double.NEGATIVE_INFINITY},
+                datatype, -2.0, 3.0, Double.NaN, Double.NaN);
+            assertLegacyReductions(
+                new double[] {Double.NaN, -2.0, 3.0}, datatype,
+                Double.NaN, Double.NaN, Double.NaN, Double.NaN);
+            assertLegacyReductions(
+                new double[] {Double.POSITIVE_INFINITY, -2.0, 3.0}, datatype,
+                -2.0, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.NaN);
+            assertLegacyReductions(
+                new double[] {Double.NEGATIVE_INFINITY, -2.0, 3.0}, datatype,
+                Double.NEGATIVE_INFINITY, 3.0, Double.NEGATIVE_INFINITY, Double.NaN);
+        }
+    }
+
+    @Test
+    void aSingleValidValueKeepsTheLegacyMeanInitialization()
+        throws Exception
+    {
+        try (OpenedFile opened = openFixture("tldouble.h5")) {
+            Dataset dataset = firstFloating(opened.file);
+            assertTrue(dataset != null, "the double fixture must contain a floating Dataset");
+            assertLegacyReductions(new double[] {5.0}, dataset.getDatatype(),
+                                    5.0, 5.0, 0.0, 0.0);
         }
     }
 
@@ -223,6 +306,42 @@ class DatasetStatisticsEngineTest {
                 return dataset;
         }
         return null;
+    }
+
+    private static Dataset firstFloating(FileFormat file) throws Exception
+    {
+        Group root = (Group)file.getRootObject();
+        for (HObject object : root.depthFirstMemberList()) {
+            if (!(object instanceof Dataset))
+                continue;
+            Dataset dataset = (Dataset)object;
+            dataset.init();
+            Datatype datatype = scalarDatatype(dataset.getDatatype());
+            if (datatype != null && datatype.isFloat())
+                return dataset;
+        }
+        return null;
+    }
+
+    private static void assertLegacyReductions(Object data, Datatype datatype,
+                                               double expectedMinimum, double expectedMaximum,
+                                               double expectedMean, double expectedStandardDeviation)
+        throws Exception
+    {
+        DatasetStatisticsEngine.Result actual = DatasetStatisticsEngine.computeCurrentPage(
+            data, datatype, null, new AtomicBoolean());
+        assertLegacyDoubleEquals(expectedMinimum, actual.getMinimum(), "minimum");
+        assertLegacyDoubleEquals(expectedMaximum, actual.getMaximum(), "maximum");
+        assertLegacyDoubleEquals(expectedMean, actual.getMean(), "mean");
+        assertLegacyDoubleEquals(expectedStandardDeviation, actual.getStandardDeviation(), "stddev");
+    }
+
+    private static void assertLegacyDoubleEquals(double expected, double actual, String name)
+    {
+        if (Double.isNaN(expected))
+            assertTrue(Double.isNaN(actual), name + " should be NaN");
+        else
+            assertEquals(expected, actual, name);
     }
 
     private static Dataset firstText(FileFormat file) throws Exception
