@@ -641,6 +641,14 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                                 I18n.text("message.tableCreationObjectFailed"));
                 return;
             }
+            /*
+             * An embedded TableView keeps its historical popup on the host
+             * Composite for compatibility, but the user interacts with the
+             * NatTable child.  Attach the same Menu to that child as well so a
+             * right-click in a cell reaches the existing Table actions.
+             */
+            if (isEmbedded)
+                dataTable.setMenu(viewMenu);
             dataTable.addLayerListener(this::handleStatisticsLayerEvent);
         }
         catch (UnsupportedOperationException ex) {
@@ -895,6 +903,18 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             public void widgetSelected(SelectionEvent e)
             {
                 showLineplot();
+            }
+        });
+
+        // Dataset statistics button
+        item = new ToolItem(toolbar, SWT.PUSH);
+        I18n.bind(item, "table.statistics");
+        I18n.bindToolTip(item, "table.statistics.tooltip");
+        item.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                showStatistics(shell);
             }
         });
 

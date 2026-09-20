@@ -723,6 +723,8 @@ public final class I18n {
                 ((Text)widget).setText(value);
             else if (widget instanceof StyledText)
                 ((StyledText)widget).setText(value);
+            else if (widget instanceof ToolItem)
+                ((ToolItem)widget).setText(value);
             else if (widget instanceof TableColumn)
                 ((TableColumn)widget).setText(value);
         }

@@ -746,12 +746,8 @@ public abstract class AbstractWindowTest {
             public void run()
             {
                 NatTable table = findNatTable(shell);
-                Control current = table;
-                while (current != null && popupMenu[0] == null) {
-                    if (!current.isDisposed())
-                        popupMenu[0] = current.getMenu();
-                    current = current.getParent();
-                }
+                if (table != null && !table.isDisposed())
+                    popupMenu[0] = table.getMenu();
             }
         });
 

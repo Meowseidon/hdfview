@@ -2,6 +2,7 @@ package uitest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -28,6 +29,66 @@ import org.junit.jupiter.api.Test;
 @Tag("ui")
 @Tag("integration")
 public class TestHDFViewDatasetStatistics extends AbstractWindowTest {
+    @Test
+    public void dataContentToolbarOpensStatisticsAndRefreshesLanguage()
+    {
+        selectLanguage(I18n.Language.ENGLISH);
+        File hdfFile = openFile("tscalarintsize.h5", FILE_MODE.READ_ONLY);
+        SWTBotShell statisticsShell = null;
+        try {
+            SWTBotTreeItem dataset = bot.tree().getTreeItem(hdfFile.getName()).getNode("DS08BITS");
+            dataset.click();
+
+            SWTBotShell mainShell = new SWTBotShell(shell);
+            assertEquals(ui("table.statistics"),
+                         mainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).getText());
+            mainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).click();
+            statisticsShell = bot.shell(ui("statistics.title"));
+            waitForValue(statisticsShell.bot().table(), 0, 1);
+
+            switchLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+            SWTBotShell chineseMainShell = new SWTBotShell(shell);
+            assertEquals(ui("table.statistics"),
+                         chineseMainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).getText());
+
+            switchLanguage(I18n.Language.ENGLISH);
+            SWTBotShell englishMainShell = new SWTBotShell(shell);
+            assertEquals(ui("table.statistics"),
+                         englishMainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).getText());
+        }
+        finally {
+            if (statisticsShell != null && statisticsShell.isOpen())
+                statisticsShell.close();
+            closeFile(hdfFile, false);
+        }
+    }
+
+    @Test
+    public void embeddedNatTableContextMenuReachesExistingTableStatisticsAction()
+    {
+        selectLanguage(I18n.Language.ENGLISH);
+        File hdfFile = openFile("tscalarintsize.h5", FILE_MODE.READ_ONLY);
+        SWTBotShell statisticsShell = null;
+        try {
+            SWTBotTreeItem dataset = bot.tree().getTreeItem(hdfFile.getName()).getNode("DS08BITS");
+            dataset.click();
+
+            SWTBotShell mainShell = new SWTBotShell(shell);
+            SWTBotNatTable table = new SWTBotNatTable(
+                mainShell.bot().widget(WidgetMatcherFactory.widgetOfType(NatTable.class)));
+            table.contextMenu(1, 1).menu(ui("table")).menu(ui("table.showStatistics")).click();
+
+            statisticsShell = bot.shell(ui("statistics.title"));
+            waitForValue(statisticsShell.bot().table(), 0, 1);
+            assertTrue(statisticsShell.isOpen(), "NatTable context menu must open Dataset statistics");
+        }
+        finally {
+            if (statisticsShell != null && statisticsShell.isOpen())
+                statisticsShell.close();
+            closeFile(hdfFile, false);
+        }
+    }
+
     @Test
     public void currentAndEntireDatasetStatisticsAreLocalizedAndCancelable()
     {
@@ -201,6 +262,12 @@ public class TestHDFViewDatasetStatistics extends AbstractWindowTest {
                     return "Timed out waiting for the Dataset switch to clear the previous highlight";
                 }
             });
+
+            mainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).click();
+            statisticsShell = bot.shell(ui("statistics.title"));
+            waitForValue(statisticsShell.bot().table(), 0, 1);
+            assertTrue(statisticsShell.bot().label(0).getText().contains("DU08BITS"),
+                       "Statistics toolbar must target the current Dataset after switching");
         }
         finally {
             if (statisticsShell != null && statisticsShell.isOpen())
