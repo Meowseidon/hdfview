@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Shell;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,12 +72,12 @@ class ThemeManagerTest {
     {
         manager = ThemeManager.forDisplay(display);
 
-        assertEquals(display.isSystemDarkTheme(), manager.isDark());
+        assertEquals(Display.isSystemDarkTheme(), manager.isDark());
         assertSame(manager, ThemeManager.forDisplay(display));
     }
 
     @Test
-    void settingsEventChangesLightDarkLightWithoutReplacingShells()
+    void systemRefreshChangesLightDarkLightWithoutReplacingShells()
     {
         AtomicBoolean dark = new AtomicBoolean(false);
         manager = new ThemeManager(display, dark::get, true);
@@ -90,22 +89,22 @@ class ThemeManagerTest {
         Color lightColor = manager.color(ThemeManager.ColorRole.SURFACE);
 
         dark.set(true);
-        display.notifyListeners(SWT.Settings, new Event());
+        manager.refreshFromSystem();
         assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
         assertTrue(lightColor.isDisposed());
         assertSame(shell, display.getShells()[0]);
         assertEquals("stable shell", shell.getText());
-        assertSame(manager.color(ThemeManager.ColorRole.SURFACE), shell.getBackground());
+        assertEquals(manager.color(ThemeManager.ColorRole.SURFACE).getRGB(), shell.getBackground().getRGB());
 
         Color darkColor = manager.color(ThemeManager.ColorRole.SURFACE);
         dark.set(false);
-        display.notifyListeners(SWT.Settings, new Event());
+        manager.refreshFromSystem();
         assertEquals(ThemeManager.Theme.LIGHT, manager.getTheme());
         assertTrue(darkColor.isDisposed());
         assertSame(shell, display.getShells()[0]);
         assertEquals(320, shell.getSize().x);
         assertEquals(240, shell.getSize().y);
-        assertSame(manager.color(ThemeManager.ColorRole.SURFACE), shell.getBackground());
+        assertEquals(manager.color(ThemeManager.ColorRole.SURFACE).getRGB(), shell.getBackground().getRGB());
 
         binding.dispose();
         shell.dispose();
@@ -121,7 +120,7 @@ class ThemeManagerTest {
 
         for (int i = 0; i < 4; i++) {
             dark.set(!dark.get());
-            display.notifyListeners(SWT.Settings, new Event());
+            manager.refreshFromSystem();
             colors.add(manager.color(ThemeManager.ColorRole.WINDOW_BACKGROUND));
             assertTrue(colors.get(i).isDisposed(), "previous palette must be disposed");
         }

@@ -1498,7 +1498,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         return style;
     }
 
-    private void registerTableStyle(IConfigRegistry configRegistry, String configLabel, String displayMode,
+    private void registerTableStyle(IConfigRegistry configRegistry, String configLabel, DisplayMode displayMode,
                                     Style style)
     {
         configRegistry.registerConfigAttribute(CellConfigAttributes.CELL_STYLE, style, displayMode, configLabel);

@@ -90,7 +90,7 @@ public final class ThemeManager {
         if (existing instanceof ThemeManager manager && !manager.disposed)
             return manager;
 
-        ThemeManager manager = new ThemeManager(display, display::isSystemDarkTheme, true);
+        ThemeManager manager = new ThemeManager(display, Display::isSystemDarkTheme, true);
         display.setData(DISPLAY_DATA_KEY, manager);
         return manager;
     }
