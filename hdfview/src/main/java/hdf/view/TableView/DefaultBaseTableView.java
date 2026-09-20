@@ -363,7 +363,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         isEmbedded = parent != null;
         viewParent = isEmbedded ? parent : new Shell(display, SWT.SHELL_TRIM);
         shell      = viewParent.getShell();
-        themeManager.applyTo(shell);
+        if (!isEmbedded)
+            themeManager.applyTo(shell);
 
         if (!isEmbedded)
             viewParent.setData(this);

@@ -14,15 +14,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.RGB;
+import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
-import org.eclipse.swt.widgets.Tree;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.Test;
 class ThemeManagerTest {
     private Display display;
     private ThemeManager manager;
+    private org.eclipse.swt.widgets.Listener settingsListener;
 
     @BeforeEach
     void setUp()
@@ -61,6 +65,23 @@ class ThemeManagerTest {
     }
 
     @Test
+    void lightPaletteKeepsSystemAndLegacyLightColors()
+    {
+        manager = new ThemeManager(display, () -> false, false);
+
+        assertEquals(display.getSystemColor(SWT.COLOR_WIDGET_FOREGROUND).getRGB(),
+                     manager.color(ThemeManager.ColorRole.FOREGROUND).getRGB());
+        assertEquals(display.getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW).getRGB(),
+                     manager.color(ThemeManager.ColorRole.SECONDARY_SURFACE).getRGB());
+        assertEquals(new RGB(255, 255, 240),
+                     manager.color(ThemeManager.ColorRole.INPUT_BACKGROUND).getRGB());
+        assertEquals(display.getSystemColor(SWT.COLOR_GRAY).getRGB(),
+                     manager.color(ThemeManager.ColorRole.READ_ONLY_BACKGROUND).getRGB());
+        assertEquals(display.getSystemColor(SWT.COLOR_YELLOW).getRGB(),
+                     manager.color(ThemeManager.ColorRole.STATISTICS_HIGHLIGHT_BACKGROUND).getRGB());
+    }
+
+    @Test
     void startsWithTheDetectedDarkTheme()
     {
         manager = new ThemeManager(display, () -> true, false);
@@ -81,10 +102,59 @@ class ThemeManagerTest {
     }
 
     @Test
-    void systemRefreshChangesLightDarkLightWithoutReplacingShells()
+    void applyToOnlyChangesShellNativeThemePreference()
+    {
+        manager = new ThemeManager(display, () -> true, false);
+        Shell shell = new Shell(display);
+        Composite page = new Composite(shell, SWT.NONE);
+        Color customBackground = new Color(display, new RGB(17, 19, 23));
+        Color customForeground = new Color(display, new RGB(231, 137, 61));
+        page.setBackground(customBackground);
+        page.setForeground(customForeground);
+
+        manager.applyTo(shell);
+
+        assertEquals(customBackground.getRGB(), page.getBackground().getRGB());
+        assertEquals(customForeground.getRGB(), page.getForeground().getRGB());
+
+        shell.dispose();
+        customBackground.dispose();
+        customForeground.dispose();
+    }
+
+    @Test
+    void doesNotThemeOrdinaryControlsWhenTheirShellIsShown()
+    {
+        manager = new ThemeManager(display, () -> true, true);
+        Shell shell = new Shell(display);
+        Composite page = new Composite(shell, SWT.NONE);
+        Label label = new Label(page, SWT.NONE);
+        Text input = new Text(page, SWT.BORDER);
+        Button button = new Button(page, SWT.PUSH);
+        Color customBackground = new Color(display, new RGB(13, 27, 41));
+        Color customForeground = new Color(display, new RGB(221, 161, 79));
+        page.setBackground(customBackground);
+        label.setForeground(customForeground);
+        input.setBackground(customBackground);
+        button.setForeground(customForeground);
+
+        shell.open();
+
+        assertEquals(customBackground.getRGB(), page.getBackground().getRGB());
+        assertEquals(customForeground.getRGB(), label.getForeground().getRGB());
+        assertEquals(customBackground.getRGB(), input.getBackground().getRGB());
+        assertEquals(customForeground.getRGB(), button.getForeground().getRGB());
+
+        shell.dispose();
+        customBackground.dispose();
+        customForeground.dispose();
+    }
+
+    @Test
+    void settingsEventChangesLightDarkLightWithoutReplacingShells()
     {
         AtomicBoolean dark = new AtomicBoolean(false);
-        manager = new ThemeManager(display, dark::get, true);
+        manager = listeningManager(dark::get);
         Shell shell = new Shell(display);
         shell.setText("stable shell");
         shell.setSize(320, 240);
@@ -93,7 +163,7 @@ class ThemeManagerTest {
         Color lightColor = manager.color(ThemeManager.ColorRole.SURFACE);
 
         dark.set(true);
-        manager.refreshFromSystem();
+        fireSettingsEvent();
         assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
         assertTrue(lightColor.isDisposed());
         assertSame(shell, display.getShells()[0]);
@@ -102,7 +172,7 @@ class ThemeManagerTest {
 
         Color darkColor = manager.color(ThemeManager.ColorRole.SURFACE);
         dark.set(false);
-        manager.refreshFromSystem();
+        fireSettingsEvent();
         assertEquals(ThemeManager.Theme.LIGHT, manager.getTheme());
         assertTrue(darkColor.isDisposed());
         assertSame(shell, display.getShells()[0]);
@@ -115,65 +185,16 @@ class ThemeManagerTest {
     }
 
     @Test
-    void themesOrdinaryPageControlsAndRefreshesThemWithoutReplacingTheShell()
-    {
-        AtomicBoolean dark = new AtomicBoolean(false);
-        manager = new ThemeManager(display, dark::get, false);
-        Shell shell = new Shell(display);
-        Composite page = new Composite(shell, SWT.NONE);
-        Label label = new Label(page, SWT.NONE);
-        Text input = new Text(page, SWT.BORDER);
-        Tree tree = new Tree(page, SWT.BORDER);
-
-        manager.applyTo(shell);
-
-        assertEquals(manager.color(ThemeManager.ColorRole.SURFACE).getRGB(), page.getBackground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.FOREGROUND).getRGB(), label.getForeground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.INPUT_BACKGROUND).getRGB(), input.getBackground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.TABLE_BODY_BACKGROUND).getRGB(),
-                     tree.getBackground().getRGB());
-
-        dark.set(true);
-        manager.refreshFromSystem();
-
-        assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
-        assertEquals(manager.color(ThemeManager.ColorRole.SURFACE).getRGB(), page.getBackground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.INPUT_BACKGROUND).getRGB(), input.getBackground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.TABLE_BODY_BACKGROUND).getRGB(),
-                     tree.getBackground().getRGB());
-
-        shell.dispose();
-    }
-
-    @Test
-    void themesControlsWhenTheirShellIsShown()
-    {
-        manager = new ThemeManager(display, () -> true, true);
-        Shell shell = new Shell(display);
-        Composite page = new Composite(shell, SWT.NONE);
-        Label label = new Label(page, SWT.NONE);
-        Text input = new Text(page, SWT.BORDER);
-
-        shell.open();
-
-        assertEquals(manager.color(ThemeManager.ColorRole.SURFACE).getRGB(), page.getBackground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.FOREGROUND).getRGB(), label.getForeground().getRGB());
-        assertEquals(manager.color(ThemeManager.ColorRole.INPUT_BACKGROUND).getRGB(), input.getBackground().getRGB());
-
-        shell.dispose();
-    }
-
-    @Test
     void disposesEveryReplacedPaletteAndTheFinalPalette()
     {
         AtomicBoolean dark = new AtomicBoolean(false);
-        manager = new ThemeManager(display, dark::get, true);
+        manager = listeningManager(dark::get);
         List<Color> colors = new ArrayList<>();
         colors.add(manager.color(ThemeManager.ColorRole.WINDOW_BACKGROUND));
 
         for (int i = 0; i < 4; i++) {
             dark.set(!dark.get());
-            manager.refreshFromSystem();
+            fireSettingsEvent();
             colors.add(manager.color(ThemeManager.ColorRole.WINDOW_BACKGROUND));
             assertTrue(colors.get(i).isDisposed(), "previous palette must be disposed");
         }
@@ -196,5 +217,22 @@ class ThemeManagerTest {
                 + Math.abs(background.getRGB().blue - foreground.getRGB().blue);
             assertTrue(distance > 150, "statistics highlight must have visible contrast");
         }
+    }
+
+    private ThemeManager listeningManager(BooleanSupplier detector)
+    {
+        return new ThemeManager(display, detector, true,
+                                listener -> settingsListener = listener,
+                                listener -> {
+                                    if (settingsListener == listener)
+                                        settingsListener = null;
+                                });
+    }
+
+    /** SWT 3.134 has no public Display.notifyListeners; dispatch the registered public listener seam. */
+    private void fireSettingsEvent()
+    {
+        assertTrue(settingsListener != null, "ThemeManager did not register an SWT.Settings listener");
+        settingsListener.handleEvent(new Event());
     }
 }

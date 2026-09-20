@@ -13,30 +13,18 @@ package hdf.view;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.custom.CCombo;
-import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.RGB;
-import org.eclipse.swt.widgets.Canvas;
-import org.eclipse.swt.widgets.Combo;
-import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Spinner;
-import org.eclipse.swt.widgets.Table;
-import org.eclipse.swt.widgets.Text;
-import org.eclipse.swt.widgets.Tree;
 
 /**
  * Owns HDFView's semantic colors and follows the operating-system theme.
@@ -65,6 +53,7 @@ public final class ThemeManager {
         DISABLED_FOREGROUND,
         INPUT_BACKGROUND,
         INPUT_FOREGROUND,
+        READ_ONLY_BACKGROUND,
         TABLE_BODY_BACKGROUND,
         TABLE_BODY_FOREGROUND,
         TABLE_HEADER_BACKGROUND,
@@ -82,11 +71,7 @@ public final class ThemeManager {
     private final BooleanSupplier systemThemeDetector;
     private final List<Consumer<ThemeManager>> listeners = new ArrayList<>();
     private final Listener settingsListener = event -> refreshFromSystem();
-    private final Listener controlShowListener = event -> {
-        if (event.widget instanceof Control control)
-            applyControlTree(control);
-    };
-    private final Map<Control, Integer> explicitlyBoundControls = new IdentityHashMap<>();
+    private Runnable removeSettingsListener = () -> {};
 
     private EnumMap<ColorRole, Color> colors;
     private Theme theme;
@@ -119,15 +104,30 @@ public final class ThemeManager {
      */
     ThemeManager(Display display, BooleanSupplier systemThemeDetector, boolean listenToSettings)
     {
+        this(display, systemThemeDetector, listenToSettings,
+             listener -> display.addListener(SWT.Settings, listener),
+             listener -> display.removeListener(SWT.Settings, listener));
+    }
+
+    /**
+     * Package-level constructor with an injectable Settings registration seam
+     * for deterministic tests.  Production callers use the constructor above,
+     * which registers directly with SWT's public Display API.
+     */
+    ThemeManager(Display display, BooleanSupplier systemThemeDetector, boolean listenToSettings,
+                 Consumer<Listener> addSettingsListener, Consumer<Listener> removeSettingsListener)
+    {
         this.display = Objects.requireNonNull(display, "display");
         this.systemThemeDetector = Objects.requireNonNull(systemThemeDetector, "systemThemeDetector");
+        Objects.requireNonNull(addSettingsListener, "addSettingsListener");
+        Objects.requireNonNull(removeSettingsListener, "removeSettingsListener");
         this.theme = systemThemeDetector.getAsBoolean() ? Theme.DARK : Theme.LIGHT;
         this.colors = createPalette(theme);
 
         applyNativeThemePreference(theme);
         if (listenToSettings) {
-            display.addListener(SWT.Settings, settingsListener);
-            display.addFilter(SWT.Show, controlShowListener);
+            addSettingsListener.accept(settingsListener);
+            this.removeSettingsListener = () -> removeSettingsListener.accept(settingsListener);
         }
         display.disposeExec(this::dispose);
     }
@@ -175,7 +175,6 @@ public final class ThemeManager {
             colors = createPalette(nextTheme);
             theme = nextTheme;
             try {
-                applyThemeToOpenShells();
                 for (Consumer<ThemeManager> listener : new ArrayList<>(listeners))
                     listener.accept(this);
             }
@@ -214,9 +213,6 @@ public final class ThemeManager {
             throw new IllegalArgumentException("Shell belongs to a different Display");
 
         shell.setDarkThemePreferred(isDark());
-        applyControlTree(shell);
-        shell.redraw();
-        shell.layout(true, true);
     }
 
     /** Bind a control's explicit background and foreground to semantic roles. */
@@ -228,15 +224,11 @@ public final class ThemeManager {
         if (control.isDisposed())
             throw new IllegalStateException("Control is disposed");
 
-        explicitlyBoundControls.merge(control, 1, Integer::sum);
         applyColors(control, backgroundRole, foregroundRole);
-        Consumer<ThemeManager> listener = manager -> {
+        Registration registration = addListener(manager -> {
             if (!control.isDisposed())
                 manager.applyColors(control, backgroundRole, foregroundRole);
-        };
-        listeners.add(listener);
-        Registration registration = new Registration(this, listener,
-                                                     () -> releaseExplicitBinding(control));
+        });
         control.addDisposeListener(event -> registration.dispose());
         return registration;
     }
@@ -261,13 +253,12 @@ public final class ThemeManager {
 
         disposed = true;
         if (!display.isDisposed()) {
-            display.removeListener(SWT.Settings, settingsListener);
-            display.removeFilter(SWT.Show, controlShowListener);
+            removeSettingsListener.run();
             if (display.getData(DISPLAY_DATA_KEY) == this)
                 display.setData(DISPLAY_DATA_KEY, null);
         }
+        removeSettingsListener = () -> {};
         listeners.clear();
-        explicitlyBoundControls.clear();
         disposePalette(colors);
         colors = new EnumMap<>(ColorRole.class);
     }
@@ -290,67 +281,7 @@ public final class ThemeManager {
         for (Shell shell : display.getShells()) {
             if (!shell.isDisposed()) {
                 shell.setDarkThemePreferred(dark);
-                shell.redraw();
             }
-        }
-    }
-
-    /** Repaint all currently existing Shell trees with the current semantic palette. */
-    private void applyThemeToOpenShells()
-    {
-        if (display.isDisposed())
-            return;
-        for (Shell shell : display.getShells()) {
-            if (!shell.isDisposed())
-                applyControlTree(shell);
-        }
-    }
-
-    /**
-     * Apply defaults to ordinary SWT controls without taking ownership of
-     * custom-painted canvases or overriding an explicit semantic binding.
-     */
-    private void applyControlTree(Control control)
-    {
-        if (control == null || control.isDisposed())
-            return;
-
-        if (!explicitlyBoundControls.containsKey(control))
-            applyDefaultColors(control);
-
-        if (control instanceof Composite composite) {
-            for (Control child : composite.getChildren())
-                applyControlTree(child);
-        }
-    }
-
-    private void applyDefaultColors(Control control)
-    {
-        if (control instanceof Shell) {
-            control.setBackground(color(ColorRole.WINDOW_BACKGROUND));
-            control.setForeground(color(ColorRole.FOREGROUND));
-        }
-        else if (control instanceof Tree || control instanceof Table ||
-                 control instanceof org.eclipse.swt.widgets.List) {
-            control.setBackground(color(ColorRole.TABLE_BODY_BACKGROUND));
-            control.setForeground(color(ColorRole.TABLE_BODY_FOREGROUND));
-        }
-        else if (control instanceof Text || control instanceof Combo ||
-                 control instanceof CCombo || control instanceof Spinner ||
-                 control instanceof StyledText) {
-            control.setBackground(color(ColorRole.INPUT_BACKGROUND));
-            control.setForeground(color(ColorRole.INPUT_FOREGROUND));
-        }
-        else if (control instanceof Canvas) {
-            // NatTable, charts, images, and palettes own their pixel colors.
-        }
-        else if (control instanceof Label) {
-            control.setBackground(color(ColorRole.SURFACE));
-            control.setForeground(color(ColorRole.FOREGROUND));
-        }
-        else {
-            control.setBackground(color(ColorRole.SURFACE));
-            control.setForeground(color(ColorRole.FOREGROUND));
         }
     }
 
@@ -373,40 +304,47 @@ public final class ThemeManager {
         boolean dark = selectedTheme == Theme.DARK;
         switch (role) {
         case WINDOW_BACKGROUND:
-            return dark ? new RGB(30, 31, 34) : new RGB(250, 250, 250);
+            return dark ? new RGB(30, 31, 34) : systemRGB(SWT.COLOR_WHITE);
         case SURFACE:
             return dark ? new RGB(43, 45, 48) : new RGB(255, 255, 255);
         case SECONDARY_SURFACE:
-            return dark ? new RGB(54, 57, 62) : new RGB(242, 243, 245);
+            return dark ? new RGB(54, 57, 62) : systemRGB(SWT.COLOR_WIDGET_LIGHT_SHADOW);
         case FOREGROUND:
-            return dark ? new RGB(232, 234, 237) : new RGB(31, 32, 35);
+            return dark ? new RGB(232, 234, 237) : systemRGB(SWT.COLOR_WIDGET_FOREGROUND);
         case DISABLED_FOREGROUND:
-            return dark ? new RGB(145, 147, 153) : new RGB(128, 128, 128);
+            return dark ? new RGB(145, 147, 153) : systemRGB(SWT.COLOR_WIDGET_DISABLED_FOREGROUND);
         case INPUT_BACKGROUND:
-            return dark ? new RGB(36, 38, 42) : new RGB(255, 255, 255);
+            return dark ? new RGB(36, 38, 42) : new RGB(255, 255, 240);
         case INPUT_FOREGROUND:
-            return dark ? new RGB(232, 234, 237) : new RGB(31, 32, 35);
+            return dark ? new RGB(232, 234, 237) : systemRGB(SWT.COLOR_WIDGET_FOREGROUND);
+        case READ_ONLY_BACKGROUND:
+            return dark ? new RGB(54, 57, 62) : systemRGB(SWT.COLOR_GRAY);
         case TABLE_BODY_BACKGROUND:
-            return dark ? new RGB(30, 31, 34) : new RGB(255, 255, 255);
+            return dark ? new RGB(30, 31, 34) : systemRGB(SWT.COLOR_WHITE);
         case TABLE_BODY_FOREGROUND:
-            return dark ? new RGB(232, 234, 237) : new RGB(31, 32, 35);
+            return dark ? new RGB(232, 234, 237) : systemRGB(SWT.COLOR_LIST_FOREGROUND);
         case TABLE_HEADER_BACKGROUND:
-            return dark ? new RGB(58, 61, 68) : new RGB(230, 232, 235);
+            return dark ? new RGB(58, 61, 68) : systemRGB(SWT.COLOR_WIDGET_NORMAL_SHADOW);
         case TABLE_HEADER_FOREGROUND:
-            return dark ? new RGB(245, 246, 248) : new RGB(31, 32, 35);
+            return dark ? new RGB(245, 246, 248) : systemRGB(SWT.COLOR_WIDGET_FOREGROUND);
         case SELECTION_BACKGROUND:
-            return dark ? new RGB(60, 110, 170) : new RGB(190, 220, 255);
+            return dark ? new RGB(60, 110, 170) : systemRGB(SWT.COLOR_LIST_SELECTION);
         case SELECTION_FOREGROUND:
-            return dark ? new RGB(255, 255, 255) : new RGB(20, 44, 72);
+            return dark ? new RGB(255, 255, 255) : systemRGB(SWT.COLOR_LIST_SELECTION_TEXT);
         case STATISTICS_HIGHLIGHT_BACKGROUND:
-            return dark ? new RGB(115, 87, 0) : new RGB(255, 233, 135);
+            return dark ? new RGB(115, 87, 0) : systemRGB(SWT.COLOR_YELLOW);
         case STATISTICS_HIGHLIGHT_FOREGROUND:
-            return dark ? new RGB(255, 244, 179) : new RGB(31, 31, 31);
+            return dark ? new RGB(255, 244, 179) : systemRGB(SWT.COLOR_BLACK);
         case SEPARATOR:
-            return dark ? new RGB(93, 96, 103) : new RGB(200, 202, 206);
+            return dark ? new RGB(93, 96, 103) : systemRGB(SWT.COLOR_WIDGET_LIGHT_SHADOW);
         default:
             throw new IllegalArgumentException("Unknown color role: " + role);
         }
+    }
+
+    private RGB systemRGB(int systemColorId)
+    {
+        return display.getSystemColor(systemColorId).getRGB();
     }
 
     private void disposePalette(EnumMap<ColorRole, Color> palette)
@@ -425,33 +363,15 @@ public final class ThemeManager {
         listeners.remove(listener);
     }
 
-    private void releaseExplicitBinding(Control control)
-    {
-        Integer count = explicitlyBoundControls.get(control);
-        if (count == null)
-            return;
-        if (count == 1)
-            explicitlyBoundControls.remove(control);
-        else
-            explicitlyBoundControls.put(control, count - 1);
-    }
-
     /** Handle used to detach a control or table listener. */
     public static final class Registration implements AutoCloseable {
         private ThemeManager manager;
         private Consumer<ThemeManager> listener;
-        private Runnable cleanup;
 
         private Registration(ThemeManager manager, Consumer<ThemeManager> listener)
         {
-            this(manager, listener, null);
-        }
-
-        private Registration(ThemeManager manager, Consumer<ThemeManager> listener, Runnable cleanup)
-        {
             this.manager = manager;
             this.listener = listener;
-            this.cleanup = cleanup;
         }
 
         /** Detach this registration. */
@@ -459,13 +379,9 @@ public final class ThemeManager {
         {
             if (manager == null)
                 return;
-            ThemeManager currentManager = manager;
-            currentManager.removeListener(listener);
-            if (cleanup != null)
-                cleanup.run();
+            manager.removeListener(listener);
             manager = null;
             listener = null;
-            cleanup = null;
         }
 
         @Override

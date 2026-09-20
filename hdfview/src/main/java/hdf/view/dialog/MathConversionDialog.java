@@ -185,7 +185,7 @@ public class MathConversionDialog extends Dialog {
         infoArea = new Text(contentGroup, SWT.MULTI | SWT.BORDER | SWT.WRAP);
         infoArea.setEditable(false);
         infoArea.setFont(curFont);
-        themeManager.bind(infoArea, ThemeManager.ColorRole.SECONDARY_SURFACE,
+        themeManager.bind(infoArea, ThemeManager.ColorRole.READ_ONLY_BACKGROUND,
                           ThemeManager.ColorRole.FOREGROUND);
         GridData infoAreaData      = new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1);
         infoAreaData.minimumHeight = 150;
