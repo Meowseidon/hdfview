@@ -224,8 +224,8 @@ public final class DatasetSearchEngine {
 
     /**
      * Search with transient dirty-buffer snapshots captured by existing
-     * TableViews.  A matching snapshot replaces the on-disk read for that
-     * Dataset; it is never written back by the search.
+     * TableViews.  Matching snapshots overlay only their selected coordinates
+     * on the bounded on-disk reads; they are never written back by the search.
      */
     public SearchSummary search(List<FileFormat> files, String query, SearchMode mode,
                                 AtomicBoolean cancelled, Listener listener,
@@ -325,11 +325,7 @@ public final class DatasetSearchEngine {
             if (cancelled.get())
                 break;
 
-            DatasetSearchSnapshot snapshot = findSnapshot(dirtySnapshots, target);
-            if (snapshot != null) {
-                searchSnapshot(snapshot, phrase, target, state, cancelled);
-                continue;
-            }
+            List<DatasetSearchSnapshot> snapshots = findSnapshots(dirtySnapshots, target);
 
             Dataset scanner = null;
             try {
@@ -365,6 +361,9 @@ public final class DatasetSearchEngine {
                     if (data == null)
                         throw new IllegalStateException("Dataset block read returned no data");
 
+                    data = overlayDirtySnapshots(data, block, rawDatatype, snapshots, cancelled);
+                    if (cancelled.get())
+                        break;
                     long blockElements = block.getElementCount();
                     processBlock(data, block, datatype, rawDatatype, phrase, target, state);
                     state.processedElements = safeAdd(state.processedElements, blockElements);
@@ -391,67 +390,117 @@ public final class DatasetSearchEngine {
         }
     }
 
-    private DatasetSearchSnapshot findSnapshot(List<DatasetSearchSnapshot> snapshots,
-                                               DatasetTarget target)
+    private List<DatasetSearchSnapshot> findSnapshots(List<DatasetSearchSnapshot> snapshots,
+                                                      DatasetTarget target)
     {
         if (snapshots == null || snapshots.isEmpty())
-            return null;
+            return Collections.emptyList();
 
         String filePath = safeFilePath(target.file);
         String datasetPath = fullPath(target.dataset);
+        List<DatasetSearchSnapshot> matches = new ArrayList<>();
         for (DatasetSearchSnapshot snapshot : snapshots) {
             if (snapshot != null && snapshot.matches(filePath, datasetPath))
-                return snapshot;
+                matches.add(snapshot);
         }
-        return null;
+        return matches.isEmpty() ? Collections.emptyList() : matches;
     }
 
-    private void searchSnapshot(DatasetSearchSnapshot snapshot, String phrase,
-                                DatasetTarget target, RunState state, AtomicBoolean cancelled)
+    /**
+     * Overlay every dirty view that belongs to this Dataset onto one bounded
+     * scan block.  The returned object may be a replacement for a scalar
+     * block; array blocks are updated in place because the native read already
+     * returned an independent buffer.
+     */
+    private static Object overlayDirtySnapshots(Object blockData, Block block,
+                                                Datatype rawDatatype,
+                                                List<DatasetSearchSnapshot> snapshots,
+                                                AtomicBoolean cancelled)
     {
-        Object data = snapshot.getData();
-        Datatype rawDatatype = snapshot.getDatatype();
-        Datatype datatype = scalarDatatype(rawDatatype);
-        if (!isSupportedValueType(datatype)) {
-            String description = datatype == null ? "Unknown datatype" : datatype.getDescription();
-            state.error(fullPath(target.dataset), description,
-                        new UnsupportedOperationException(description));
-            return;
-        }
+        if (snapshots == null || snapshots.isEmpty())
+            return blockData;
 
-        int length = valueLength(data);
-        state.totalElements = safeAdd(state.totalElements, snapshot.getElementCount());
-        int valuesPerCell = valuesPerCell(rawDatatype);
-        NumericQuery numeric = (datatype.isInteger() || datatype.isFloat())
-            ? NumericQuery.parse(phrase, datatype.isInteger()) : null;
-        String folded = phrase.toLowerCase(Locale.ROOT);
-        for (int offset = 0; offset < length; offset++) {
+        int blockValuesPerCell = valuesPerCell(rawDatatype);
+        Object result = blockData;
+        for (DatasetSearchSnapshot snapshot : snapshots) {
+            if (snapshot == null)
+                continue;
+
+            int dirtyValuesPerCell = valuesPerCell(snapshot.getDatatype());
+            if (dirtyValuesPerCell != blockValuesPerCell)
+                continue;
+
+            result = overlayDirtySnapshot(result, block, snapshot,
+                                          blockValuesPerCell, cancelled);
+        }
+        return result;
+    }
+
+    /** Overlay one selected dirty view; later snapshots win on exact overlap. */
+    private static Object overlayDirtySnapshot(Object blockData, Block block,
+                                               DatasetSearchSnapshot snapshot,
+                                               int valuesPerCell,
+                                               AtomicBoolean cancelled)
+    {
+        Object dirtyData = snapshot.getData();
+        int dirtyLength = valueLength(dirtyData);
+        int blockLength = valueLength(blockData);
+        Object[] overlayData = null;
+        for (int valueIndex = 0; valueIndex < dirtyLength; valueIndex++) {
             if (cancelled.get())
                 break;
 
-            Object value = valueAt(data, offset);
-            boolean matched;
-            if (numeric != null)
-                matched = numeric.valid && numeric.matches(value);
-            else {
-                String text = datatype.isChar() ? charScalarToText(value) : scalarToText(value);
-                matched = text.toLowerCase(Locale.ROOT).contains(folded);
-            }
+            long[] coordinate = snapshot.coordinateForValue(valueIndex, valuesPerCell);
+            int localCell = localIndex(coordinate, block.start, block.count);
+            if (localCell < 0)
+                continue;
 
-            if (matched) {
-                String text = datatype.isChar() ? charScalarToText(value) : scalarToText(value);
-                DatasetSearchResult.MatchType matchType = numeric != null
-                    ? DatasetSearchResult.MatchType.NUMERIC_VALUE
-                    : (datatype.isChar() ? DatasetSearchResult.MatchType.CHAR_VALUE
-                                          : DatasetSearchResult.MatchType.STRING_VALUE);
-                state.emit(new DatasetSearchResult(safeFilePath(target.file), fullPath(target.dataset), text,
-                                                   snapshot.coordinateForValue(offset, valuesPerCell), matchType));
-            }
+            long localValue = (long)localCell * valuesPerCell + valueIndex % valuesPerCell;
+            if (localValue < 0 || localValue >= blockLength)
+                continue;
 
-            state.processedElements = safeAdd(state.processedElements,
-                                              offset + 1 == length ? snapshot.getElementCount() : 0);
+            Object value = valueAt(dirtyData, valueIndex);
+            if (blockData != null && blockData.getClass().isArray()) {
+                if (overlayData == null)
+                    overlayData = objectArray(blockData);
+                overlayData[(int)localValue] = value;
+            }
+            else if (localValue == 0) {
+                blockData = value;
+            }
         }
-        state.progress(fullPath(target.dataset));
+        return overlayData == null ? blockData : overlayData;
+    }
+
+    /** Copy primitive read arrays to boxed values so dirty display wrappers can overlay them. */
+    private static Object[] objectArray(Object data)
+    {
+        if (data instanceof Object[])
+            return (Object[])data;
+
+        int length = Array.getLength(data);
+        Object[] result = new Object[length];
+        for (int i = 0; i < length; i++)
+            result[i] = Array.get(data, i);
+        return result;
+    }
+
+    private static int localIndex(long[] coordinate, long[] start, long[] count)
+    {
+        if (coordinate == null || start == null || count == null ||
+            coordinate.length != start.length || coordinate.length != count.length)
+            return -1;
+
+        long index = 0;
+        for (int i = 0; i < coordinate.length; i++) {
+            if (coordinate[i] < start[i] || coordinate[i] >= start[i] + count[i])
+                return -1;
+            long local = coordinate[i] - start[i];
+            if (index > Integer.MAX_VALUE / Math.max(1L, count[i]))
+                return -1;
+            index = index * count[i] + local;
+        }
+        return index > Integer.MAX_VALUE ? -1 : (int)index;
     }
 
     private Object readBlock(Dataset scanner, Block block) throws Exception

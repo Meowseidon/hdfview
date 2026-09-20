@@ -15,6 +15,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -177,6 +178,82 @@ class DatasetSearchEngineTest {
     }
 
     @Test
+    void dirtyPagesOverlayTheWholeDatasetAndPreserveTheDiskAndBuffers() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tframeselection.h5")) {
+            Dataset dataset = firstDataset(opened.file, true, false, 3);
+            assertNotNull(dataset, "the frame fixture must contain a rank-three numeric Dataset");
+            dataset.init();
+            long[] dims = dataset.getDims();
+            assertArrayEquals(new long[] {5, 5, 5}, dims);
+
+            int[] diskValues = readFullIntDataset(dataset);
+            int pageSize = (int)(dims[1] * dims[2]);
+            int[] pageZero = Arrays.copyOfRange(diskValues, 0, pageSize);
+            int[] pageOne = Arrays.copyOfRange(diskValues, pageSize, pageSize * 2);
+            int originalPageZeroValue = pageZero[0];
+            int originalPageOneValue = pageOne[0];
+
+            int dirtyPageZeroValue = unusedValue(diskValues, 123456789);
+            int dirtyPageOneValue = unusedValue(diskValues, 246813579);
+            pageZero[0] = dirtyPageZeroValue;
+            pageOne[0] = dirtyPageOneValue;
+
+            int diskOnlyIndex = -1;
+            for (int i = pageSize * 2; i < diskValues.length; i++) {
+                if (!contains(pageZero, diskValues[i]) && !contains(pageOne, diskValues[i])) {
+                    diskOnlyIndex = i;
+                    break;
+                }
+            }
+            assertTrue(diskOnlyIndex >= 0,
+                       "the fixture must provide a value outside both dirty pages");
+
+            List<DatasetSearchSnapshot> dirtySnapshots = Arrays.asList(
+                new DatasetSearchSnapshot(opened.file.getFilePath(), dataset.getFullName(), pageZero,
+                                          new long[] {0, 0, 0}, new long[] {1, 5, 5},
+                                          new long[] {1, 1, 1}, dims, dataset.getDatatype()),
+                new DatasetSearchSnapshot(opened.file.getFilePath(), dataset.getFullName(), pageOne,
+                                          new long[] {1, 0, 0}, new long[] {1, 5, 5},
+                                          new long[] {1, 1, 1}, dims, dataset.getDatatype()));
+
+            String datasetPath = dataset.getFullName();
+            long[] diskOnlyCoordinate = linearCoordinate(dims, diskOnlyIndex);
+            List<DatasetSearchResult> diskResults = searchValues(
+                opened.file, DatasetSearchEngine.scalarToText(diskValues[diskOnlyIndex]), dirtySnapshots);
+            assertTrue(hasMatchAt(diskResults, datasetPath, diskOnlyCoordinate,
+                                  DatasetSearchEngine.scalarToText(diskValues[diskOnlyIndex])),
+                       "a dirty page must not hide matching disk content on another page");
+
+            List<DatasetSearchResult> firstDirtyResults = searchValues(
+                opened.file, DatasetSearchEngine.scalarToText(dirtyPageZeroValue), dirtySnapshots);
+            assertTrue(hasMatchAt(firstDirtyResults, datasetPath, new long[] {0, 0, 0},
+                                  DatasetSearchEngine.scalarToText(dirtyPageZeroValue)),
+                       "the first dirty page's new value must be searchable");
+
+            List<DatasetSearchResult> secondDirtyResults = searchValues(
+                opened.file, DatasetSearchEngine.scalarToText(dirtyPageOneValue), dirtySnapshots);
+            assertTrue(hasMatchAt(secondDirtyResults, datasetPath, new long[] {1, 0, 0},
+                                  DatasetSearchEngine.scalarToText(dirtyPageOneValue)),
+                       "a second dirty snapshot for the same Dataset must be merged");
+
+            List<DatasetSearchResult> replacedValueResults = searchValues(
+                opened.file, DatasetSearchEngine.scalarToText(originalPageZeroValue), dirtySnapshots);
+            assertFalse(hasMatchAt(replacedValueResults, datasetPath, new long[] {0, 0, 0},
+                                    DatasetSearchEngine.scalarToText(originalPageZeroValue)),
+                        "the replaced disk value must not survive the dirty overlay");
+
+            assertTrue(pageZero[0] == dirtyPageZeroValue && pageOne[0] == dirtyPageOneValue,
+                       "search must not mutate the captured dirty buffers");
+
+            int[] afterSearch = readFullIntDataset(dataset);
+            assertTrue(afterSearch[0] == originalPageZeroValue &&
+                       afterSearch[pageSize] == originalPageOneValue,
+                       "search must not write dirty values back to the Dataset");
+        }
+    }
+
+    @Test
     void dirtyTableBufferIsSearchedWithoutWritingItToDisk() throws Exception
     {
         try (OpenedFile opened = openFixture("tscalarintsize.h5")) {
@@ -206,6 +283,58 @@ class DatasetSearchEngineTest {
             @Override
             public void onResults(List<DatasetSearchResult> results) { destination.addAll(results); }
         };
+    }
+
+    private static List<DatasetSearchResult> searchValues(FileFormat file, String query,
+                                                           List<DatasetSearchSnapshot> dirtySnapshots)
+    {
+        List<DatasetSearchResult> results = new ArrayList<>();
+        new DatasetSearchEngine().search(Collections.singletonList(file), query,
+                                         DatasetSearchEngine.SearchMode.DATA_VALUE,
+                                         new AtomicBoolean(), collecting(results), dirtySnapshots);
+        return results;
+    }
+
+    private static boolean hasMatchAt(List<DatasetSearchResult> results, String datasetPath,
+                                      long[] coordinate, String matchedValue)
+    {
+        return results.stream().anyMatch(result ->
+            result.getDatasetPath().equals(datasetPath) &&
+            Arrays.equals(coordinate, result.getCoordinate()) &&
+            result.getMatchedValue().equals(matchedValue));
+    }
+
+    private static int[] readFullIntDataset(Dataset dataset) throws Exception
+    {
+        long[] dims = dataset.getDims();
+        long[] start = dataset.getStartDims();
+        long[] count = dataset.getSelectedDims();
+        long[] stride = dataset.getStride();
+        for (int i = 0; i < dims.length; i++) {
+            start[i] = 0;
+            count[i] = dims[i];
+            stride[i] = 1;
+        }
+        dataset.clearData();
+        Object data = dataset.getData();
+        assertTrue(data instanceof int[], "the frame fixture must use a Java int buffer");
+        return (int[])data;
+    }
+
+    private static int unusedValue(int[] values, int candidate)
+    {
+        while (contains(values, candidate))
+            candidate++;
+        return candidate;
+    }
+
+    private static boolean contains(int[] values, int candidate)
+    {
+        for (int value : values) {
+            if (value == candidate)
+                return true;
+        }
+        return false;
     }
 
     private static Dataset firstDataset(FileFormat file, boolean numeric, boolean text, int minimumRank)
