@@ -5,6 +5,7 @@
 
 package hdf.view.statistics;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -194,6 +195,112 @@ class DatasetStatisticsEngineTest {
     }
 
     @Test
+    void entireDatasetOverlaysDirtyNumericArrayCellsWithoutWritingDisk() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tattr2.h5")) {
+            Dataset dataset = findDataset(opened.file, "/g2/array2D");
+            assertTrue(dataset != null, "the array fixture must contain /g2/array2D");
+            dataset.init();
+
+            Datatype datatype = dataset.getDatatype();
+            assertTrue(datatype.isArray());
+            assertArrayEquals(new long[] {3}, datatype.getArrayDims());
+            assertTrue(datatype.getDatatypeBase() != null &&
+                       datatype.getDatatypeBase().isInteger());
+
+            Object diskData = dataset.getData();
+            assertTrue(diskData instanceof int[], "the numeric array buffer must be flat");
+            assertArrayEquals(new int[] {1, 2, 3, 4, 5, 6, 7, 8, 9,
+                                         10, 11, 12, 13, 14, 15, 16, 17, 18},
+                              (int[])diskData);
+
+            long[] start = dataset.getStartDims();
+            long[] count = dataset.getSelectedDims();
+            start[0] = 1;
+            count[0] = 1;
+            long[] stride = dataset.getStride().clone();
+            long[] dims = dataset.getDims().clone();
+            dataset.clearData();
+            int[] dirtyData = (int[])dataset.getData();
+            assertArrayEquals(new int[] {7, 8, 9, 10, 11, 12}, dirtyData);
+            dirtyData = dirtyData.clone();
+            dirtyData[4] = -99;
+            DatasetSearchSnapshot dirtyPage = new DatasetSearchSnapshot(
+                opened.file.getFilePath(), dataset.getFullName(), dirtyData,
+                start.clone(), count.clone(), stride, dims, datatype);
+            DatasetStatisticsEngine.Request request = new DatasetStatisticsEngine.Request(
+                dataset, dirtyPage, dirtyPage, dataset.getFillValue());
+
+            DatasetStatisticsEngine.Result currentResult = DatasetStatisticsEngine.compute(
+                request, DatasetStatisticsEngine.Scope.CURRENT_PAGE, new AtomicBoolean(), null);
+            DatasetStatisticsEngine.Result entireResult = DatasetStatisticsEngine.compute(
+                request, DatasetStatisticsEngine.Scope.ENTIRE_DATASET, new AtomicBoolean(), null);
+
+            assertEquals(6, currentResult.getTotal());
+            assertEquals(0, currentResult.getZero());
+            assertEquals(6, currentResult.getNonZero());
+            assertEquals(-99.0, currentResult.getMinimum());
+            assertEquals(12.0, currentResult.getMaximum());
+            assertEquals(-53.0 / 6.0, currentResult.getMean());
+            assertEquals(Math.sqrt(11725.0 / 6.0), currentResult.getStandardDeviation());
+            assertEquals(5, currentResult.getPositive());
+            assertEquals(1, currentResult.getNegative());
+            assertEquals(5, currentResult.getNonNegative());
+            assertEquals(18, entireResult.getTotal());
+            assertEquals(0, entireResult.getZero());
+            assertEquals(18, entireResult.getNonZero());
+            assertEquals(17, entireResult.getPositive());
+            assertEquals(1, entireResult.getNegative());
+            assertEquals(17, entireResult.getNonNegative());
+            assertEquals(-99.0, entireResult.getMinimum());
+            assertEquals(18.0, entireResult.getMaximum());
+            assertEquals(61.0 / 18.0, entireResult.getMean());
+            assertEquals(Math.sqrt(208481.0 / 306.0), entireResult.getStandardDeviation());
+
+            assertEquals(-99, dirtyData[4], "the dirty snapshot must remain unsaved");
+            dataset.clearData();
+            assertArrayEquals(new int[] {7, 8, 9, 10, 11, 12}, (int[])dataset.getData(),
+                              "statistics must not write the dirty array value to disk");
+        }
+    }
+
+    @Test
+    void entireDatasetStillOverlaysDirtyScalarCells() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tattr2.h5")) {
+            Dataset dataset = findDataset(opened.file, "/g2/integer");
+            assertTrue(dataset != null, "the scalar fixture must contain /g2/integer");
+            dataset.init();
+            assertTrue(!dataset.getDatatype().isArray());
+
+            int[] diskData = (int[])dataset.getData();
+            assertArrayEquals(new int[] {1, 2}, diskData);
+            int[] dirtyData = diskData.clone();
+            dirtyData[0] = -77;
+            DatasetSearchSnapshot dirtyPage = new DatasetSearchSnapshot(
+                opened.file.getFilePath(), dataset.getFullName(), dirtyData,
+                dataset.getStartDims(), dataset.getSelectedDims(), dataset.getStride(),
+                dataset.getDims(), dataset.getDatatype());
+            DatasetStatisticsEngine.Request request = new DatasetStatisticsEngine.Request(
+                dataset, dirtyPage, dirtyPage, dataset.getFillValue());
+
+            DatasetStatisticsEngine.Result currentResult = DatasetStatisticsEngine.compute(
+                request, DatasetStatisticsEngine.Scope.CURRENT_PAGE, new AtomicBoolean(), null);
+            DatasetStatisticsEngine.Result entireResult = DatasetStatisticsEngine.compute(
+                request, DatasetStatisticsEngine.Scope.ENTIRE_DATASET, new AtomicBoolean(), null);
+
+            assertEquals(-77.0, currentResult.getMinimum());
+            assertEquals(-77.0, entireResult.getMinimum());
+            assertEquals(currentResult.getMaximum(), entireResult.getMaximum());
+            assertEquals(currentResult.getMean(), entireResult.getMean());
+            assertEquals(currentResult.getStandardDeviation(), entireResult.getStandardDeviation());
+
+            dataset.clearData();
+            assertArrayEquals(new int[] {1, 2}, (int[])dataset.getData());
+        }
+    }
+
+    @Test
     void unsupportedStringDatatypeIsReported() throws Exception
     {
         try (OpenedFile opened = openFixture("tstr.h5")) {
@@ -290,6 +397,16 @@ class DatasetStatisticsEngineTest {
     private static Dataset firstNumeric(FileFormat file) throws Exception
     {
         return firstNumeric(file, 0);
+    }
+
+    private static Dataset findDataset(FileFormat file, String fullName) throws Exception
+    {
+        Group root = (Group)file.getRootObject();
+        for (HObject object : root.depthFirstMemberList()) {
+            if (object instanceof Dataset && fullName.equals(object.getFullName()))
+                return (Dataset)object;
+        }
+        return null;
     }
 
     private static Dataset firstNumeric(FileFormat file, int minimumRank) throws Exception

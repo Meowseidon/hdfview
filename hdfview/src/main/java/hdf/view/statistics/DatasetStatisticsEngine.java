@@ -421,8 +421,14 @@ public final class DatasetStatisticsEngine {
         if (blockData == null || dirtyPage == null || !blockData.getClass().isArray())
             return;
 
-        /* Current TableView scalar buffers have one Java value per Dataset cell. */
-        if (valuesPerCell(datatype) != 1)
+        /*
+         * ArrayDataProvider exposes numeric array cells as a flat native buffer:
+         * all scalar values for one Dataset cell are contiguous.  Keep the
+         * Dataset coordinate at cell granularity, then address the scalar
+         * offset within that cell separately.
+         */
+        int scalarValuesPerCell = valuesPerCell(datatype);
+        if (scalarValuesPerCell <= 0 || scalarValuesPerCell == Integer.MAX_VALUE)
             return;
 
         Object dirtyData = dirtyPage.getData();
@@ -430,12 +436,16 @@ public final class DatasetStatisticsEngine {
         long[] blockStart = block.getStart();
         long[] blockCount = block.getCount();
         for (int i = 0; i < dirtyLength; i++) {
-            long[] coordinate = dirtyPage.coordinateForValue(i, 1);
+            long[] coordinate = dirtyPage.coordinateForValue(i, scalarValuesPerCell);
             int localIndex = localIndex(coordinate, blockStart, blockCount);
-            if (localIndex < 0 || localIndex >= Array.getLength(blockData))
+            if (localIndex < 0)
+                continue;
+            long scalarIndex = (long)localIndex * scalarValuesPerCell +
+                               (i % scalarValuesPerCell);
+            if (scalarIndex < 0 || scalarIndex >= Array.getLength(blockData))
                 continue;
             try {
-                Array.set(blockData, localIndex, valueAt(dirtyData, i));
+                Array.set(blockData, (int)scalarIndex, valueAt(dirtyData, i));
             }
             catch (IllegalArgumentException ignored) {
                 // A display-only conversion with a different Java wrapper cannot
