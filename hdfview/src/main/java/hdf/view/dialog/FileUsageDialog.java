@@ -184,6 +184,7 @@ public final class FileUsageDialog {
         cancelPendingWork();
         lastResult = null;
         selectedProcess = null;
+        I18n.bindDynamic(fileLabel, this::fileLabelText);
         table.removeAll();
         detailsLabel.setText("");
         detailsLabel.requestLayout();

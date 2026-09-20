@@ -22,6 +22,10 @@ class FileUsageI18nTest {
         assertTrue(chinese.getString("dialog.fileUsage.action.confirm").contains("损坏"));
         assertTrue(english.getString("dialog.fileUsage.status.noExternal").contains("No external"));
         assertTrue(chinese.getString("dialog.fileUsage.status.noExternal").contains("未发现外部占用"));
+        assertTrue(english.getString("dialog.fileUsage.status.externalCount")
+                           .contains("external usage item(s)"));
+        assertTrue(chinese.getString("dialog.fileUsage.status.externalCount")
+                           .contains("外部占用项"));
         assertTrue(english.getString("dialog.fileUsage.error.native").contains("Windows error"));
         assertTrue(chinese.getString("dialog.fileUsage.error.native").contains("Windows 错误"));
     }
