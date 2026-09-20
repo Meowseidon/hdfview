@@ -48,6 +48,7 @@ import hdf.view.TableView.TableViewFactory;
 import hdf.view.TreeView.DefaultTreeView;
 import hdf.view.TreeView.TreeView;
 import hdf.view.ViewProperties.DataViewType;
+import hdf.view.dialog.FileUsageDialog;
 import hdf.view.dialog.ImageConversionDialog;
 import hdf.view.dialog.InputDialog;
 import hdf.view.dialog.UserOptionsDialog;
@@ -55,6 +56,7 @@ import hdf.view.dialog.UserOptionsGeneralPage;
 import hdf.view.dialog.UserOptionsHDFPage;
 import hdf.view.dialog.UserOptionsNode;
 import hdf.view.dialog.UserOptionsViewModulesPage;
+import hdf.view.fileusage.FileUsageInspectorFactory;
 import hdf.view.i18n.I18n;
 import hdf.view.search.DatasetSearchDialog;
 import hdf.view.search.DatasetSearchEngine;
@@ -217,6 +219,8 @@ public class HDFView implements DataViewManager {
 
     private Button recentFilesButton;
     private Button clearTextButton;
+    private Button fileUsageButton;
+    private FileUsageDialog fileUsageDialog;
 
     /** Inline selector showing and changing the access mode of the selected file. */
     private Combo accessModeSelector;
@@ -583,7 +587,7 @@ public class HDFView implements DataViewManager {
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setFont(currentFont);
         I18n.bind(shell, "window.title", HDFVIEW_VERSION);
-        shell.setLayout(new GridLayout(4, false));
+        shell.setLayout(new GridLayout(5, false));
         shell.addListener(SWT.Close, event -> {
             if (inlineTableView != null && !inlineTableView.isViewDisposed())
                 inlineTableView.commitActiveCellEditor();
@@ -601,6 +605,8 @@ public class HDFView implements DataViewManager {
                 }
 
                 cancelDatasetSearch();
+                if (fileUsageDialog != null)
+                    fileUsageDialog.dispose();
 
                 synchronized (DatasetSearchEngine.NATIVE_IO_LOCK) {
                     disposeInlineDataView();
@@ -1276,6 +1282,8 @@ public class HDFView implements DataViewManager {
         if (userOptionDialog != null && userOptionDialog.getShell() != null &&
             !userOptionDialog.getShell().isDisposed())
             userOptionDialog.refreshLanguage();
+        if (fileUsageDialog != null && !fileUsageDialog.getShell().isDisposed())
+            fileUsageDialog.refreshLanguage();
 
         if (englishLanguageItem != null && !englishLanguageItem.isDisposed())
             englishLanguageItem.setSelection(language == I18n.Language.ENGLISH);
@@ -1572,7 +1580,7 @@ public class HDFView implements DataViewManager {
     {
         toolBar = new ToolBar(shell, SWT.HORIZONTAL | SWT.RIGHT);
         toolBar.setFont(Display.getCurrent().getSystemFont());
-        toolBar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 4, 1));
+        toolBar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 5, 1));
 
         ToolItem openItem = new ToolItem(toolBar, SWT.PUSH);
         I18n.bindToolTip(openItem, "toolbar.open");
@@ -1758,6 +1766,23 @@ public class HDFView implements DataViewManager {
 
         createAccessModeSelector(shell);
 
+        fileUsageButton = new Button(shell, SWT.PUSH);
+        fileUsageButton.setFont(currentFont);
+        I18n.bind(fileUsageButton, "button.fileUsage");
+        I18n.bindToolTip(fileUsageButton, "tooltip.fileUsage");
+        fileUsageButton.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
+        fileUsageButton.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                FileFormat file = treeView == null ? null : treeView.getSelectedFile();
+                if (file == null)
+                    file = accessModeFile;
+                openFileUsageDialog(file);
+            }
+        });
+        updateFileUsageButton();
+
         clearTextButton = new Button(shell, SWT.PUSH);
         I18n.bindToolTip(clearTextButton, "tooltip.clearText");
         clearTextButton.setFont(currentFont);
@@ -1800,6 +1825,7 @@ public class HDFView implements DataViewManager {
     public void fileOpened(FileFormat file)
     {
         updateAccessModeStatus(file);
+        syncFileUsageSelection(file);
     }
 
     /** Update the inline access-mode selector without rebuilding any views. */
@@ -1807,6 +1833,31 @@ public class HDFView implements DataViewManager {
     {
         accessModeFile = file;
         refreshAccessModeSelector();
+        updateFileUsageButton();
+    }
+
+    private void updateFileUsageButton()
+    {
+        if (fileUsageButton != null && !fileUsageButton.isDisposed())
+            fileUsageButton.setEnabled(accessModeFile != null);
+    }
+
+    private void syncFileUsageSelection(FileFormat file)
+    {
+        if (fileUsageDialog != null && !fileUsageDialog.getShell().isDisposed())
+            fileUsageDialog.setCurrentFile(file);
+    }
+
+    private void openFileUsageDialog(FileFormat file)
+    {
+        if (file == null)
+            return;
+        if (fileUsageDialog == null || fileUsageDialog.getShell().isDisposed()) {
+            fileUsageDialog = new FileUsageDialog(
+                    mainWindow, FileUsageInspectorFactory.create(), ProcessHandle.current().pid());
+        }
+        fileUsageDialog.setCurrentFile(file);
+        fileUsageDialog.open();
     }
 
     /** Refresh selector items and selection without using translated text for behavior. */
@@ -1919,7 +1970,7 @@ public class HDFView implements DataViewManager {
     {
         SashForm content = new SashForm(shell, SWT.VERTICAL);
         content.setSashWidth(10);
-        content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 4, 1));
+        content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 5, 1));
 
         // Add Data content area and Status Area to main window
         Composite container = new Composite(content, SWT.NONE);
@@ -2161,10 +2212,12 @@ public class HDFView implements DataViewManager {
      */
     public void showMetaData(final HObject obj)
     {
+        FileFormat selectedFile = obj == null ? null : obj.getFileFormat();
+        updateAccessModeStatus(selectedFile);
+        syncFileUsageSelection(selectedFile);
+
         if (rightTabFolder == null || rightTabFolder.isDisposed())
             return;
-
-        updateAccessModeStatus(obj == null ? null : obj.getFileFormat());
 
         /* A repeated notification for the same object does not rebuild the view. */
         if (obj != null && sameObject(displayedMetadataObject, obj) && rightTabFolder.getItemCount() > 0) {
@@ -2531,6 +2584,7 @@ public class HDFView implements DataViewManager {
 
         if (wasAccessModeFile)
             updateAccessModeStatus(null);
+        syncFileUsageSelection(treeView.getSelectedFile());
 
         System.gc();
         }
@@ -2722,6 +2776,10 @@ public class HDFView implements DataViewManager {
         urlBar.requestLayout();
         clearTextButton.setFont(font);
         clearTextButton.requestLayout();
+        if (fileUsageButton != null) {
+            fileUsageButton.setFont(font);
+            fileUsageButton.requestLayout();
+        }
         accessModeSelector.setFont(font);
         accessModeSelector.requestLayout();
         status.setFont(font);

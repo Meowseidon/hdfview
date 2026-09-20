@@ -16,6 +16,7 @@
   <properties>
     <module-name>org.hdfgroup.hdfview</module-name>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <jna.version>5.19.1</jna.version>
     <!-- Which staged native libraries are held back from jpackage's input directory -->
     <!-- and placed beside the launcher instead. Overridden by jpackage-win-base, the -->
     <!-- only profile that passes them on to jpackage; patterns that match nothing -->
@@ -33,6 +34,12 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!-- Core JNA is used only by the lazily-loaded Windows file-usage provider. -->
+    <dependency>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+      <version>${jna.version}</version>
     </dependency>
     <!-- SLF4J implementations - choose at runtime via launcher script -->
     <!-- slf4j-nop DISABLED for debugging - uncomment for production to disable logging -->
