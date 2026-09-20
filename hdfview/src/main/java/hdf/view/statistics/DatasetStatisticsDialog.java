@@ -7,6 +7,7 @@ package hdf.view.statistics;
 
 import java.util.Locale;
 
+import hdf.view.ThemeManager;
 import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
@@ -117,6 +118,7 @@ public final class DatasetStatisticsDialog {
         }
 
         shell = new Shell(parent, SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MODELESS);
+        ThemeManager.forDisplay(shell.getDisplay()).applyTo(shell);
         I18n.bind(shell, "statistics.title");
         shell.setLayout(new GridLayout(1, false));
         shell.addListener(SWT.Close, event -> {

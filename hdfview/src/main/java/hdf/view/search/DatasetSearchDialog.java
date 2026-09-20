@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import hdf.view.HDFView;
+import hdf.view.ThemeManager;
 import hdf.view.i18n.I18n;
 
 import org.eclipse.swt.SWT;
@@ -53,6 +54,7 @@ public final class DatasetSearchDialog {
     {
         this.viewer = viewer;
         shell = new Shell(parent, SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MODELESS);
+        ThemeManager.forDisplay(shell.getDisplay()).applyTo(shell);
         createContents();
     }
 

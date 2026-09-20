@@ -53,6 +53,8 @@ import org.eclipse.swt.widgets.Shell;
  */
 public class Chart extends Dialog {
     private Shell shell;
+    private ThemeManager themeManager;
+    private ThemeManager.Registration themeRegistration;
 
     private Font curFont;
 
@@ -223,6 +225,8 @@ public class Chart extends Dialog {
     {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM);
+        themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         shell.setFont(curFont);
         I18n.bindDynamic(shell, windowTitleSupplier);
         shell.setImages(ViewProperties.getHdfIcons());
@@ -234,6 +238,10 @@ public class Chart extends Dialog {
         shell.addDisposeListener(new DisposeListener() {
             public void widgetDisposed(DisposeEvent e)
             {
+                if (themeRegistration != null) {
+                    themeRegistration.dispose();
+                    themeRegistration = null;
+                }
                 if (curFont != null)
                     curFont.dispose();
                 if (barColor != null)
@@ -242,7 +250,11 @@ public class Chart extends Dialog {
         });
 
         chartP = new ChartCanvas(shell, SWT.DOUBLE_BUFFERED | SWT.BORDER);
-        chartP.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WHITE));
+        themeManager.bind(chartP, ThemeManager.ColorRole.SURFACE, ThemeManager.ColorRole.FOREGROUND);
+        themeRegistration = themeManager.addListener(manager -> {
+            if (chartP != null && !chartP.isDisposed())
+                chartP.redraw();
+        });
         chartP.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         // Add close button
@@ -384,6 +396,7 @@ public class Chart extends Dialog {
                     GC g = e.gc;
 
                     g.setFont(curFont);
+                    g.setForeground(themeManager.color(ThemeManager.ColorRole.FOREGROUND));
 
                     Rectangle canvasBounds = getClientArea();
                     Color c                = g.getForeground();
@@ -520,7 +533,7 @@ public class Chart extends Dialog {
 
                         // draw a box on the legend
                         if ((lineLabels != null) && (lineLabels.length >= numberOfLines)) {
-                            g.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
+                            g.setForeground(themeManager.color(ThemeManager.ColorRole.FOREGROUND));
                             g.drawRectangle(canvasBounds.width - legendWidth - GAP, GAP, legendWidth,
                                             legendHeight);
                         }
