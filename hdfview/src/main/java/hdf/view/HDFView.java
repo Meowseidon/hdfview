@@ -877,7 +877,7 @@ public class HDFView implements DataViewManager {
             public void widgetSelected(SelectionEvent e)
             {
                 cancelDatasetSearch();
-                closeAllWindows();
+                closeAllWindows(true);
 
                 List<FileFormat> files = treeView.getCurrentFiles();
                 while (!files.isEmpty()) {
@@ -898,6 +898,7 @@ public class HDFView implements DataViewManager {
                 clearRightTabs();
                 displayedMetadataObject = null;
                 updateAccessModeStatus(null);
+                syncFileUsageSelectionFromTree();
                 layoutRightTabs();
 
                 urlBar.setText("");
@@ -1848,6 +1849,30 @@ public class HDFView implements DataViewManager {
             fileUsageDialog.setCurrentFile(file);
     }
 
+    /** Keep the modeless File Usage dialog aligned with the TreeView selection. */
+    private void syncFileUsageSelectionFromTree()
+    {
+        syncFileUsageSelection(fileUsageSelectionFromTree());
+    }
+
+    /**
+     * Resolve the File Usage file after a tree node is removed. The TreeView
+     * clears its selected-file field while disposing the selected root; when
+     * exactly one file remains, that file is an unambiguous replacement.
+     */
+    private FileFormat fileUsageSelectionFromTree()
+    {
+        if (treeView == null)
+            return null;
+
+        FileFormat selected = treeView.getSelectedFile();
+        if (selected != null)
+            return selected;
+
+        List<FileFormat> openFiles = treeView.getCurrentFiles();
+        return openFiles.size() == 1 ? openFiles.get(0) : null;
+    }
+
     private void openFileUsageDialog(FileFormat file)
     {
         if (file == null)
@@ -1954,11 +1979,13 @@ public class HDFView implements DataViewManager {
                 throw new java.io.IOException(I18n.text("message.reopenFileFailed", filename));
 
             updateAccessModeStatus(reopened);
+            syncFileUsageSelectionFromTree();
         }
         catch (Exception ex) {
             /* reopenFile restores the original FileFormat when possible. Refresh
              * from the TreeView so a failed switch never leaves a stale selector. */
             updateAccessModeStatus(treeView.getSelectedFile());
+            syncFileUsageSelectionFromTree();
             display.beep();
             String detail = ex.getMessage() == null ? ex.toString() : ex.getMessage();
             Tools.showError(mainWindow, I18n.text("action.changeAccessMode"),
@@ -2587,7 +2614,7 @@ public class HDFView implements DataViewManager {
 
         if (wasAccessModeFile)
             updateAccessModeStatus(null);
-        syncFileUsageSelection(treeView.getSelectedFile());
+        syncFileUsageSelectionFromTree();
 
         System.gc();
         }
@@ -2918,10 +2945,19 @@ public class HDFView implements DataViewManager {
      */
     private void closeAllWindows()
     {
+        closeAllWindows(false);
+    }
+
+    /** Close child windows, optionally keeping the modeless File Usage dialog. */
+    private void closeAllWindows(boolean keepFileUsageDialog)
+    {
         Shell[] sList = display.getShells();
 
         for (int i = 0; i < sList.length; i++) {
             if (sList[i].equals(mainWindow))
+                continue;
+            if (keepFileUsageDialog && fileUsageDialog != null && !fileUsageDialog.getShell().isDisposed()
+                    && sList[i].equals(fileUsageDialog.getShell()))
                 continue;
             sList[i].dispose();
         }

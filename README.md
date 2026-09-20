@@ -48,6 +48,10 @@ The first command is a fast compile check. The second creates the direct-launch 
 
 `--debug` selects the existing SLF4J simple logger. `--validate` checks Java major version 21+, native-library configuration, and direct-JAR runtime artifacts; it does not run Maven or a build. `--maven` checks Maven only for that mode and uses the existing `mvn exec:java -Dexec.mainClass="hdf.view.HDFView" -pl hdfview` launch path. Use the build commands above when the artifact is not present.
 
+### File Usage (Windows only)
+
+The File Usage dialog uses Windows Restart Manager to find applications and services using the selected HDF file. It shows the PID, process, executable path, and visible top-level window title when available. Restart Manager reports file usage; it does not distinguish read locks from write locks. Request Close sends a normal window-close request. Force Terminate is high risk: ending a program that is writing an HDF file may lose unsaved data and may corrupt the file.
+
 ### Test
 
 The focused inline Dataset UI regression suite can be run with:
