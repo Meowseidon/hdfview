@@ -726,7 +726,16 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             shell.setSize(width, height);
         }
         else {
-            viewParent.layout(true, true);
+            /*
+             * HDFView lays out the persistent right pane once after the
+             * embedded view has been created.  Its recursive layout reaches
+             * this parent, so laying it out here would repeat the same work
+             * inside one Dataset selection transaction.  Other embedded
+             * hosts do not own that outer transaction and retain the old
+             * local layout behavior.
+             */
+            if (!(viewer instanceof HDFView))
+                viewParent.layout(true, true);
         }
     }
 

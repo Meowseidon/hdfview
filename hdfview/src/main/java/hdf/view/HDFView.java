@@ -2223,8 +2223,6 @@ public class HDFView implements DataViewManager {
             if (isInlineTableDataset(obj))
                 createInlineDataContent(obj);
 
-            layoutRightTabs();
-
             if (dataContentTab != null && !dataContentTab.isDisposed())
                 rightTabFolder.setSelection(dataContentTab);
             else if (rightTabFolder.getItemCount() > 0)
@@ -2263,7 +2261,6 @@ public class HDFView implements DataViewManager {
                 if (inlineTableView != null || dataContentTab != null)
                     disposeInlineDataView();
                 createInlineDataContent(obj);
-                layoutRightTabs();
             }
             finally {
                 rightTabFolder.setRedraw(true);

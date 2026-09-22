@@ -27,11 +27,16 @@ import hdf.view.i18n.I18n;
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.Rectangle;
+import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Layout;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
@@ -54,6 +59,40 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
     private static final String EDIT_FILE = "tintsize.h5";
     private static final String EDIT_DATASET = "DS08BITS";
     private static final String EDITOR_LIFECYCLE_FILE = "inline-editor-lifecycle.h5";
+
+    /** Test-only layout probe; production code has no persistent layout counter. */
+    private static final class CountingFillLayout extends Layout {
+        private int layoutCalls;
+
+        @Override
+        protected Point computeSize(Composite composite, int wHint, int hHint,
+                                    boolean flushCache)
+        {
+            Control[] children = composite.getChildren();
+            Point result = children.length == 0
+                ? new Point(0, 0)
+                : children[0].computeSize(wHint, hHint, flushCache);
+            if (wHint != SWT.DEFAULT)
+                result.x = wHint;
+            if (hHint != SWT.DEFAULT)
+                result.y = hHint;
+            return result;
+        }
+
+        @Override
+        protected void layout(Composite composite, boolean flushCache)
+        {
+            layoutCalls++;
+            Rectangle area = composite.getClientArea();
+            for (Control child : composite.getChildren())
+                child.setBounds(area);
+        }
+
+        private void reset()
+        {
+            layoutCalls = 0;
+        }
+    }
 
     @Test
     public void selectingDatasetShowsInlineDataAndDoubleClickKeepsMainShell()
@@ -88,6 +127,16 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
             assertTrue(waitForTab("tab.dataContent").isActive(),
                        "default Dataset double-click must focus the inline Data Content tab");
 
+            CountingFillLayout[] layoutProbe = new CountingFillLayout[1];
+            Display.getDefault().syncExec(() -> {
+                TabFolder rightTabFolder = dataTabWidget.getParent();
+                Composite rightTabContent = (Composite)rightTabFolder.getParent();
+                layoutProbe[0] = new CountingFillLayout();
+                rightTabContent.setLayout(layoutProbe[0]);
+                rightTabContent.layout(true, true);
+                layoutProbe[0].reset();
+            });
+
             SWTBotTreeItem secondDataset = fileItem.getNode("DU64BITS");
             secondDataset.click();
             SWTBotTabItem secondDataTab = waitForTab("tab.dataContent");
@@ -107,10 +156,13 @@ public class TestHDFViewInlineDataset extends AbstractWindowTest {
             assertSame(generalPageControl,
                        controlOf(bot.tabItem(I18n.text("tab.generalObjectInfo")).widget),
                        "Dataset A -> B must retain the General Object Info page Composite");
+
             SWTBotTabItem generalTab = bot.tabItem(I18n.text("tab.generalObjectInfo"));
             generalTab.activate();
             assertEquals("DU64BITS", bot.textWithLabel(I18n.text("meta.objectName")).getText(),
                          "switching Dataset must refresh General Object Info");
+            assertEquals(1, layoutProbe[0].layoutCalls,
+                         "Dataset A -> B must perform one complete right-pane layout");
         }
         finally {
             closeFile(hdfFile, false);
