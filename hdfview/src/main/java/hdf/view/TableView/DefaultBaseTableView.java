@@ -34,7 +34,6 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -69,6 +68,7 @@ import hdf.view.i18n.I18n;
 import hdf.view.search.DatasetSearchSnapshot;
 import hdf.view.statistics.DatasetStatisticsDialog;
 import hdf.view.statistics.DatasetStatisticsEngine;
+import hdf.view.statistics.StatisticsHighlightMask;
 
 import hdf.hdf5lib.HDF5Constants;
 
@@ -83,6 +83,7 @@ import org.eclipse.nebula.widgets.nattable.config.AbstractUiBindingConfiguration
 import org.eclipse.nebula.widgets.nattable.config.CellConfigAttributes;
 import org.eclipse.nebula.widgets.nattable.config.IConfigRegistry;
 import org.eclipse.nebula.widgets.nattable.config.IEditableRule;
+import org.eclipse.nebula.widgets.nattable.coordinate.PositionCoordinate;
 import org.eclipse.nebula.widgets.nattable.coordinate.Range;
 import org.eclipse.nebula.widgets.nattable.data.IDataProvider;
 import org.eclipse.nebula.widgets.nattable.data.validate.DataValidator;
@@ -100,6 +101,7 @@ import org.eclipse.nebula.widgets.nattable.grid.layer.RowHeaderLayer;
 import org.eclipse.nebula.widgets.nattable.layer.DataLayer;
 import org.eclipse.nebula.widgets.nattable.layer.ILayer;
 import org.eclipse.nebula.widgets.nattable.layer.IUniqueIndexLayer;
+import org.eclipse.nebula.widgets.nattable.layer.LayerUtil;
 import org.eclipse.nebula.widgets.nattable.layer.LabelStack;
 import org.eclipse.nebula.widgets.nattable.layer.cell.IConfigLabelAccumulator;
 import org.eclipse.nebula.widgets.nattable.layer.event.ILayerEvent;
@@ -286,7 +288,14 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         "HDFVIEW_STATISTICS_HIGHLIGHT";
 
     /** Body-cell positions highlighted by the current statistics result. */
-    private final Set<Long> statisticsHighlightCells = new HashSet<>();
+    private final StatisticsHighlightMask statisticsHighlightCells =
+        new StatisticsHighlightMask();
+
+    /** Data-layer cell captured before an editor commit for the no-event fallback. */
+    private int statisticsCommitColumn = -1;
+    private int statisticsCommitRow = -1;
+    private boolean statisticsCommitPending;
+    private boolean statisticsCommitEventReceived;
 
     /** The active comparison rule, retained while the displayed page changes. */
     private DatasetStatisticsEngine.Kind statisticsHighlightKind;
@@ -765,6 +774,10 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     public void commitActiveCellEditor()
     {
         boolean committed = false;
+        int pendingColumn = -1;
+        int pendingRow = -1;
+        int pendingTableColumn = -1;
+        int pendingTableRow = -1;
         try {
             if (dataTable == null) {
                 log.debug("commitActiveCellEditor(): No active cell editor");
@@ -777,6 +790,20 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                 return;
             }
 
+            if (statisticsHighlightKind != null) {
+                statisticsCommitPending = true;
+                statisticsCommitEventReceived = false;
+                int[] cell = getStatisticsEditorCell();
+                if (cell != null) {
+                    pendingColumn = cell[0];
+                    pendingRow = cell[1];
+                    pendingTableColumn = cell[2];
+                    pendingTableRow = cell[3];
+                    statisticsCommitColumn = pendingColumn;
+                    statisticsCommitRow = pendingRow;
+                }
+            }
+
             log.debug("commitActiveCellEditor(): Active cell editor detected - committing before disposal");
             activeCellEditor.commit(SelectionLayer.MoveDirectionEnum.NONE, true, true);
             committed = true;
@@ -787,13 +814,54 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         }
 
         /*
-         * NatTable normally emits a DataUpdateEvent for this operation.  Keep
-         * this explicit refresh as well because a few TableView editor paths
-         * commit through the editor without propagating that event through the
-         * top-level layer.
+         * NatTable normally emits a DataUpdateEvent synchronously.  The event
+         * handler has already performed the one-cell update in that case.  A
+         * few TableView editor paths commit without propagating that event
+         * through the top-level layer, so update the captured cell only as a
+         * fallback instead of rebuilding the whole page.
          */
-        if (committed && statisticsHighlightKind != null)
-            refreshStatisticsHighlight();
+        if (committed && statisticsHighlightKind != null && !statisticsCommitEventReceived) {
+            if (pendingColumn >= 0 && pendingRow >= 0)
+                refreshStatisticsHighlightCell(
+                    pendingColumn, pendingRow, pendingTableColumn, pendingTableRow);
+            else
+                refreshStatisticsHighlight();
+        }
+
+        statisticsCommitColumn = -1;
+        statisticsCommitRow = -1;
+        statisticsCommitPending = false;
+        statisticsCommitEventReceived = false;
+    }
+
+    /** Map the editor's selected layer position to the data-layer position. */
+    private int[] getStatisticsEditorCell()
+    {
+        if (selectionLayer == null || dataLayer == null)
+            return null;
+
+        PositionCoordinate selected = selectionLayer.getLastSelectedCellPosition();
+        if (selected == null || selected.getLayer() == null)
+            return null;
+
+        try {
+            int column = LayerUtil.convertColumnPosition(
+                selected.getLayer(), selected.getColumnPosition(), dataLayer);
+            int row = LayerUtil.convertRowPosition(
+                selected.getLayer(), selected.getRowPosition(), dataLayer);
+            if (column < 0 || row < 0 || column >= dataLayer.getColumnCount() ||
+                row >= dataLayer.getRowCount())
+                return null;
+            int tableColumn = dataTable.underlyingToLocalColumnPosition(
+                selected.getLayer(), selected.getColumnPosition());
+            int tableRow = dataTable.underlyingToLocalRowPosition(
+                selected.getLayer(), selected.getRowPosition());
+            return new int[] {column, row, tableColumn, tableRow};
+        }
+        catch (RuntimeException ex) {
+            log.debug("Unable to map the active editor cell to the data layer", ex);
+            return null;
+        }
     }
 
     /** Prepare active editing and pending changes exactly once. */
@@ -1645,8 +1713,14 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         if (kind == null || dataTable == null || dataLayer == null || dataProvider == null)
             return;
 
-        statisticsHighlightKind = kind;
+        /*
+         * Commit before installing the new rule.  Enabling a highlight is a
+         * deliberate full-page operation, so an editor event from this commit
+         * must not do an incremental update that is immediately discarded by
+         * the full rebuild below.
+         */
         commitActiveCellEditor();
+        statisticsHighlightKind = kind;
         refreshStatisticsHighlight();
     }
 
@@ -1672,13 +1746,9 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         try {
             int rows = dataProvider.getRowCount();
             int columns = dataProvider.getColumnCount();
-            for (int row = 0; row < rows; row++) {
-                for (int column = 0; column < columns; column++) {
-                    Object value = dataLayer.getDataValueByPosition(column, row);
-                    if (value != null && DatasetStatisticsEngine.matches(value, statisticsHighlightKind))
-                        statisticsHighlightCells.add(cellKey(column, row));
-                }
-            }
+            statisticsHighlightCells.refreshAll(
+                statisticsHighlightKind, rows, columns,
+                dataLayer::getDataValueByPosition);
         }
         catch (UnsupportedOperationException ex) {
             log.debug("highlightStatistics(): unsupported table value", ex);
@@ -1696,8 +1766,108 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     /** Reapply an active rule after NatTable has committed an edit. */
     private void handleStatisticsLayerEvent(ILayerEvent event)
     {
-        if (event instanceof DataUpdateEvent && statisticsHighlightKind != null)
-            refreshStatisticsHighlight();
+        if (!(event instanceof DataUpdateEvent) || statisticsHighlightKind == null ||
+            dataLayer == null || dataTable == null || dataTable.isDisposed())
+            return;
+
+        DataUpdateEvent update = (DataUpdateEvent)event;
+        ILayer eventLayer = update.getLayer();
+        int eventColumn = update.getColumnPosition();
+        int eventRow = update.getRowPosition();
+        int dataColumn;
+        int dataRow;
+        try {
+            dataColumn = LayerUtil.convertColumnPosition(eventLayer, eventColumn, dataLayer);
+            dataRow = LayerUtil.convertRowPosition(eventLayer, eventRow, dataLayer);
+        }
+        catch (RuntimeException ex) {
+            log.debug("Unable to map a statistics DataUpdateEvent to the data layer", ex);
+            return;
+        }
+
+        if (dataColumn < 0 || dataRow < 0 || dataColumn >= dataLayer.getColumnCount() ||
+            dataRow >= dataLayer.getRowCount())
+            return;
+
+        try {
+            boolean membershipChanged = statisticsHighlightCells.updateCell(
+                statisticsHighlightKind, dataColumn, dataRow,
+                dataLayer::getDataValueByPosition);
+            if (statisticsCommitPending)
+                statisticsCommitEventReceived = true;
+
+            /*
+             * The event has already caused NatTable's normal cell repaint.
+             * Repaint explicitly only when the statistics label changed.  At
+             * the top-level listener the event positions are NatTable-local;
+             * convert a directly delivered lower-layer event defensively for
+             * focused tests and alternate layer paths.
+             */
+            if (membershipChanged) {
+                int tableColumn = eventColumn;
+                int tableRow = eventRow;
+                if (eventLayer != dataTable && !update.convertToLocal(dataTable))
+                    return;
+                tableColumn = update.getColumnPosition();
+                tableRow = update.getRowPosition();
+                if (tableColumn >= 0 && tableRow >= 0 &&
+                    tableColumn < dataTable.getColumnCount() &&
+                    tableRow < dataTable.getRowCount())
+                    dataTable.repaintCell(tableColumn, tableRow);
+            }
+        }
+        catch (UnsupportedOperationException ex) {
+            log.debug("statistics highlight update: unsupported table value", ex);
+            disableStatisticsHighlight();
+        }
+        catch (RuntimeException ex) {
+            log.warn("statistics highlight update: unable to update cell", ex);
+            disableStatisticsHighlight();
+        }
+    }
+
+    /** Update one cell for an editor path that did not publish a layer event. */
+    private void refreshStatisticsHighlightCell(int column, int row,
+                                                int tableColumn, int tableRow)
+    {
+        if (dataTable == null || dataTable.isDisposed() || dataLayer == null ||
+            statisticsHighlightKind == null || column < 0 || row < 0 ||
+            column >= dataLayer.getColumnCount() || row >= dataLayer.getRowCount())
+            return;
+
+        try {
+            statisticsHighlightCells.updateCell(
+                statisticsHighlightKind, column, row,
+                dataLayer::getDataValueByPosition);
+            /*
+             * The selected position normally maps to a NatTable-local cell
+             * before the commit.  Repaint that cell when possible.  If an
+             * unusual editor path cannot provide that mapping, retain the
+             * reliable visual fallback; neither path scans the page again.
+             */
+            if (tableColumn >= 0 && tableRow >= 0 &&
+                tableColumn < dataTable.getColumnCount() &&
+                tableRow < dataTable.getRowCount())
+                dataTable.repaintCell(tableColumn, tableRow);
+            else
+                dataTable.doCommand(new VisualRefreshCommand());
+        }
+        catch (UnsupportedOperationException ex) {
+            log.debug("statistics highlight fallback: unsupported table value", ex);
+            disableStatisticsHighlight();
+        }
+        catch (RuntimeException ex) {
+            log.warn("statistics highlight fallback: unable to update cell", ex);
+            disableStatisticsHighlight();
+        }
+    }
+
+    private void disableStatisticsHighlight()
+    {
+        statisticsHighlightKind = null;
+        statisticsHighlightCells.clear();
+        if (dataTable != null && !dataTable.isDisposed())
+            dataTable.doCommand(new VisualRefreshCommand());
     }
 
     @Override
@@ -1759,11 +1929,6 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         return message == null || message.length() == 0 ? ex.getClass().getSimpleName() : message;
     }
 
-    private static long cellKey(int column, int row)
-    {
-        return (((long)row) << 32) ^ (column & 0xffffffffL);
-    }
-
     @Override
     public Object getTable()
     {
@@ -1813,7 +1978,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             {
                 if (previous != null)
                     previous.accumulateConfigLabels(configLabels, columnPosition, rowPosition);
-                if (statisticsHighlightCells.contains(cellKey(columnPosition, rowPosition)))
+                if (statisticsHighlightCells.contains(columnPosition, rowPosition))
                     configLabels.addLabelOnTop(STATISTICS_HIGHLIGHT_LABEL);
             }
         });
