@@ -19,7 +19,7 @@ The following commands describe the Windows workflow for this custom fork. Run t
 - JDK 21 or later. The Maven compiler configuration targets Java 21.
 - Maven 3.6 or later is needed for source builds and `run-hdfview.bat --maven`; the verified local Maven version is 3.9.16. The default direct-JAR launcher and `--validate` do not require Maven.
 - HDF5 2.2.0 native libraries are required. HDF4 4.4.0 libraries are optional unless HDF4 files are needed. Configure the local `build.properties` entries `hdf5.lib.dir`, `hdf5.plugin.dir`, `hdf.lib.dir`, and the Windows semicolon-separated `platform.hdf.lib` DLL path. Keep absolute machine paths in local configuration; do not commit them.
-- Windows SWT is selected by the Maven profile as `org.eclipse.swt.win32.win32.x86_64` version 3.126.0. SWTBot tests need a real Windows desktop/display and the configured native libraries.
+- Windows SWT is selected by the Maven profile as `org.eclipse.swt.win32.win32.x86_64` version 3.134.0. SWTBot tests need a real Windows desktop/display and the configured native libraries.
 
 `build.properties` is the Maven user-properties input, not a portable native-library bundle. Set its paths for the local machine before building. A packaged app-image or installer contains its own jpackage runtime; end users do not need Maven or a separate JDK, but source development still requires JDK 21+.
 

@@ -34,6 +34,7 @@ import hdf.object.h5.H5ReferenceType;
 import hdf.object.h5.H5ReferenceType.H5ReferenceData;
 import hdf.view.DataView.DataViewManager;
 import hdf.view.DefaultFileFilter;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.TreeView.DefaultTreeView;
 import hdf.view.TreeView.TreeView;
@@ -341,7 +342,9 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
 
         attributeInfoGroup = new org.eclipse.swt.widgets.Group(aparent, SWT.NONE);
         attributeInfoGroup.setFont(curFont);
-        attributeInfoGroup.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+        ThemeManager.forDisplay(display).bind(attributeInfoGroup,
+                                              ThemeManager.ColorRole.SECONDARY_SURFACE,
+                                              ThemeManager.ColorRole.FOREGROUND);
         attributeInfoGroup.setLayout(new GridLayout(3, false));
         attributeInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -553,7 +556,9 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             new org.eclipse.swt.widgets.Group(goparent, SWT.NONE);
         generalInfoGroup.setFont(curFont);
         generalInfoGroup.setLayout(new GridLayout(2, false));
-        generalInfoGroup.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+        ThemeManager.forDisplay(display).bind(generalInfoGroup,
+                                              ThemeManager.ColorRole.SECONDARY_SURFACE,
+                                              ThemeManager.ColorRole.FOREGROUND);
         generalInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         /* Object name section */

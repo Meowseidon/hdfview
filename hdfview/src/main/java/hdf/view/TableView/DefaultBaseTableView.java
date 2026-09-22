@@ -57,6 +57,7 @@ import hdf.view.DefaultFileFilter;
 import hdf.view.HDFView;
 import hdf.view.TableView.DataDisplayConverterFactory.HDFDisplayConverter;
 import hdf.view.TableView.DataProviderFactory.HDFDataProvider;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.TreeView.TreeView;
 import hdf.view.ViewProperties;
@@ -175,6 +176,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     private static final Logger log = LoggerFactory.getLogger(DefaultBaseTableView.class);
 
     private final Display display = Display.getDefault();
+    private final ThemeManager themeManager = ThemeManager.forDisplay(display);
+    private ThemeManager.Registration themeRegistration;
     /** The shell used for dialogs and, for standalone views, the top-level view shell. */
     protected final Shell shell;
 
@@ -369,6 +372,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         isEmbedded = parent != null;
         viewParent = isEmbedded ? parent : new Shell(display, SWT.SHELL_TRIM);
         shell      = viewParent.getShell();
+        if (!isEmbedded)
+            themeManager.applyTo(shell);
 
         if (!isEmbedded)
             viewParent.setData(this);
@@ -572,7 +577,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
 
         cellValueField = new Text(cellValueFieldScroller, SWT.MULTI | SWT.BORDER | SWT.WRAP);
         cellValueField.setEditable(false);
-        cellValueField.setBackground(new Color(display, 255, 255, 240));
+        themeManager.bind(cellValueField, ThemeManager.ColorRole.INPUT_BACKGROUND,
+                          ThemeManager.ColorRole.DISABLED_FOREGROUND);
         cellValueField.setEnabled(false);
         cellValueField.setFont(curFont);
 
@@ -659,6 +665,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             if (isEmbedded)
                 dataTable.setMenu(viewMenu);
             dataTable.addLayerListener(this::handleStatisticsLayerEvent);
+            themeRegistration = themeManager.addListener(manager -> applyTableTheme());
+            applyTableTheme();
         }
         catch (UnsupportedOperationException ex) {
             log.debug("Subclass does not implement createTable()");
@@ -928,6 +936,10 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         dataValue = null;
         statisticsHighlightKind = null;
         statisticsHighlightCells.clear();
+        if (themeRegistration != null) {
+            themeRegistration.dispose();
+            themeRegistration = null;
+        }
         dataTable = null;
 
         if (curFont != null && !curFont.isDisposed())
@@ -1512,6 +1524,63 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
      * @return the newly created data table
      */
     protected abstract NatTable createTable(Composite parent, DataFormat theDataObject);
+
+    /**
+     * Replace only NatTable's registered visual styles.  The data provider,
+     * selection layer, current editor, and statistics label accumulator remain
+     * untouched so a system-theme change cannot reload or reset the dataset.
+     */
+    private void applyTableTheme()
+    {
+        if (dataTable == null || dataTable.isDisposed())
+            return;
+
+        IConfigRegistry configRegistry = dataTable.getConfigRegistry();
+
+        registerTableStyle(configRegistry, GridRegion.BODY, DisplayMode.NORMAL,
+                           createTableStyle(themeManager.color(ThemeManager.ColorRole.TABLE_BODY_BACKGROUND),
+                                            themeManager.color(ThemeManager.ColorRole.TABLE_BODY_FOREGROUND), true));
+        registerTableStyle(configRegistry, GridRegion.BODY, DisplayMode.SELECT,
+                           createTableStyle(themeManager.color(ThemeManager.ColorRole.SELECTION_BACKGROUND),
+                                            themeManager.color(ThemeManager.ColorRole.SELECTION_FOREGROUND), true));
+
+        Style statisticsStyle = createTableStyle(
+            themeManager.color(ThemeManager.ColorRole.STATISTICS_HIGHLIGHT_BACKGROUND),
+            themeManager.color(ThemeManager.ColorRole.STATISTICS_HIGHLIGHT_FOREGROUND), true);
+        registerTableStyle(configRegistry, STATISTICS_HIGHLIGHT_LABEL, DisplayMode.NORMAL, statisticsStyle);
+        registerTableStyle(configRegistry, STATISTICS_HIGHLIGHT_LABEL, DisplayMode.SELECT, statisticsStyle);
+
+        Style headerStyle = createTableStyle(themeManager.color(ThemeManager.ColorRole.TABLE_HEADER_BACKGROUND),
+                                             themeManager.color(ThemeManager.ColorRole.TABLE_HEADER_FOREGROUND),
+                                             false);
+        Style selectedHeaderStyle = createTableStyle(
+            themeManager.color(ThemeManager.ColorRole.SELECTION_BACKGROUND),
+            themeManager.color(ThemeManager.ColorRole.SELECTION_FOREGROUND), false);
+        for (String region : new String[] {GridRegion.COLUMN_HEADER, GridRegion.ROW_HEADER, GridRegion.CORNER}) {
+            registerTableStyle(configRegistry, region, DisplayMode.NORMAL, headerStyle);
+            registerTableStyle(configRegistry, region, DisplayMode.SELECT, selectedHeaderStyle);
+        }
+
+        dataTable.doCommand(new VisualRefreshCommand());
+    }
+
+    private Style createTableStyle(Color background, Color foreground, boolean leftAligned)
+    {
+        Style style = new Style();
+        if (leftAligned)
+            style.setAttributeValue(CellStyleAttributes.HORIZONTAL_ALIGNMENT, HorizontalAlignmentEnum.LEFT);
+        style.setAttributeValue(CellStyleAttributes.BACKGROUND_COLOR, background);
+        style.setAttributeValue(CellStyleAttributes.FOREGROUND_COLOR, foreground);
+        style.setAttributeValue(CellStyleAttributes.FONT,
+                                curFont == null ? display.getSystemFont() : curFont);
+        return style;
+    }
+
+    private void registerTableStyle(IConfigRegistry configRegistry, String configLabel, DisplayMode displayMode,
+                                    Style style)
+    {
+        configRegistry.registerConfigAttribute(CellConfigAttributes.CELL_STYLE, style, displayMode, configLabel);
+    }
 
     /**
      * Show the object reference data.
@@ -3198,7 +3267,9 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                     cellStyle.setAttributeValue(CellStyleAttributes.HORIZONTAL_ALIGNMENT,
                                                 HorizontalAlignmentEnum.LEFT);
                     cellStyle.setAttributeValue(CellStyleAttributes.BACKGROUND_COLOR,
-                                                Display.getCurrent().getSystemColor(SWT.COLOR_WHITE));
+                                                themeManager.color(ThemeManager.ColorRole.TABLE_BODY_BACKGROUND));
+                    cellStyle.setAttributeValue(CellStyleAttributes.FOREGROUND_COLOR,
+                                                themeManager.color(ThemeManager.ColorRole.TABLE_BODY_FOREGROUND));
 
                     if (curFont != null)
                         cellStyle.setAttributeValue(CellStyleAttributes.FONT, curFont);
@@ -3216,9 +3287,11 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                     statisticsStyle.setAttributeValue(CellStyleAttributes.HORIZONTAL_ALIGNMENT,
                                                        HorizontalAlignmentEnum.LEFT);
                     statisticsStyle.setAttributeValue(CellStyleAttributes.BACKGROUND_COLOR,
-                                                       Display.getCurrent().getSystemColor(SWT.COLOR_YELLOW));
+                                                       themeManager.color(
+                                                           ThemeManager.ColorRole.STATISTICS_HIGHLIGHT_BACKGROUND));
                     statisticsStyle.setAttributeValue(CellStyleAttributes.FOREGROUND_COLOR,
-                                                       Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
+                                                       themeManager.color(
+                                                           ThemeManager.ColorRole.STATISTICS_HIGHLIGHT_FOREGROUND));
                     if (curFont != null)
                         statisticsStyle.setAttributeValue(CellStyleAttributes.FONT, curFont);
                     configRegistry.registerConfigAttribute(CellConfigAttributes.CELL_STYLE,
@@ -3395,7 +3468,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                         {
                             this.cellPainter = new LineBorderDecorator(new TextPainter(false, true, 2, true));
                             this.bgColor =
-                                Display.getDefault().getSystemColor(SWT.COLOR_WIDGET_NORMAL_SHADOW);
+                                themeManager.color(ThemeManager.ColorRole.TABLE_HEADER_BACKGROUND);
                             this.font = (curFont == null) ? Display.getDefault().getSystemFont() : curFont;
                         }
                     });
@@ -3520,7 +3593,7 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
                         {
                             this.cellPainter =
                                 new BeveledBorderDecorator(new TextPainter(false, true, 2, true));
-                            this.bgColor = Display.getDefault().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW);
+                            this.bgColor = themeManager.color(ThemeManager.ColorRole.TABLE_HEADER_BACKGROUND);
                             this.font    = (curFont == null) ? Display.getDefault().getSystemFont() : curFont;
                         }
                     });

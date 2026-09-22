@@ -26,7 +26,7 @@
     <hdf5.version>2.2.0</hdf5.version>
     <user.properties.file>build.properties</user.properties.file>
     <properties.plugin.version>1.2.1</properties.plugin.version>
-    <swt.version>3.126.0</swt.version>
+    <swt.version>3.134.0</swt.version>
     <osgi.platform>gtk.linux.x86_64</osgi.platform>
     <!-- Skip shell-based exec plugins on Windows (no sh available) -->
     <maven.exec.skip>false</maven.exec.skip>

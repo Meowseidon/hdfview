@@ -59,6 +59,7 @@ import hdf.view.DataView.DataViewFactoryProducer;
 import hdf.view.DataView.DataViewManager;
 import hdf.view.DefaultFileFilter;
 import hdf.view.PaletteView.PaletteView;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.TreeView.TreeView;
 import hdf.view.ViewProperties;
@@ -147,7 +148,9 @@ public class DefaultImageView implements ImageView {
     private static final Logger log = LoggerFactory.getLogger(DefaultImageView.class);
 
     private final Display display = Display.getDefault();
+    private final ThemeManager themeManager = ThemeManager.forDisplay(display);
     private final Shell shell;
+    private ThemeManager.Registration themeRegistration;
     private Font curFont;
 
     /** Horizontal direction to flip an image. */
@@ -307,6 +310,11 @@ public class DefaultImageView implements ImageView {
     public DefaultImageView(DataViewManager theView, HashMap map)
     {
         shell = new Shell(display, SWT.SHELL_TRIM);
+        themeManager.applyTo(shell);
+        themeRegistration = themeManager.addListener(manager -> {
+            if (paletteComponent != null && !paletteComponent.isDisposed())
+                paletteComponent.redraw();
+        });
 
         shell.setData(this);
 
@@ -317,6 +325,10 @@ public class DefaultImageView implements ImageView {
             @Override
             public void widgetDisposed(DisposeEvent e)
             {
+                if (themeRegistration != null) {
+                    themeRegistration.dispose();
+                    themeRegistration = null;
+                }
                 // reload the data when it is displayed next time
                 // because the display type (table or image) may be
                 // different.
@@ -2469,7 +2481,7 @@ public class DefaultImageView implements ImageView {
                     gc.setFont(newFont);
 
                     gc.setBackground(oldBackground);
-                    gc.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
+                    gc.setForeground(themeManager.color(ThemeManager.ColorRole.FOREGROUND));
 
                     int trueHeight;
                     int i = 0;
@@ -3698,6 +3710,7 @@ public class DefaultImageView implements ImageView {
         {
             Shell parent = getParent();
             shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+            themeManager.applyTo(shell);
             shell.setFont(curFont);
             I18n.bind(shell, "dialog.image.animation.title", dataset.getName());
             shell.setImages(ViewProperties.getHdfIcons());
@@ -3841,6 +3854,7 @@ public class DefaultImageView implements ImageView {
         {
             Shell parent = getParent();
             shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+            themeManager.applyTo(shell);
             shell.setFont(curFont);
             I18n.bind(shell, "dialog.image.valueRange.title");
             shell.setImages(ViewProperties.getHdfIcons());
@@ -4119,6 +4133,7 @@ public class DefaultImageView implements ImageView {
         {
             Shell parent = getParent();
             shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+            themeManager.applyTo(shell);
             shell.setFont(curFont);
             I18n.bind(shell, "dialog.image.brightnessContrast.title");
             shell.setImages(ViewProperties.getHdfIcons());

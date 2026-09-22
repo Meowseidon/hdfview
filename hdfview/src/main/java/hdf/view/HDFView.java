@@ -129,6 +129,7 @@ public class HDFView implements DataViewManager {
 
     private static Display display;
     private static Shell mainWindow;
+    private static ThemeManager themeManager;
 
     /** Determines whether HDFView is being executed for GUI testing. */
     private boolean isTesting = false;
@@ -313,6 +314,7 @@ public class HDFView implements DataViewManager {
 
         if (display == null || display.isDisposed())
             display = new Display();
+        themeManager = ThemeManager.forDisplay(display);
 
         rootDir  = root;
         startDir = startPath;
@@ -585,6 +587,7 @@ public class HDFView implements DataViewManager {
     {
         // Create a new display window
         final Shell shell = new Shell(display);
+        themeManager.applyTo(shell);
         shell.setImages(ViewProperties.getHdfIcons());
         shell.setFont(currentFont);
         I18n.bind(shell, "window.title", HDFVIEW_VERSION);
@@ -2003,6 +2006,7 @@ public class HDFView implements DataViewManager {
         container.setLayout(new FillLayout());
 
         Composite statusArea = new Composite(content, SWT.NONE);
+        themeManager.bindBackground(statusArea, ThemeManager.ColorRole.SECONDARY_SURFACE);
         statusArea.setLayout(new FillLayout(SWT.HORIZONTAL));
 
         final SashForm contentArea = new SashForm(container, SWT.HORIZONTAL);
@@ -2010,14 +2014,14 @@ public class HDFView implements DataViewManager {
 
         // Add TreeView and DataView to content area pane
         treeArea = new ScrolledComposite(contentArea, SWT.H_SCROLL | SWT.V_SCROLL | SWT.BORDER);
-        treeArea.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WHITE));
+        themeManager.bindBackground(treeArea, ThemeManager.ColorRole.WINDOW_BACKGROUND);
         treeArea.setExpandHorizontal(true);
         treeArea.setExpandVertical(true);
 
         generalArea = new ScrolledComposite(contentArea, SWT.H_SCROLL | SWT.V_SCROLL | SWT.BORDER);
         generalArea.setExpandHorizontal(true);
         generalArea.setExpandVertical(true);
-        generalArea.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+        themeManager.bindBackground(generalArea, ThemeManager.ColorRole.SECONDARY_SURFACE);
         generalArea.setMinHeight(contentArea.getSize().y - 2);
 
         /*
@@ -2026,6 +2030,7 @@ public class HDFView implements DataViewManager {
          * the old dispose/setContent cycle and its visible blank state.
          */
         rightTabContent = new Composite(generalArea, SWT.NONE);
+        themeManager.bindBackground(rightTabContent, ThemeManager.ColorRole.SURFACE);
         rightTabContent.setLayout(new FillLayout());
         rightTabFolder = new TabFolder(rightTabContent, SWT.NONE);
         generalArea.setContent(rightTabContent);
@@ -2033,7 +2038,8 @@ public class HDFView implements DataViewManager {
 
         // Create status area for displaying messages and metadata
         status = new Text(statusArea, SWT.V_SCROLL | SWT.MULTI | SWT.BORDER);
-        status.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+        themeManager.bind(status, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         status.setEditable(false);
         status.setFont(currentFont);
 

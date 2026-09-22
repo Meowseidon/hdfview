@@ -26,6 +26,7 @@ import hdf.object.FileFormat;
 import hdf.object.Group;
 import hdf.object.HObject;
 import hdf.view.DefaultFileFilter;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
 import hdf.view.i18n.I18n;
@@ -70,6 +71,8 @@ public class NewLinkDialog extends Dialog {
     private static final Logger log = LoggerFactory.getLogger(NewLinkDialog.class);
 
     private Shell shell;
+    private ThemeManager themeManager;
+    private ThemeManager.Registration targetObjectThemeRegistration;
 
     private Font curFont;
 
@@ -142,6 +145,8 @@ public class NewLinkDialog extends Dialog {
     {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+        themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         shell.setFont(curFont);
         I18n.bind(shell, "dialog.newLink.title");
         shell.setImages(ViewProperties.getHdfIcons());
@@ -215,7 +220,7 @@ public class NewLinkDialog extends Dialog {
                 targetObject.setEnabled(true);
                 targetObject.setEditable(false);
                 targetObject.setBackground(
-                    Display.getDefault().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+                    themeManager.color(ThemeManager.ColorRole.SECONDARY_SURFACE));
 
                 targetObject.removeAll();
                 retrieveObjects(fileFormat);
@@ -351,7 +356,11 @@ public class NewLinkDialog extends Dialog {
         targetObject.setFont(curFont);
         targetObject.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
         targetObject.setEditable(false);
-        targetObject.setBackground(Display.getDefault().getSystemColor(SWT.COLOR_WIDGET_LIGHT_SHADOW));
+        targetObject.setBackground(themeManager.color(ThemeManager.ColorRole.SECONDARY_SURFACE));
+        targetObjectThemeRegistration = themeManager.addListener(manager -> {
+            if (targetObject != null && !targetObject.isDisposed() && !targetObject.getEditable())
+                targetObject.setBackground(manager.color(ThemeManager.ColorRole.SECONDARY_SURFACE));
+        });
 
         groupList            = new ArrayList<>(objList.size());
         Object obj           = null;
@@ -442,6 +451,10 @@ public class NewLinkDialog extends Dialog {
             @Override
             public void widgetDisposed(DisposeEvent e)
             {
+                if (targetObjectThemeRegistration != null) {
+                    targetObjectThemeRegistration.dispose();
+                    targetObjectThemeRegistration = null;
+                }
                 if (curFont != null)
                     curFont.dispose();
             }

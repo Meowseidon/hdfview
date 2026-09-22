@@ -16,6 +16,7 @@ package hdf.view.dialog;
 
 import java.lang.reflect.Array;
 
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
 import hdf.view.i18n.I18n;
@@ -111,6 +112,8 @@ public class MathConversionDialog extends Dialog {
     {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+        ThemeManager themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         shell.setFont(curFont);
         I18n.bind(shell, "dialog.convertData.title");
         shell.setImages(ViewProperties.getHdfIcons());
@@ -182,7 +185,8 @@ public class MathConversionDialog extends Dialog {
         infoArea = new Text(contentGroup, SWT.MULTI | SWT.BORDER | SWT.WRAP);
         infoArea.setEditable(false);
         infoArea.setFont(curFont);
-        infoArea.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_GRAY));
+        themeManager.bind(infoArea, ThemeManager.ColorRole.READ_ONLY_BACKGROUND,
+                          ThemeManager.ColorRole.FOREGROUND);
         GridData infoAreaData      = new GridData(SWT.FILL, SWT.FILL, true, true, 2, 1);
         infoAreaData.minimumHeight = 150;
         infoArea.setLayoutData(infoAreaData);
