@@ -16,9 +16,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -131,6 +133,113 @@ public final class DatasetSearchEngine {
             for (long value : count)
                 result = Math.multiplyExact(result, value);
             return result;
+        }
+    }
+
+    /**
+     * Lazy row-major iterator over bounded Dataset blocks.
+     *
+     * <p>The iterator keeps only the Dataset shape, the chosen tile shape, and
+     * the current tile origin.  Calling {@link #hasNext()} never constructs a
+     * block; one {@link Block} is created only by the corresponding
+     * {@link #next()} call.  This is intentionally a small custom iterator so
+     * a cancellation flag can stop block generation before the next block is
+     * materialized.</p>
+     */
+    public static final class BlockIterator implements Iterator<Block> {
+        private final long[] dims;
+        private final long[] tile;
+        private final long[] start;
+        private final AtomicBoolean cancelled;
+        private boolean hasNext;
+        private long generatedBlockCount;
+
+        private BlockIterator(long[] dims, long maxElements, AtomicBoolean cancelled)
+        {
+            this.cancelled = cancelled;
+            if (dims == null) {
+                this.dims = null;
+                this.tile = null;
+                this.start = null;
+                this.hasNext = false;
+                return;
+            }
+
+            this.dims = dims.clone();
+            if (this.dims.length == 0) {
+                this.tile = new long[0];
+                this.start = new long[0];
+                this.hasNext = true;
+                return;
+            }
+            if (maxElements <= 0)
+                throw new IllegalArgumentException("maxElements must be positive");
+
+            for (long dim : this.dims) {
+                if (dim < 0)
+                    throw new IllegalArgumentException("Dataset dimensions cannot be negative");
+            }
+
+            boolean empty = false;
+            for (long dim : this.dims) {
+                if (dim == 0) {
+                    empty = true;
+                    break;
+                }
+            }
+
+            this.tile = chooseTile(this.dims, maxElements);
+            this.start = new long[this.dims.length];
+            this.hasNext = !empty;
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            if (cancelled != null && cancelled.get()) {
+                hasNext = false;
+                return false;
+            }
+            return hasNext;
+        }
+
+        @Override
+        public Block next()
+        {
+            if (!hasNext())
+                throw new NoSuchElementException();
+
+            long[] count = new long[dims.length];
+            for (int i = 0; i < dims.length; i++)
+                count[i] = Math.min(tile[i], dims[i] - start[i]);
+
+            Block block = new Block(start, count);
+            if (generatedBlockCount < Long.MAX_VALUE)
+                generatedBlockCount++;
+            advance();
+            return block;
+        }
+
+        /** Number of blocks whose objects have actually been created. */
+        public long getGeneratedBlockCount() { return generatedBlockCount; }
+
+        private void advance()
+        {
+            if (dims.length == 0) {
+                hasNext = false;
+                return;
+            }
+
+            for (int dimension = dims.length - 1; dimension >= 0; dimension--) {
+                long limit = dims[dimension];
+                long step = tile[dimension];
+                if (start[dimension] < limit - step) {
+                    start[dimension] += step;
+                    return;
+                }
+                start[dimension] = 0;
+            }
+            hasNext = false;
         }
     }
 
@@ -350,20 +459,17 @@ public final class DatasetSearchEngine {
                     continue;
                 }
 
-                List<Block> blocks = buildBlocks(dims, SEARCH_BLOCK_ELEMENTS);
-                for (Block block : blocks)
-                    state.totalElements = safeAdd(state.totalElements, block.getElementCount());
-                DatasetSearchOverlay dirtyOverlay = new DatasetSearchOverlay(snapshots, blocks);
-                for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
-                    if (cancelled.get())
-                        break;
-
-                    Block block = blocks.get(blockIndex);
+                state.totalElements = safeAdd(state.totalElements, safeElementCount(dims));
+                DatasetSearchOverlay dirtyOverlay = new DatasetSearchOverlay(
+                    snapshots, dims, SEARCH_BLOCK_ELEMENTS);
+                BlockIterator blocks = iterateBlocks(dims, SEARCH_BLOCK_ELEMENTS, cancelled);
+                while (!cancelled.get() && blocks.hasNext()) {
+                    Block block = blocks.next();
                     Object data = readBlock(scanner, block);
                     if (data == null)
                         throw new IllegalStateException("Dataset block read returned no data");
 
-                    data = overlayDirtySnapshots(data, rawDatatype, dirtyOverlay, blockIndex, cancelled);
+                    data = overlayDirtySnapshots(data, rawDatatype, dirtyOverlay, block, cancelled);
                     if (cancelled.get())
                         break;
                     long blockElements = block.getElementCount();
@@ -414,7 +520,7 @@ public final class DatasetSearchEngine {
      * are boxed only if at least one dirty value actually intersects them.
      */
     private static Object overlayDirtySnapshots(Object blockData, Datatype rawDatatype,
-                                                DatasetSearchOverlay overlay, int blockIndex,
+                                                DatasetSearchOverlay overlay, Block block,
                                                 AtomicBoolean cancelled)
     {
         if (overlay == null)
@@ -427,8 +533,8 @@ public final class DatasetSearchEngine {
         Object[] overlayData = {null};
         Object[] result = {blockData};
         int blockLength = valueLength(blockData);
-        overlay.forEachValue(blockIndex, blockValuesPerCell, (snapshot, blockValueIndex,
-                                                               snapshotValueIndex) -> {
+        overlay.forEachValue(block, blockValuesPerCell, (snapshot, blockValueIndex,
+                                                         snapshotValueIndex) -> {
             if (cancelled != null && cancelled.get())
                 return false;
             if (blockValueIndex < 0 || blockValueIndex >= blockLength)
@@ -634,16 +740,74 @@ public final class DatasetSearchEngine {
             return Collections.emptyList();
         if (dims.length == 0)
             return Collections.singletonList(new Block(new long[0], new long[0]));
+
+        List<Block> blocks = new ArrayList<>();
+        BlockIterator iterator = iterateBlocks(dims, maxElements);
+        while (iterator.hasNext())
+            blocks.add(iterator.next());
+        return blocks.isEmpty() ? Collections.emptyList() : blocks;
+    }
+
+    /**
+     * Create a lazy row-major block iterator.  The optional cancellation flag
+     * is checked before each block is generated and is also observed by
+     * {@link BlockIterator#hasNext()}.
+     */
+    public static BlockIterator iterateBlocks(long[] dims, long maxElements,
+                                              AtomicBoolean cancelled)
+    {
+        return new BlockIterator(dims, maxElements, cancelled);
+    }
+
+    /** Create a lazy row-major block iterator without cancellation. */
+    public static BlockIterator iterateBlocks(long[] dims, long maxElements)
+    {
+        return iterateBlocks(dims, maxElements, null);
+    }
+
+    /** Package-private tile metadata shared by the streaming dirty overlay. */
+    static long[] blockTile(long[] dims, long maxElements)
+    {
+        if (dims == null)
+            return null;
+        if (dims.length == 0)
+            return new long[0];
         if (maxElements <= 0)
             throw new IllegalArgumentException("maxElements must be positive");
+        for (long dim : dims) {
+            if (dim < 0)
+                throw new IllegalArgumentException("Dataset dimensions cannot be negative");
+        }
+        return chooseTile(dims, maxElements);
+    }
+
+    /**
+     * Return a shape's element count without iterating its blocks.  Overflow
+     * saturates at {@link Long#MAX_VALUE}; a zero dimension yields zero.
+     */
+    public static long safeElementCount(long[] dims)
+    {
+        if (dims == null)
+            return 0;
 
         for (long dim : dims) {
             if (dim < 0)
                 throw new IllegalArgumentException("Dataset dimensions cannot be negative");
             if (dim == 0)
-                return Collections.emptyList();
+                return 0;
         }
 
+        long result = 1;
+        for (long dim : dims) {
+            if (result > Long.MAX_VALUE / dim)
+                return Long.MAX_VALUE;
+            result *= dim;
+        }
+        return result;
+    }
+
+    private static long[] chooseTile(long[] dims, long maxElements)
+    {
         long[] tile = dims.clone();
         while (productExceeds(tile, maxElements)) {
             int split = 0;
@@ -653,30 +817,9 @@ public final class DatasetSearchEngine {
             }
             if (tile[split] <= 1)
                 break;
-            tile[split] = Math.max(1, (tile[split] + 1) / 2);
+            tile[split] = Math.max(1, tile[split] / 2 + tile[split] % 2);
         }
-
-        List<Block> blocks = new ArrayList<>();
-        long[] start = new long[dims.length];
-        while (true) {
-            long[] count = new long[dims.length];
-            for (int i = 0; i < dims.length; i++)
-                count[i] = Math.min(tile[i], dims[i] - start[i]);
-            blocks.add(new Block(start, count));
-
-            int dimension = dims.length - 1;
-            while (dimension >= 0) {
-                start[dimension] += tile[dimension];
-                if (start[dimension] < dims[dimension])
-                    break;
-                start[dimension] = 0;
-                dimension--;
-            }
-            if (dimension < 0)
-                break;
-        }
-
-        return blocks;
+        return tile;
     }
 
     private static boolean productExceeds(long[] values, long limit)

@@ -342,22 +342,18 @@ public final class DatasetStatisticsEngine {
             if (dims == null)
                 throw new IllegalStateException("Dataset dimensions are unavailable");
 
-            List<DatasetSearchEngine.Block> blocks =
-                DatasetSearchEngine.buildBlocks(dims, STATISTICS_BLOCK_ELEMENTS);
-            long total = 0;
-            for (DatasetSearchEngine.Block block : blocks)
-                total = safeAdd(total, block.getElementCount());
+            long total = DatasetSearchEngine.safeElementCount(dims);
 
             Accumulator accumulator = new Accumulator(request.getFillValue());
             DatasetSearchOverlay dirtyOverlay = new DatasetSearchOverlay(
                 request.getDirtyPage() == null ? java.util.Collections.emptyList()
                                                 : java.util.Collections.singletonList(request.getDirtyPage()),
-                blocks);
-            scanBlocks(scanner, blocks, dirtyOverlay, datatype, cancelled, listener,
+                dims, STATISTICS_BLOCK_ELEMENTS);
+            scanBlocks(scanner, dims, dirtyOverlay, datatype, cancelled, listener,
                        accumulator, total, false);
             accumulator.finishMean();
 
-            scanBlocks(scanner, blocks, dirtyOverlay, datatype, cancelled, listener,
+            scanBlocks(scanner, dims, dirtyOverlay, datatype, cancelled, listener,
                        accumulator, total, true);
             accumulator.finishVariance();
             return new Result(Scope.ENTIRE_DATASET, accumulator);
@@ -374,18 +370,22 @@ public final class DatasetStatisticsEngine {
         }
     }
 
-    private static void scanBlocks(Dataset scanner, List<DatasetSearchEngine.Block> blocks,
+    private static void scanBlocks(Dataset scanner, long[] dims,
                                    DatasetSearchOverlay dirtyOverlay, Datatype datatype,
                                    AtomicBoolean cancelled, Listener listener,
                                    Accumulator accumulator, long total, boolean variancePass)
         throws Exception
     {
         long processed = 0;
-        for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
+        DatasetSearchEngine.BlockIterator blocks = DatasetSearchEngine.iterateBlocks(
+            dims, STATISTICS_BLOCK_ELEMENTS, cancelled);
+        while (true) {
             checkCancelled(cancelled);
-            DatasetSearchEngine.Block block = blocks.get(blockIndex);
+            if (!blocks.hasNext())
+                break;
+            DatasetSearchEngine.Block block = blocks.next();
             Object data = readBlock(scanner, block);
-            overlayDirtyPage(data, dirtyOverlay, blockIndex, datatype, cancelled);
+            overlayDirtyPage(data, dirtyOverlay, block, datatype, cancelled);
             checkCancelled(cancelled);
 
             if (variancePass) {
@@ -423,7 +423,7 @@ public final class DatasetStatisticsEngine {
 
     /** Merge only the dirty values indexed for the current block. */
     private static void overlayDirtyPage(Object blockData, DatasetSearchOverlay dirtyOverlay,
-                                         int blockIndex, Datatype datatype,
+                                         DatasetSearchEngine.Block block, Datatype datatype,
                                          AtomicBoolean cancelled)
     {
         if (blockData == null || dirtyOverlay == null || !blockData.getClass().isArray())
@@ -440,8 +440,8 @@ public final class DatasetStatisticsEngine {
             return;
 
         int blockLength = Array.getLength(blockData);
-        dirtyOverlay.forEachValue(blockIndex, scalarValuesPerCell,
-                                  (snapshot, blockValueIndex, snapshotValueIndex) -> {
+        dirtyOverlay.forEachValue(block, scalarValuesPerCell,
+                                   (snapshot, blockValueIndex, snapshotValueIndex) -> {
             if (cancelled != null && cancelled.get())
                 return false;
             if (blockValueIndex < 0 || blockValueIndex >= blockLength)

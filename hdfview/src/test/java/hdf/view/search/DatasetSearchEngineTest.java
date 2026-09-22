@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Array;
@@ -20,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -47,6 +49,89 @@ class DatasetSearchEngineTest {
         for (DatasetSearchEngine.Block block : blocks)
             assertTrue(block.getElementCount() <= 1024,
                        "every native read block must stay within the configured bound");
+    }
+
+    @Test
+    void lazyBlocksMatchTheExistingEagerHelperForNonDivisibleAndHighRankShapes()
+    {
+        long[][] shapes = {
+            {5, 7},
+            {2, 3, 4, 5}
+        };
+        for (long[] shape : shapes) {
+            List<DatasetSearchEngine.Block> eager =
+                DatasetSearchEngine.buildBlocks(shape, 10);
+            DatasetSearchEngine.BlockIterator lazy =
+                DatasetSearchEngine.iterateBlocks(shape, 10);
+            List<DatasetSearchEngine.Block> streamed = new ArrayList<>();
+            while (lazy.hasNext())
+                streamed.add(lazy.next());
+
+            assertEquals(eager.size(), streamed.size(), "lazy block count must match the helper");
+            for (int i = 0; i < eager.size(); i++) {
+                assertArrayEquals(eager.get(i).getStart(), streamed.get(i).getStart(),
+                                  "lazy block start must retain row-major order");
+                assertArrayEquals(eager.get(i).getCount(), streamed.get(i).getCount(),
+                                  "lazy block count must retain row-major coverage");
+            }
+        }
+
+        List<DatasetSearchEngine.Block> tailBlocks =
+            DatasetSearchEngine.buildBlocks(new long[] {5, 7}, 10);
+        assertArrayEquals(new long[] {2, 1},
+                          tailBlocks.get(tailBlocks.size() - 1).getCount(),
+                          "the non-divisible final block must be clipped to the Dataset shape");
+    }
+
+    @Test
+    void lazyBlockIteratorHandlesZeroDimensionsAndSaturatingShapeCounts()
+    {
+        DatasetSearchEngine.BlockIterator empty =
+            DatasetSearchEngine.iterateBlocks(new long[] {4, 0, 9}, 10);
+        assertFalse(empty.hasNext(), "a zero-dimensional Dataset has no blocks");
+        assertEquals(0L, DatasetSearchEngine.safeElementCount(new long[] {4, 0, 9}));
+        assertEquals(1L, DatasetSearchEngine.safeElementCount(new long[0]),
+                     "a rank-zero Dataset contains one scalar element");
+        assertEquals(Long.MAX_VALUE,
+                     DatasetSearchEngine.safeElementCount(new long[] {Long.MAX_VALUE, 2}),
+                     "shape multiplication must saturate instead of overflowing");
+        assertThrows(IllegalArgumentException.class,
+                     () -> DatasetSearchEngine.safeElementCount(new long[] {-1}));
+    }
+
+    @Test
+    void lazyProductionBlockStreamConsumesTheFirstBlockBeforeGeneratingTheTail()
+    {
+        DatasetSearchEngine.BlockIterator blocks =
+            DatasetSearchEngine.iterateBlocks(new long[] {1000, 1000}, 1);
+
+        assertTrue(blocks.hasNext());
+        assertEquals(0L, blocks.getGeneratedBlockCount(),
+                     "hasNext must not pre-materialize a block");
+        DatasetSearchEngine.Block first = blocks.next();
+        assertArrayEquals(new long[] {0, 0}, first.getStart());
+        assertEquals(1L, blocks.getGeneratedBlockCount(),
+                     "consuming the first block must create only that block");
+        assertTrue(blocks.hasNext(), "the stream must still have a tail");
+        assertEquals(1L, blocks.getGeneratedBlockCount(),
+                     "checking for the tail must not generate it");
+    }
+
+    @Test
+    void lazyBlockIteratorStopsGeneratingAfterCancellation()
+    {
+        AtomicBoolean cancelled = new AtomicBoolean();
+        DatasetSearchEngine.BlockIterator blocks =
+            DatasetSearchEngine.iterateBlocks(new long[] {1000, 1000}, 1, cancelled);
+
+        assertTrue(blocks.hasNext());
+        blocks.next();
+        cancelled.set(true);
+
+        assertFalse(blocks.hasNext(), "cancellation must stop the block stream promptly");
+        assertEquals(1L, blocks.getGeneratedBlockCount(),
+                     "cancellation must not create another block");
+        assertThrows(NoSuchElementException.class, blocks::next);
     }
 
     @Test
@@ -84,6 +169,35 @@ class DatasetSearchEngineTest {
                      "the two edited cells must land in different blocks");
         assertTrue(visitedValues[0] < blocks.size() * page.length,
                    "overlay work must not scale as block count times the old page size");
+    }
+
+    @Test
+    void streamedOverlayFindsSparseValuesByBlockWithoutAnEagerBlockList()
+    {
+        long[] dims = {64, 64};
+        int[] page = new int[(int)(dims[0] * dims[1])];
+        DatasetSearchSnapshot dirty = DatasetSearchSnapshot.fromChangedValues(
+            "file.h5", "/dataset", page, new int[] {1 * 64 + 1, 60 * 64 + 60},
+            new long[] {0, 0}, dims, new long[] {1, 1}, dims, null);
+        DatasetSearchOverlay overlay = new DatasetSearchOverlay(
+            Collections.singletonList(dirty), dims, 256);
+        DatasetSearchEngine.BlockIterator blocks =
+            DatasetSearchEngine.iterateBlocks(dims, 256);
+
+        Set<Integer> blocksWithDirtyValues = new HashSet<>();
+        int blockIndex = 0;
+        while (blocks.hasNext()) {
+            int currentBlockIndex = blockIndex++;
+            DatasetSearchEngine.Block block = blocks.next();
+            overlay.forEachValue(block, 1, (snapshot, blockValueIndex, snapshotValueIndex) -> {
+                blocksWithDirtyValues.add(currentBlockIndex);
+                return true;
+            });
+        }
+
+        assertEquals(Set.of(0, blockIndex - 1), blocksWithDirtyValues,
+                     "the streamed overlay must route each changed cell to its actual block");
+        assertEquals(16, blockIndex, "the test shape must produce a bounded 4 by 4 tile grid");
     }
 
     @Test
