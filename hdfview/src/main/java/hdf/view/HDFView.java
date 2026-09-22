@@ -60,6 +60,7 @@ import hdf.view.fileusage.FileUsageInspectorFactory;
 import hdf.view.i18n.I18n;
 import hdf.view.search.DatasetSearchDialog;
 import hdf.view.search.DatasetSearchEngine;
+import hdf.view.search.DatasetSearchException;
 import hdf.view.search.DatasetSearchResult;
 import hdf.view.search.DatasetSearchSnapshot;
 
@@ -1352,10 +1353,9 @@ public class HDFView implements DataViewManager {
             @Override
             public void onError(String datasetPath, String message, Throwable error)
             {
-                String displayMessage = error instanceof UnsupportedOperationException
-                    ? I18n.text("search.unsupportedDatatype", message) : message;
+                DatasetSearchException failure = DatasetSearchException.from(error);
                 postDatasetSearchUpdate(generation, dialog,
-                                        () -> dialog.addError(datasetPath, displayMessage));
+                                        () -> dialog.addError(datasetPath, failure));
             }
         };
 
@@ -1367,10 +1367,9 @@ public class HDFView implements DataViewManager {
             }
             catch (Throwable error) {
                 log.warn("Dataset content search failed", error);
-                final String message = error.getMessage() == null
-                    ? error.getClass().getSimpleName() : error.getMessage();
+                final DatasetSearchException failure = DatasetSearchException.from(error);
                 postDatasetSearchUpdate(generation, dialog,
-                                        () -> dialog.addError(I18n.text("common.file"), message));
+                                        () -> dialog.addError(I18n.text("common.file"), failure));
                 summary = null;
             }
 

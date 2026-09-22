@@ -302,12 +302,20 @@ public final class DatasetSearchEngine {
             }
         }
 
-        private void error(String datasetPath, String message, Throwable error)
+        private void error(String datasetPath, DatasetSearchException failure)
         {
+            String message = failure.technicalDetail();
+            Object[] messageArgs = failure.messageArgs();
+            if (message.isEmpty() && messageArgs.length > 0)
+                message = String.valueOf(messageArgs[0]);
+            if (message.isEmpty())
+                message = failure.messageKey();
+
             String text = datasetPath + ": " + message;
             errors.add(text);
+            log.warn("Dataset search failed for {} ({})", datasetPath, failure.messageKey(), failure);
             try {
-                listener.onError(datasetPath, message, error);
+                listener.onError(datasetPath, message, failure);
             }
             catch (RuntimeException ex) {
                 log.debug("Dataset search error listener failed", ex);
@@ -400,7 +408,8 @@ public final class DatasetSearchEngine {
                 }
             }
             catch (Exception ex) {
-                state.error(safeFilePath(file), "Unable to enumerate Datasets", ex);
+                state.error(safeFilePath(file), DatasetSearchException.localizedWithCause(
+                    DatasetSearchException.Code.DATASET_ENUMERATION, ex));
             }
         }
 
@@ -450,12 +459,19 @@ public final class DatasetSearchEngine {
                 Datatype datatype = scalarDatatype(rawDatatype);
 
                 if (dims == null)
-                    throw new IllegalStateException("Dataset dimensions are unavailable");
+                    throw DatasetSearchException.localized(
+                        DatasetSearchException.Code.DIMENSIONS_UNAVAILABLE);
 
                 if (!isSupportedValueType(datatype)) {
-                    String description = datatype == null ? "Unknown datatype" : datatype.getDescription();
-                    state.error(fullPath(target.dataset), description,
-                                new UnsupportedOperationException(description));
+                    if (datatype == null) {
+                        state.error(fullPath(target.dataset), DatasetSearchException.localized(
+                            DatasetSearchException.Code.UNKNOWN_DATATYPE));
+                    }
+                    else {
+                        state.error(fullPath(target.dataset), DatasetSearchException.localized(
+                            DatasetSearchException.Code.UNSUPPORTED_DATATYPE,
+                            datatype.getDescription()));
+                    }
                     continue;
                 }
 
@@ -467,7 +483,8 @@ public final class DatasetSearchEngine {
                     Block block = blocks.next();
                     Object data = readBlock(scanner, block);
                     if (data == null)
-                        throw new IllegalStateException("Dataset block read returned no data");
+                        throw DatasetSearchException.localized(
+                            DatasetSearchException.Code.BLOCK_READ_NO_DATA);
 
                     data = overlayDirtySnapshots(data, rawDatatype, dirtyOverlay, block, cancelled);
                     if (cancelled.get())
@@ -479,11 +496,15 @@ public final class DatasetSearchEngine {
                 }
             }
             catch (OutOfMemoryError error) {
-                state.error(fullPath(target.dataset), "Dataset block could not be read", error);
+                state.error(fullPath(target.dataset), DatasetSearchException.localizedWithCause(
+                    DatasetSearchException.Code.BLOCK_READ_FAILED, error));
+            }
+            catch (DatasetSearchException error) {
+                state.error(fullPath(target.dataset), error);
             }
             catch (Exception ex) {
-                state.error(fullPath(target.dataset), ex.getMessage() == null
-                                                            ? "Dataset could not be searched" : ex.getMessage(), ex);
+                state.error(fullPath(target.dataset), DatasetSearchException.localizedWithCause(
+                    DatasetSearchException.Code.SEARCH_FAILED, ex));
             }
             finally {
                 if (scanner != null) {
@@ -577,9 +598,11 @@ public final class DatasetSearchEngine {
             long[] blockCount = block.count;
 
             if (start == null || count == null || stride == null)
-                throw new IllegalStateException("Dataset subset selection is unavailable");
+                throw DatasetSearchException.localized(
+                    DatasetSearchException.Code.SUBSET_UNAVAILABLE);
             if (start.length != blockStart.length || count.length != blockCount.length)
-                throw new IllegalStateException("Dataset subset rank changed while searching");
+                throw DatasetSearchException.localized(
+                    DatasetSearchException.Code.SELECTION_RANK_CHANGED);
 
             for (int i = 0; i < blockStart.length; i++) {
                 start[i]  = blockStart[i];
@@ -689,8 +712,9 @@ public final class DatasetSearchEngine {
             return constructor.newInstance(source.getFileFormat(), source.getName(), source.getPath());
         }
         catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException("Dataset type cannot create an independent scan object: " +
-                                            source.getClass().getName(), ex);
+            throw DatasetSearchException.localizedWithCause(
+                DatasetSearchException.Code.DATASET_READER_UNAVAILABLE, ex,
+                source.getClass().getName());
         }
     }
 

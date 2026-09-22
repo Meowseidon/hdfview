@@ -50,6 +50,138 @@ public final class DatasetStatisticsEngine {
         NON_NEGATIVE
     }
 
+    /** Stable presentation categories used when a statistics request fails. */
+    public enum ErrorCode {
+        REQUEST_INCOMPLETE("statistics.error.requestIncomplete"),
+        SCOPE_UNAVAILABLE("statistics.error.scopeNull"),
+        DIMENSIONS_UNAVAILABLE("statistics.error.dimensionsUnavailable"),
+        SUBSET_UNAVAILABLE("statistics.error.subsetUnavailable"),
+        SELECTION_RANK_CHANGED("statistics.error.selectionRankChanged"),
+        DATASET_READER_UNAVAILABLE("statistics.error.datasetReaderUnavailable"),
+        NO_DATA("statistics.noData"),
+        UNSUPPORTED_DATATYPE("statistics.unsupported"),
+        UNKNOWN_DATATYPE("statistics.error.unknownDatatype"),
+        VALUE_NOT_NUMERIC_OR_BOOLEAN("statistics.error.valueNotNumericOrBoolean"),
+        CALCULATION_FAILED("statistics.error.failed");
+
+        private final String messageKey;
+
+        ErrorCode(String messageKey) { this.messageKey = messageKey; }
+
+        public String messageKey() { return messageKey; }
+    }
+
+    /** Language-independent contract consumed by the presentation layer. */
+    public interface LocalizedFailure {
+        String messageKey();
+
+        Object[] messageArgs();
+    }
+
+    /** A state or native-read failure with a stable localized presentation. */
+    public static class StatisticsException extends IllegalStateException
+        implements LocalizedFailure
+    {
+        private static final long serialVersionUID = 1L;
+
+        private final ErrorCode code;
+        private final Object[] messageArgs;
+
+        private StatisticsException(ErrorCode code, Throwable cause, Object[] messageArgs)
+        {
+            super(code.messageKey(), cause);
+            this.code        = code;
+            this.messageArgs = messageArgs == null ? new Object[0] : messageArgs.clone();
+        }
+
+        public static StatisticsException localized(ErrorCode code, Object... messageArgs)
+        {
+            return new StatisticsException(code, null, messageArgs);
+        }
+
+        public static StatisticsException localizedWithCause(ErrorCode code, Throwable cause,
+                                                             Object... messageArgs)
+        {
+            return new StatisticsException(code, cause, messageArgs);
+        }
+
+        public ErrorCode code() { return code; }
+
+        @Override
+        public String messageKey() { return code.messageKey(); }
+
+        @Override
+        public Object[] messageArgs() { return messageArgs.clone(); }
+    }
+
+    /** Unsupported-value failure retained as an UnsupportedOperationException. */
+    public static final class UnsupportedDatatypeException extends UnsupportedOperationException
+        implements LocalizedFailure
+    {
+        private static final long serialVersionUID = 1L;
+
+        private final ErrorCode code;
+        private final Object[] messageArgs;
+
+        private UnsupportedDatatypeException(ErrorCode code, Object... messageArgs)
+        {
+            super(code.messageKey());
+            this.code        = code;
+            this.messageArgs = messageArgs == null ? new Object[0] : messageArgs.clone();
+        }
+
+        private UnsupportedDatatypeException(ErrorCode code, Throwable cause,
+                                             Object... messageArgs)
+        {
+            super(code.messageKey(), cause);
+            this.code        = code;
+            this.messageArgs = messageArgs == null ? new Object[0] : messageArgs.clone();
+        }
+
+        public static UnsupportedDatatypeException localized(ErrorCode code,
+                                                             Object... messageArgs)
+        {
+            return new UnsupportedDatatypeException(code, messageArgs);
+        }
+
+        public static UnsupportedDatatypeException localizedWithCause(ErrorCode code,
+                                                                      Throwable cause,
+                                                                      Object... messageArgs)
+        {
+            return new UnsupportedDatatypeException(code, cause, messageArgs);
+        }
+
+        public ErrorCode code() { return code; }
+
+        @Override
+        public String messageKey() { return code.messageKey(); }
+
+        @Override
+        public Object[] messageArgs() { return messageArgs.clone(); }
+    }
+
+    /** Invalid caller input retains the old IllegalArgumentException contract. */
+    public static final class RequestException extends IllegalArgumentException
+        implements LocalizedFailure
+    {
+        private static final long serialVersionUID = 1L;
+
+        private final ErrorCode code;
+
+        private RequestException(ErrorCode code) { super(code.messageKey()); this.code = code; }
+
+        public static RequestException localized(ErrorCode code)
+        {
+            return new RequestException(code);
+        }
+
+        @Override
+        public String messageKey() { return code.messageKey(); }
+
+        @Override
+        public Object[] messageArgs() { return new Object[0]; }
+    }
+
     /** Cooperative cancellation exception used by worker callers. */
     public static final class StatisticsCancelled extends Exception {
         private static final long serialVersionUID = 1L;
@@ -273,9 +405,10 @@ public final class DatasetStatisticsEngine {
         throws Exception
     {
         if (request == null || request.getDataset() == null || request.getCurrentPage() == null)
-            throw new IllegalArgumentException("Dataset statistics request is incomplete");
+            throw DatasetStatisticsEngine.RequestException.localized(
+                ErrorCode.REQUEST_INCOMPLETE);
         if (scope == null)
-            throw new IllegalArgumentException("Statistics scope is null");
+            throw DatasetStatisticsEngine.RequestException.localized(ErrorCode.SCOPE_UNAVAILABLE);
 
         AtomicBoolean stop = cancelled == null ? new AtomicBoolean(false) : cancelled;
         Listener callback = listener == null ? (processed, total, phase) -> {} : listener;
@@ -318,9 +451,11 @@ public final class DatasetStatisticsEngine {
         if (containsBoolean(sampleData))
             return;
 
-        String description = scalar == null ? "Unknown datatype" : scalar.getDescription();
-        throw new UnsupportedOperationException(
-            "Statistics supports numeric and boolean Dataset values only (" + description + ")");
+        if (scalar == null)
+            throw UnsupportedDatatypeException.localized(ErrorCode.UNKNOWN_DATATYPE);
+
+        String description = scalar.getDescription();
+        throw UnsupportedDatatypeException.localized(ErrorCode.UNSUPPORTED_DATATYPE, description);
     }
 
     private static Result computeEntireDataset(Request request, AtomicBoolean cancelled,
@@ -340,7 +475,7 @@ public final class DatasetStatisticsEngine {
             }
             validateDatatype(datatype, request.getCurrentPage().getData());
             if (dims == null)
-                throw new IllegalStateException("Dataset dimensions are unavailable");
+                throw StatisticsException.localized(ErrorCode.DIMENSIONS_UNAVAILABLE);
 
             long total = DatasetSearchEngine.safeElementCount(dims);
 
@@ -357,6 +492,18 @@ public final class DatasetStatisticsEngine {
                        accumulator, total, true);
             accumulator.finishVariance();
             return new Result(Scope.ENTIRE_DATASET, accumulator);
+        }
+        catch (StatisticsCancelled ex) {
+            throw ex;
+        }
+        catch (StatisticsException ex) {
+            throw ex;
+        }
+        catch (UnsupportedDatatypeException ex) {
+            throw ex;
+        }
+        catch (Exception ex) {
+            throw StatisticsException.localizedWithCause(ErrorCode.CALCULATION_FAILED, ex);
         }
         finally {
             if (scanner != null) {
@@ -408,9 +555,10 @@ public final class DatasetStatisticsEngine {
             long[] stride = scanner.getStride();
             long[] blockStart = block.getStart();
             long[] blockCount = block.getCount();
-            if (start == null || count == null || stride == null ||
-                start.length != blockStart.length || count.length != blockCount.length)
-                throw new IllegalStateException("Dataset subset selection is unavailable");
+            if (start == null || count == null || stride == null)
+                throw StatisticsException.localized(ErrorCode.SUBSET_UNAVAILABLE);
+            if (start.length != blockStart.length || count.length != blockCount.length)
+                throw StatisticsException.localized(ErrorCode.SELECTION_RANK_CHANGED);
 
             for (int i = 0; i < blockStart.length; i++) {
                 start[i]  = blockStart[i];
@@ -510,8 +658,8 @@ public final class DatasetStatisticsEngine {
             return constructor.newInstance(source.getFileFormat(), source.getName(), source.getPath());
         }
         catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException("Dataset type cannot create an independent statistics object: " +
-                                            source.getClass().getName(), ex);
+            throw StatisticsException.localizedWithCause(
+                ErrorCode.DATASET_READER_UNAVAILABLE, ex, source.getClass().getName());
         }
     }
 
@@ -543,8 +691,8 @@ public final class DatasetStatisticsEngine {
             return ((Boolean)value) ? 1.0 : 0.0;
         if (value instanceof Number)
             return ((Number)value).doubleValue();
-        throw new UnsupportedOperationException("Statistics value is not numeric or boolean: " +
-                                                String.valueOf(value));
+        throw UnsupportedDatatypeException.localized(
+            ErrorCode.VALUE_NOT_NUMERIC_OR_BOOLEAN, String.valueOf(value));
     }
 
     private static Double numericOrNull(Object value)

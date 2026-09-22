@@ -14,9 +14,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import hdf.view.i18n.I18n;
 
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
 import org.eclipse.swtbot.swt.finder.waits.Conditions;
 import org.eclipse.swtbot.swt.finder.waits.DefaultCondition;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotButton;
@@ -95,6 +99,69 @@ public class TestHDFViewFileUsage extends AbstractWindowTest {
         }
     }
 
+    @Test
+    public void fileUsageRowsAndActionsFollowLanguageWithoutSecondDisplayRefresh() {
+        activateMainWindow();
+        selectLanguage(I18n.Language.ENGLISH);
+        File hdfFile = openFile(FILE_A, FILE_MODE.READ_ONLY);
+        Label[] refreshProbe = new Label[1];
+        AtomicInteger displayRefreshes = new AtomicInteger();
+
+        try {
+            bot.tree().getTreeItem(FILE_A).click();
+            SWTBotShell fileUsage = openFileUsageDialog();
+            waitForUsageResult(fileUsage);
+
+            Display.getDefault().syncExec(() -> {
+                refreshProbe[0] = new Label(fileUsage.widget, SWT.NONE);
+                refreshProbe[0].setVisible(false);
+                I18n.bindDynamic(refreshProbe[0], () -> {
+                    displayRefreshes.incrementAndGet();
+                    return "probe";
+                });
+                displayRefreshes.set(0);
+            });
+
+            int englishCurrentRow = currentHdfViewRow(fileUsage);
+            assertTrue(fileUsage.bot().table().getTableItem(englishCurrentRow).getText(1)
+                           .contains(I18n.text("dialog.fileUsage.current")));
+            fileUsage.bot().table().select(englishCurrentRow);
+            assertFalse(fileUsage.bot().button(I18n.text("dialog.fileUsage.requestClose")).isEnabled());
+            assertFalse(fileUsage.bot().button(I18n.text("dialog.fileUsage.forceTerminate")).isEnabled());
+
+            activateMainWindow();
+            selectLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+            assertEquals(1, displayRefreshes.get(),
+                         "one language change must refresh the Display only once");
+            assertEquals(I18n.text("dialog.fileUsage.requestClose"),
+                         fileUsage.bot().button(I18n.text("dialog.fileUsage.requestClose")).getText());
+            assertEquals(I18n.text("dialog.fileUsage.forceTerminate"),
+                         fileUsage.bot().button(I18n.text("dialog.fileUsage.forceTerminate")).getText());
+            int chineseCurrentRow = currentHdfViewRow(fileUsage);
+            assertTrue(fileUsage.bot().table().getTableItem(chineseCurrentRow).getText(1)
+                           .contains(I18n.text("dialog.fileUsage.current")));
+            fileUsage.bot().table().select(chineseCurrentRow);
+            assertFalse(fileUsage.bot().button(I18n.text("dialog.fileUsage.requestClose")).isEnabled());
+            assertFalse(fileUsage.bot().button(I18n.text("dialog.fileUsage.forceTerminate")).isEnabled());
+
+            displayRefreshes.set(0);
+            activateMainWindow();
+            selectLanguage(I18n.Language.ENGLISH);
+            assertEquals(1, displayRefreshes.get(),
+                         "switching back must also refresh the Display only once");
+            int restoredCurrentRow = currentHdfViewRow(fileUsage);
+            assertTrue(fileUsage.bot().table().getTableItem(restoredCurrentRow).getText(1)
+                           .contains(I18n.text("dialog.fileUsage.current")));
+        }
+        finally {
+            if (refreshProbe[0] != null && !refreshProbe[0].isDisposed())
+                refreshProbe[0].dispose();
+            selectLanguage(I18n.Language.ENGLISH);
+            if (hasTreeItem(bot.tree(), FILE_A))
+                closeFile(hdfFile, false);
+        }
+    }
+
     private SWTBotShell openFileUsageDialog() {
         SWTBotButton button = bot.button(ui("button.fileUsage"));
         assertTrue(button.isEnabled(), "File Usage must be enabled for an open file");
@@ -141,6 +208,16 @@ public class TestHDFViewFileUsage extends AbstractWindowTest {
     private void assertFileUsageFile(SWTBotShell fileUsage, File file) {
         String expectedPath = Path.of(file.getAbsolutePath()).toAbsolutePath().normalize().toString();
         assertEquals(ui("dialog.fileUsage.file", expectedPath), fileUsage.bot().label(0).getText());
+    }
+
+    private int currentHdfViewRow(SWTBotShell fileUsage) {
+        String marker = I18n.text("dialog.fileUsage.current");
+        SWTBotTable table = fileUsage.bot().table();
+        for (int row = 0; row < table.rowCount(); row++) {
+            if (table.getTableItem(row).getText(1).contains(marker))
+                return row;
+        }
+        throw new AssertionError("File Usage result did not contain the current HDFView process");
     }
 
     private boolean hasTreeItem(SWTBotTree tree, String filename) {

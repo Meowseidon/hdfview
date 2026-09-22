@@ -210,9 +210,16 @@ public final class FileUsageDialog {
         if (shell.isDisposed()) {
             return;
         }
-        I18n.refreshDisplay(shell.getDisplay());
-        renderResult(lastResult);
-        updateActionState();
+        /*
+         * HDFView has already refreshed the complete Display.  Only this
+         * dialog's result rows contain localized values built from model data
+         * rather than I18n bindings, so rerender those rows and update the
+         * local action/layout state here.
+         */
+        if (lastResult == null)
+            updateActionState();
+        else
+            renderResult(lastResult);
         shell.layout(true, true);
     }
 

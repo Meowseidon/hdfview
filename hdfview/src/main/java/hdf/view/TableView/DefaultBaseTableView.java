@@ -1892,7 +1892,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     {
         commitActiveCellEditor();
         if (!(dataObject instanceof Dataset) || dataValue == null)
-            throw new IllegalStateException(I18n.text("statistics.noData"));
+            throw DatasetStatisticsEngine.RequestException.localized(
+                DatasetStatisticsEngine.ErrorCode.NO_DATA);
 
         HObject object = (HObject)dataObject;
         FileFormat file = object.getFileFormat();
@@ -1932,10 +1933,13 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
 
     private String statisticsError(Exception ex)
     {
-        String message = ex == null ? "" : ex.getMessage();
-        if (ex instanceof UnsupportedOperationException)
-            return I18n.text("statistics.unsupported", message == null ? "" : message);
-        return message == null || message.length() == 0 ? ex.getClass().getSimpleName() : message;
+        if (ex instanceof DatasetStatisticsEngine.LocalizedFailure failure) {
+            log.warn("Dataset statistics failed ({})", failure.messageKey(), ex);
+            return I18n.text(failure.messageKey(), failure.messageArgs());
+        }
+
+        log.warn("Dataset statistics failed", ex);
+        return I18n.text("statistics.error.failed");
     }
 
     @Override

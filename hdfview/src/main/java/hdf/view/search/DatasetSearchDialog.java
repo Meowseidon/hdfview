@@ -48,6 +48,7 @@ public final class DatasetSearchDialog {
     private Object[] statusArgs = new Object[0];
     private String lastErrorPath = "";
     private String lastErrorMessage = "";
+    private DatasetSearchException lastError;
 
     public DatasetSearchDialog(HDFView viewer, Shell parent)
     {
@@ -102,7 +103,10 @@ public final class DatasetSearchDialog {
         I18n.bindDynamic(errorLabel, () -> {
             if (lastErrorPath == null || lastErrorPath.isEmpty())
                 return "";
-            return I18n.text("search.skipped", lastErrorPath, lastErrorMessage);
+            String message = lastError == null
+                ? lastErrorMessage
+                : I18n.text(lastError.messageKey(), lastError.messageArgs());
+            return I18n.text("search.skipped", lastErrorPath, message);
         });
 
         resultTable = new Table(shell, SWT.BORDER | SWT.FULL_SELECTION | SWT.SINGLE | SWT.V_SCROLL |
@@ -155,6 +159,7 @@ public final class DatasetSearchDialog {
         clearResults();
         lastErrorPath    = "";
         lastErrorMessage = "";
+        lastError        = null;
         searching        = true;
         searchButton.setEnabled(false);
         cancelButton.setEnabled(true);
@@ -211,6 +216,18 @@ public final class DatasetSearchDialog {
             return;
         lastErrorPath    = path == null ? "" : path;
         lastErrorMessage = message == null ? "" : message;
+        lastError        = null;
+        errorLabel.getParent().layout(true, true);
+    }
+
+    /** Called on the SWT UI thread with a stable, language-independent failure. */
+    public void addError(String path, DatasetSearchException failure)
+    {
+        if (shell.isDisposed())
+            return;
+        lastErrorPath    = path == null ? "" : path;
+        lastErrorMessage = "";
+        lastError        = failure;
         errorLabel.getParent().layout(true, true);
     }
 

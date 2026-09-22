@@ -15,7 +15,9 @@
 package hdf.view.i18n;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +25,8 @@ import java.util.Locale;
 import java.util.ResourceBundle;
 
 import hdf.view.ViewProperties;
+import hdf.view.search.DatasetSearchException;
+import hdf.view.statistics.DatasetStatisticsEngine;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -114,5 +118,52 @@ class I18nTest {
                 System.setProperty(PROPERTY_NAME, originalPropertyFile);
             Files.deleteIfExists(propertyFile);
         }
+    }
+
+    @Test
+    void newSearchAndStatisticsFailuresUseLocalizedKeysInsteadOfEnglishMessages()
+    {
+        I18n.setLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+
+        DatasetSearchException searchFailure = DatasetSearchException.localizedWithCause(
+            DatasetSearchException.Code.BLOCK_READ_NO_DATA,
+            new IllegalStateException("Dataset block read returned no data"));
+        assertEquals("数据集块读取未返回数据。",
+                     I18n.text(searchFailure.messageKey(), searchFailure.messageArgs()));
+        assertFalse(I18n.text(searchFailure.messageKey(), searchFailure.messageArgs())
+                        .contains("Dataset block read returned no data"));
+
+        DatasetSearchException genericSearchFailure = DatasetSearchException.from(
+            new IllegalStateException("Dataset subset selection is unavailable"));
+        assertEquals("无法查找数据集。",
+                     I18n.text(genericSearchFailure.messageKey(), genericSearchFailure.messageArgs()));
+        assertFalse(I18n.text(genericSearchFailure.messageKey(), genericSearchFailure.messageArgs())
+                        .contains("Dataset subset selection is unavailable"));
+
+        DatasetStatisticsEngine.UnsupportedDatatypeException unsupported =
+            assertThrows(DatasetStatisticsEngine.UnsupportedDatatypeException.class,
+                         () -> DatasetStatisticsEngine.validateDatatype(null,
+                                                                        new String[] {"text"}));
+        assertEquals("数据集数据类型不可用。",
+                     I18n.text(unsupported.messageKey(), unsupported.messageArgs()));
+        assertFalse(I18n.text(unsupported.messageKey(), unsupported.messageArgs())
+                        .contains("Dataset"));
+
+        DatasetStatisticsEngine.UnsupportedDatatypeException valueFailure =
+            assertThrows(DatasetStatisticsEngine.UnsupportedDatatypeException.class,
+                         () -> DatasetStatisticsEngine.matches("text",
+                                                               DatasetStatisticsEngine.Kind.ZERO));
+        assertEquals("统计值不是数值或布尔值：text",
+                     I18n.text(valueFailure.messageKey(), valueFailure.messageArgs()));
+
+        DatasetStatisticsEngine.StatisticsException statisticsFailure =
+            DatasetStatisticsEngine.StatisticsException.localizedWithCause(
+                DatasetStatisticsEngine.ErrorCode.SUBSET_UNAVAILABLE,
+                new IllegalStateException("Dataset subset selection is unavailable"));
+        assertEquals("数据集子集选择不可用。",
+                     I18n.text(statisticsFailure.messageKey(), statisticsFailure.messageArgs()));
+        assertFalse(I18n.text(statisticsFailure.messageKey(), statisticsFailure.messageArgs())
+                        .contains("Dataset subset selection is unavailable"));
+        assertEquals("当前没有可用的数据。", I18n.text("statistics.noData"));
     }
 }
