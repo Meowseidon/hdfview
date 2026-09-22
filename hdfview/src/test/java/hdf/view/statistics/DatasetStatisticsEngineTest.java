@@ -225,11 +225,16 @@ class DatasetStatisticsEngineTest {
             assertArrayEquals(new int[] {7, 8, 9, 10, 11, 12}, dirtyData);
             dirtyData = dirtyData.clone();
             dirtyData[4] = -99;
-            DatasetSearchSnapshot dirtyPage = new DatasetSearchSnapshot(
+            DatasetSearchSnapshot currentPage = new DatasetSearchSnapshot(
                 opened.file.getFilePath(), dataset.getFullName(), dirtyData,
                 start.clone(), count.clone(), stride, dims, datatype);
+            DatasetSearchSnapshot dirtyPage = DatasetSearchSnapshot.fromChangedValues(
+                opened.file.getFilePath(), dataset.getFullName(), dirtyData, new int[] {4},
+                start.clone(), count.clone(), stride, dims, datatype);
+            assertTrue(dirtyPage != null && dirtyPage.isSparse());
+            assertArrayEquals(new int[] {10, -99, 12}, (int[])dirtyPage.getData());
             DatasetStatisticsEngine.Request request = new DatasetStatisticsEngine.Request(
-                dataset, dirtyPage, dirtyPage, dataset.getFillValue());
+                dataset, currentPage, dirtyPage, dataset.getFillValue());
 
             DatasetStatisticsEngine.Result currentResult = DatasetStatisticsEngine.compute(
                 request, DatasetStatisticsEngine.Scope.CURRENT_PAGE, new AtomicBoolean(), null);

@@ -1536,6 +1536,16 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
 
         HObject object = (HObject)dataObject;
         FileFormat file = object.getFileFormat();
+        int[] changedValueIndices = dataProvider.getChangedValueIndices();
+        if (changedValueIndices.length > 0) {
+            DatasetSearchSnapshot sparse = DatasetSearchSnapshot.fromChangedValues(
+                file == null ? null : file.getFilePath(), object.getFullName(), dataValue,
+                changedValueIndices, dataObject.getStartDims(), dataObject.getSelectedDims(),
+                dataObject.getStride(), dataObject.getDims(), dataObject.getDatatype());
+            if (sparse != null)
+                return sparse;
+        }
+
         return new DatasetSearchSnapshot(file == null ? null : file.getFilePath(), object.getFullName(),
                                          dataValue, dataObject.getStartDims(),
                                          dataObject.getSelectedDims(), dataObject.getStride(),
@@ -1711,7 +1721,27 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             file == null ? null : file.getFilePath(), object.getFullName(), dataValue,
             dataObject.getStartDims(), dataObject.getSelectedDims(), dataObject.getStride(),
             dataObject.getDims(), dataObject.getDatatype());
-        DatasetSearchSnapshot dirtyPage = getSearchSnapshot();
+        DatasetSearchSnapshot dirtyPage = null;
+        if (dataProvider != null && dataProvider.getIsValueChanged()) {
+            /*
+             * A dirty provider with no tracked cell positions can only have
+             * reached this state through an existing bulk-edit path.  Its
+             * current-page snapshot already contains the complete immutable
+             * buffer, so reusing it is semantically identical and avoids a
+             * second deep copy.  Normal cell edits use a sparse snapshot and
+             * need both representations: current-page statistics need every
+             * value while the entire-Dataset overlay needs only changed cells.
+            */
+            int[] changedValueIndices = dataProvider.getChangedValueIndices();
+            if (changedValueIndices.length == 0) {
+                dirtyPage = currentPage;
+            }
+            else {
+                dirtyPage = getSearchSnapshot();
+                if (dirtyPage == null || !dirtyPage.isSparse())
+                    dirtyPage = currentPage;
+            }
+        }
         return new DatasetStatisticsEngine.Request((Dataset)dataObject, currentPage, dirtyPage, fillValue);
     }
 

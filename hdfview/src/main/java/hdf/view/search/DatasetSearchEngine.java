@@ -353,15 +353,17 @@ public final class DatasetSearchEngine {
                 List<Block> blocks = buildBlocks(dims, SEARCH_BLOCK_ELEMENTS);
                 for (Block block : blocks)
                     state.totalElements = safeAdd(state.totalElements, block.getElementCount());
-                for (Block block : blocks) {
+                DatasetSearchOverlay dirtyOverlay = new DatasetSearchOverlay(snapshots, blocks);
+                for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
                     if (cancelled.get())
                         break;
 
+                    Block block = blocks.get(blockIndex);
                     Object data = readBlock(scanner, block);
                     if (data == null)
                         throw new IllegalStateException("Dataset block read returned no data");
 
-                    data = overlayDirtySnapshots(data, block, rawDatatype, snapshots, cancelled);
+                    data = overlayDirtySnapshots(data, rawDatatype, dirtyOverlay, blockIndex, cancelled);
                     if (cancelled.get())
                         break;
                     long blockElements = block.getElementCount();
@@ -407,69 +409,43 @@ public final class DatasetSearchEngine {
     }
 
     /**
-     * Overlay every dirty view that belongs to this Dataset onto one bounded
-     * scan block.  The returned object may be a replacement for a scalar
-     * block; array blocks are updated in place because the native read already
-     * returned an independent buffer.
+     * Overlay only the dirty values indexed for one bounded scan block.  The
+     * returned object may be a replacement for a scalar block; array blocks
+     * are boxed only if at least one dirty value actually intersects them.
      */
-    private static Object overlayDirtySnapshots(Object blockData, Block block,
-                                                Datatype rawDatatype,
-                                                List<DatasetSearchSnapshot> snapshots,
+    private static Object overlayDirtySnapshots(Object blockData, Datatype rawDatatype,
+                                                DatasetSearchOverlay overlay, int blockIndex,
                                                 AtomicBoolean cancelled)
     {
-        if (snapshots == null || snapshots.isEmpty())
+        if (overlay == null)
             return blockData;
 
         int blockValuesPerCell = valuesPerCell(rawDatatype);
-        Object result = blockData;
-        for (DatasetSearchSnapshot snapshot : snapshots) {
-            if (snapshot == null)
-                continue;
+        if (blockValuesPerCell <= 0 || blockValuesPerCell == Integer.MAX_VALUE)
+            return blockData;
 
-            int dirtyValuesPerCell = valuesPerCell(snapshot.getDatatype());
-            if (dirtyValuesPerCell != blockValuesPerCell)
-                continue;
-
-            result = overlayDirtySnapshot(result, block, snapshot,
-                                          blockValuesPerCell, cancelled);
-        }
-        return result;
-    }
-
-    /** Overlay one selected dirty view; later snapshots win on exact overlap. */
-    private static Object overlayDirtySnapshot(Object blockData, Block block,
-                                               DatasetSearchSnapshot snapshot,
-                                               int valuesPerCell,
-                                               AtomicBoolean cancelled)
-    {
-        Object dirtyData = snapshot.getData();
-        int dirtyLength = valueLength(dirtyData);
+        Object[] overlayData = {null};
+        Object[] result = {blockData};
         int blockLength = valueLength(blockData);
-        Object[] overlayData = null;
-        for (int valueIndex = 0; valueIndex < dirtyLength; valueIndex++) {
-            if (cancelled.get())
-                break;
+        overlay.forEachValue(blockIndex, blockValuesPerCell, (snapshot, blockValueIndex,
+                                                               snapshotValueIndex) -> {
+            if (cancelled != null && cancelled.get())
+                return false;
+            if (blockValueIndex < 0 || blockValueIndex >= blockLength)
+                return true;
 
-            long[] coordinate = snapshot.coordinateForValue(valueIndex, valuesPerCell);
-            int localCell = localIndex(coordinate, block.start, block.count);
-            if (localCell < 0)
-                continue;
-
-            long localValue = (long)localCell * valuesPerCell + valueIndex % valuesPerCell;
-            if (localValue < 0 || localValue >= blockLength)
-                continue;
-
-            Object value = valueAt(dirtyData, valueIndex);
+            Object value = valueAt(snapshot.getData(), snapshotValueIndex);
             if (blockData != null && blockData.getClass().isArray()) {
-                if (overlayData == null)
-                    overlayData = objectArray(blockData);
-                overlayData[(int)localValue] = value;
+                if (overlayData[0] == null)
+                    overlayData[0] = objectArray(blockData);
+                ((Object[])overlayData[0])[blockValueIndex] = value;
             }
-            else if (localValue == 0) {
-                blockData = value;
+            else if (blockValueIndex == 0) {
+                result[0] = value;
             }
-        }
-        return overlayData == null ? blockData : overlayData;
+            return true;
+        });
+        return overlayData[0] == null ? result[0] : overlayData[0];
     }
 
     /** Copy primitive read arrays to boxed values so dirty display wrappers can overlay them. */
@@ -483,24 +459,6 @@ public final class DatasetSearchEngine {
         for (int i = 0; i < length; i++)
             result[i] = Array.get(data, i);
         return result;
-    }
-
-    private static int localIndex(long[] coordinate, long[] start, long[] count)
-    {
-        if (coordinate == null || start == null || count == null ||
-            coordinate.length != start.length || coordinate.length != count.length)
-            return -1;
-
-        long index = 0;
-        for (int i = 0; i < coordinate.length; i++) {
-            if (coordinate[i] < start[i] || coordinate[i] >= start[i] + count[i])
-                return -1;
-            long local = coordinate[i] - start[i];
-            if (index > Integer.MAX_VALUE / Math.max(1L, count[i]))
-                return -1;
-            index = index * count[i] + local;
-        }
-        return index > Integer.MAX_VALUE ? -1 : (int)index;
     }
 
     private Object readBlock(Dataset scanner, Block block) throws Exception

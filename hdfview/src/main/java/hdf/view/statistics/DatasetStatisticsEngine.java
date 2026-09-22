@@ -14,6 +14,7 @@ import hdf.object.Dataset;
 import hdf.object.Datatype;
 import hdf.object.FileFormat;
 import hdf.view.search.DatasetSearchEngine;
+import hdf.view.search.DatasetSearchOverlay;
 import hdf.view.search.DatasetSearchSnapshot;
 
 /**
@@ -348,11 +349,15 @@ public final class DatasetStatisticsEngine {
                 total = safeAdd(total, block.getElementCount());
 
             Accumulator accumulator = new Accumulator(request.getFillValue());
-            scanBlocks(scanner, blocks, request.getDirtyPage(), datatype, cancelled, listener,
+            DatasetSearchOverlay dirtyOverlay = new DatasetSearchOverlay(
+                request.getDirtyPage() == null ? java.util.Collections.emptyList()
+                                                : java.util.Collections.singletonList(request.getDirtyPage()),
+                blocks);
+            scanBlocks(scanner, blocks, dirtyOverlay, datatype, cancelled, listener,
                        accumulator, total, false);
             accumulator.finishMean();
 
-            scanBlocks(scanner, blocks, request.getDirtyPage(), datatype, cancelled, listener,
+            scanBlocks(scanner, blocks, dirtyOverlay, datatype, cancelled, listener,
                        accumulator, total, true);
             accumulator.finishVariance();
             return new Result(Scope.ENTIRE_DATASET, accumulator);
@@ -370,16 +375,18 @@ public final class DatasetStatisticsEngine {
     }
 
     private static void scanBlocks(Dataset scanner, List<DatasetSearchEngine.Block> blocks,
-                                   DatasetSearchSnapshot dirtyPage, Datatype datatype,
+                                   DatasetSearchOverlay dirtyOverlay, Datatype datatype,
                                    AtomicBoolean cancelled, Listener listener,
                                    Accumulator accumulator, long total, boolean variancePass)
         throws Exception
     {
         long processed = 0;
-        for (DatasetSearchEngine.Block block : blocks) {
+        for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
             checkCancelled(cancelled);
+            DatasetSearchEngine.Block block = blocks.get(blockIndex);
             Object data = readBlock(scanner, block);
-            overlayDirtyPage(data, block, dirtyPage, datatype);
+            overlayDirtyPage(data, dirtyOverlay, blockIndex, datatype, cancelled);
+            checkCancelled(cancelled);
 
             if (variancePass) {
                 forEachValue(data, value -> accumulator.acceptVariance(value, accumulator.mean), cancelled);
@@ -414,11 +421,12 @@ public final class DatasetStatisticsEngine {
         }
     }
 
-    /** Merge the current dirty page into only the blocks it overlaps. */
-    private static void overlayDirtyPage(Object blockData, DatasetSearchEngine.Block block,
-                                         DatasetSearchSnapshot dirtyPage, Datatype datatype)
+    /** Merge only the dirty values indexed for the current block. */
+    private static void overlayDirtyPage(Object blockData, DatasetSearchOverlay dirtyOverlay,
+                                         int blockIndex, Datatype datatype,
+                                         AtomicBoolean cancelled)
     {
-        if (blockData == null || dirtyPage == null || !blockData.getClass().isArray())
+        if (blockData == null || dirtyOverlay == null || !blockData.getClass().isArray())
             return;
 
         /*
@@ -431,44 +439,23 @@ public final class DatasetStatisticsEngine {
         if (scalarValuesPerCell <= 0 || scalarValuesPerCell == Integer.MAX_VALUE)
             return;
 
-        Object dirtyData = dirtyPage.getData();
-        int dirtyLength = valueLength(dirtyData);
-        long[] blockStart = block.getStart();
-        long[] blockCount = block.getCount();
-        for (int i = 0; i < dirtyLength; i++) {
-            long[] coordinate = dirtyPage.coordinateForValue(i, scalarValuesPerCell);
-            int localIndex = localIndex(coordinate, blockStart, blockCount);
-            if (localIndex < 0)
-                continue;
-            long scalarIndex = (long)localIndex * scalarValuesPerCell +
-                               (i % scalarValuesPerCell);
-            if (scalarIndex < 0 || scalarIndex >= Array.getLength(blockData))
-                continue;
+        int blockLength = Array.getLength(blockData);
+        dirtyOverlay.forEachValue(blockIndex, scalarValuesPerCell,
+                                  (snapshot, blockValueIndex, snapshotValueIndex) -> {
+            if (cancelled != null && cancelled.get())
+                return false;
+            if (blockValueIndex < 0 || blockValueIndex >= blockLength)
+                return true;
             try {
-                Array.set(blockData, (int)scalarIndex, valueAt(dirtyData, i));
+                Array.set(blockData, blockValueIndex,
+                          valueAt(snapshot.getData(), snapshotValueIndex));
             }
             catch (IllegalArgumentException ignored) {
                 // A display-only conversion with a different Java wrapper cannot
                 // be installed in the native block; leave the disk value intact.
             }
-        }
-    }
-
-    private static int localIndex(long[] coordinate, long[] start, long[] count)
-    {
-        if (coordinate == null || start == null || count == null ||
-            coordinate.length != start.length || coordinate.length != count.length)
-            return -1;
-        long index = 0;
-        for (int i = 0; i < coordinate.length; i++) {
-            if (coordinate[i] < start[i] || coordinate[i] >= start[i] + count[i])
-                return -1;
-            long local = coordinate[i] - start[i];
-            if (index > Integer.MAX_VALUE / Math.max(1L, count[i]))
-                return -1;
-            index = index * count[i] + local;
-        }
-        return index > Integer.MAX_VALUE ? -1 : (int)index;
+            return true;
+        });
     }
 
     private static void forEachValue(Object data, ValueConsumer consumer, AtomicBoolean cancelled)

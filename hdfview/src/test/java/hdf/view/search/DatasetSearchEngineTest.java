@@ -6,6 +6,7 @@
 package hdf.view.search;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,7 +18,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import hdf.object.Dataset;
@@ -26,6 +29,7 @@ import hdf.object.FileFormat;
 import hdf.object.Group;
 import hdf.object.HObject;
 import hdf.object.h5.H5File;
+import hdf.view.TableView.DataProviderFactory;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -43,6 +47,119 @@ class DatasetSearchEngineTest {
         for (DatasetSearchEngine.Block block : blocks)
             assertTrue(block.getElementCount() <= 1024,
                        "every native read block must stay within the configured bound");
+    }
+
+    @Test
+    void dirtyOverlayIndexesChangedCellsAcrossDifferentTwoDimensionalBlocks()
+    {
+        long[] dims = {64, 64};
+        int[] page = new int[(int)(dims[0] * dims[1])];
+        int firstCell = 1 * (int)dims[1] + 1;
+        int lastCell = 60 * (int)dims[1] + 60;
+        DatasetSearchSnapshot dirty = DatasetSearchSnapshot.fromChangedValues(
+            "file.h5", "/dataset", page, new int[] {firstCell, lastCell},
+            new long[] {0, 0}, dims, new long[] {1, 1}, dims, null);
+        List<DatasetSearchEngine.Block> blocks = DatasetSearchEngine.buildBlocks(dims, 256);
+        DatasetSearchOverlay overlay = new DatasetSearchOverlay(
+            Collections.singletonList(dirty), blocks);
+
+        Set<Integer> blocksWithDirtyValues = new HashSet<>();
+        int[] visitedValues = {0};
+        for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
+            int currentBlockIndex = blockIndex;
+            overlay.forEachValue(blockIndex, 1, (snapshot, blockValueIndex, snapshotValueIndex) -> {
+                blocksWithDirtyValues.add(currentBlockIndex);
+                visitedValues[0]++;
+                return true;
+            });
+        }
+
+        assertNotNull(dirty);
+        assertTrue(dirty.isSparse(), "a changed-cell capture must not retain a dense page");
+        assertEquals(2, Array.getLength(dirty.getData()));
+        assertTrue(blocks.size() > 1, "the regression needs multiple bounded blocks");
+        assertEquals(2, visitedValues[0],
+                     "only changed values should be presented to the block overlay");
+        assertEquals(Set.of(0, blocks.size() - 1), blocksWithDirtyValues,
+                     "the two edited cells must land in different blocks");
+        assertTrue(visitedValues[0] < blocks.size() * page.length,
+                   "overlay work must not scale as block count times the old page size");
+    }
+
+    @Test
+    void denseOverlayIntersectsStridedSelectionsWithoutCoordinateAllocationsPerValue()
+    {
+        long[] dims = {8, 8};
+        DatasetSearchSnapshot dirty = new DatasetSearchSnapshot(
+            "file.h5", "/dataset", new int[] {11, 12, 21, 22, 31, 32},
+            new long[] {0, 1}, new long[] {3, 2}, new long[] {2, 3}, dims, null);
+        List<DatasetSearchEngine.Block> blocks = DatasetSearchEngine.buildBlocks(dims, 8);
+        DatasetSearchOverlay overlay = new DatasetSearchOverlay(
+            Collections.singletonList(dirty), blocks);
+        List<Integer> snapshotValueIndices = new ArrayList<>();
+
+        for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
+            overlay.forEachValue(blockIndex, 1, (snapshot, blockValueIndex, snapshotValueIndex) -> {
+                snapshotValueIndices.add(snapshotValueIndex);
+                return true;
+            });
+        }
+
+        assertEquals(Arrays.asList(0, 1, 2, 3, 4, 5), snapshotValueIndices,
+                     "stride coordinates must retain row-major dirty-buffer order");
+    }
+
+    @Test
+    void laterDirtySnapshotWinsWhenTwoSnapshotsOverlap()
+    {
+        List<DatasetSearchSnapshot> snapshots = Arrays.asList(
+            new DatasetSearchSnapshot("file.h5", "/dataset", new int[] {11},
+                                      new long[] {1}, new long[] {1}, new long[] {1},
+                                      new long[] {4}, null),
+            new DatasetSearchSnapshot("file.h5", "/dataset", new int[] {22},
+                                      new long[] {1}, new long[] {1}, new long[] {1},
+                                      new long[] {4}, null));
+        List<DatasetSearchEngine.Block> blocks = DatasetSearchEngine.buildBlocks(
+            new long[] {4}, 4);
+        DatasetSearchOverlay overlay = new DatasetSearchOverlay(snapshots, blocks);
+        int[] blockData = {0, 0, 0, 0};
+
+        overlay.forEachValue(0, 1, (snapshot, blockValueIndex, snapshotValueIndex) -> {
+            blockData[blockValueIndex] = ((int[])snapshot.getData())[snapshotValueIndex];
+            return true;
+        });
+
+        assertArrayEquals(new int[] {0, 22, 0, 0}, blockData,
+                          "later overlapping dirty snapshots must retain overwrite order");
+    }
+
+    @Test
+    void tableProviderReportsChangedScalarPositionsForSparseSnapshots() throws Exception
+    {
+        try (OpenedFile opened = openFixture("tattr2.h5")) {
+            Dataset dataset = findDataset(opened.file, "/g2/integer");
+            assertNotNull(dataset);
+            dataset.init();
+            Object data = dataset.getData();
+            DataProviderFactory.HDFDataProvider provider =
+                DataProviderFactory.getDataProvider(dataset, data, false);
+
+            provider.setDataValue(0, 0, "-777");
+
+            assertTrue(provider.getIsValueChanged());
+            assertArrayEquals(new int[] {0}, provider.getChangedValueIndices());
+            DatasetSearchSnapshot sparse = DatasetSearchSnapshot.fromChangedValues(
+                opened.file.getFilePath(), dataset.getFullName(), data,
+                provider.getChangedValueIndices(), dataset.getStartDims(),
+                dataset.getSelectedDims(), dataset.getStride(), dataset.getDims(),
+                dataset.getDatatype());
+            assertTrue(sparse != null && sparse.isSparse());
+            assertEquals(1, Array.getLength(sparse.getData()));
+
+            provider.setIsValueChanged(false);
+            assertFalse(provider.getIsValueChanged());
+            assertEquals(0, provider.getChangedValueIndices().length);
+        }
     }
 
     @Test
@@ -262,9 +379,13 @@ class DatasetSearchEngineTest {
             dataset.init();
 
             List<DatasetSearchResult> results = new ArrayList<>();
-            DatasetSearchSnapshot dirty = new DatasetSearchSnapshot(
-                opened.file.getFilePath(), dataset.getFullName(), new byte[] {42},
-                new long[] {0}, new long[] {1}, new long[] {1}, dataset.getDims(), dataset.getDatatype());
+            byte[] dirtyData = ((byte[])dataset.getData()).clone();
+            dirtyData[0] = 42;
+            DatasetSearchSnapshot dirty = DatasetSearchSnapshot.fromChangedValues(
+                opened.file.getFilePath(), dataset.getFullName(), dirtyData, new int[] {0},
+                dataset.getStartDims(), dataset.getSelectedDims(), dataset.getStride(),
+                dataset.getDims(), dataset.getDatatype());
+            assertTrue(dirty != null && dirty.isSparse());
             new DatasetSearchEngine().search(Collections.singletonList(opened.file), "42",
                                              DatasetSearchEngine.SearchMode.DATA_VALUE,
                                              new AtomicBoolean(), collecting(results),
@@ -351,6 +472,16 @@ class DatasetSearchEngineTest {
                               (text && datatype != null && (datatype.isString() || datatype.isChar()));
             if (matches && dataset.getRank() >= minimumRank)
                 return dataset;
+        }
+        return null;
+    }
+
+    private static Dataset findDataset(FileFormat file, String fullName) throws Exception
+    {
+        Group root = (Group)file.getRootObject();
+        for (HObject object : root.depthFirstMemberList()) {
+            if (object instanceof Dataset && fullName.equals(object.getFullName()))
+                return (Dataset)object;
         }
         return null;
     }

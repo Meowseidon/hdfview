@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.TreeSet;
 
 import hdf.object.CompoundDataFormat;
 import hdf.object.DataFormat;
@@ -53,6 +54,39 @@ public class DataProviderFactory {
      */
     private static DataFormat dataFormatReference = null;
 
+    /** Share edit positions across nested compound/array providers. */
+    private static final ThreadLocal<DirtyValueTracker> ACTIVE_DIRTY_TRACKER = new ThreadLocal<>();
+
+    private static final class DirtyValueTracker {
+        private final TreeSet<Integer> changedValues = new TreeSet<>();
+
+        private void mark(int index)
+        {
+            if (index >= 0)
+                changedValues.add(index);
+        }
+
+        private void markRange(int start, int length)
+        {
+            if (start < 0 || length <= 0)
+                return;
+            long end = (long)start + length;
+            for (long index = start; index < end && index <= Integer.MAX_VALUE; index++)
+                changedValues.add((int)index);
+        }
+
+        private int[] toArray()
+        {
+            int[] result = new int[changedValues.size()];
+            int resultIndex = 0;
+            for (Integer valueIndex : changedValues)
+                result[resultIndex++] = valueIndex;
+            return result;
+        }
+
+        private void clear() { changedValues.clear(); }
+    }
+
     /**
      * Get the Data Display Provider for the supplied data object.
      *
@@ -84,9 +118,17 @@ public class DataProviderFactory {
             dtype = dtype.getDatatypeBase();
         }
 
-        HDFDataProvider dataProvider = getDataProvider(dtype, dataBuf, dataTransposed);
-
-        return dataProvider;
+        DirtyValueTracker previousTracker = ACTIVE_DIRTY_TRACKER.get();
+        ACTIVE_DIRTY_TRACKER.set(new DirtyValueTracker());
+        try {
+            return getDataProvider(dtype, dataBuf, dataTransposed);
+        }
+        finally {
+            if (previousTracker == null)
+                ACTIVE_DIRTY_TRACKER.remove();
+            else
+                ACTIVE_DIRTY_TRACKER.set(previousTracker);
+        }
     }
 
     private static HDFDataProvider getDataProvider(final Datatype dtype, final Object dataBuf,
@@ -157,6 +199,9 @@ public class DataProviderFactory {
         /** if the data value has changed. */
         protected boolean isValueChanged;
 
+        /** Scalar positions changed through any nested provider for this buffer. */
+        private final DirtyValueTracker dirtyValueTracker;
+
         /** the type of the parent. */
         protected final boolean isContainerType;
 
@@ -186,6 +231,8 @@ public class DataProviderFactory {
             throws Exception
         {
             this.dataBuf = dataBuf;
+            DirtyValueTracker activeTracker = ACTIVE_DIRTY_TRACKER.get();
+            this.dirtyValueTracker = activeTracker == null ? new DirtyValueTracker() : activeTracker;
 
             this.originalFormatClass = dataFormatReference.getOriginalClass();
 
@@ -537,6 +584,7 @@ public class DataProviderFactory {
                 break;
             }
 
+            dirtyValueTracker.mark(bufIndex);
             isValueChanged = true;
         }
 
@@ -557,7 +605,12 @@ public class DataProviderFactory {
          *
          * @param isChanged if the data value is changed
          */
-        public final void setIsValueChanged(boolean isChanged) { isValueChanged = isChanged; }
+        public final void setIsValueChanged(boolean isChanged)
+        {
+            isValueChanged = isChanged;
+            if (!isChanged)
+                dirtyValueTracker.clear();
+        }
 
         /**
          * Check if the datavalue has changed.
@@ -565,6 +618,15 @@ public class DataProviderFactory {
          * @return if the datavalue has changed
          */
         public final boolean getIsValueChanged() { return isValueChanged; }
+
+        /** Return sorted scalar positions changed in the current buffer. */
+        public final int[] getChangedValueIndices() { return dirtyValueTracker.toArray(); }
+
+        /** Mark a successful bulk buffer edit without changing the dirty flag contract. */
+        public final void markChangedValueRange(int start, int length)
+        {
+            dirtyValueTracker.markRange(start, length);
+        }
 
         /**
          * Update the data buffer for this HDFDataProvider. This is necessary for when
@@ -577,6 +639,7 @@ public class DataProviderFactory {
         public final void updateDataBuffer(Object newBuf)
         {
             this.dataBuf = newBuf;
+            dirtyValueTracker.clear();
 
             if (rank > 1) {
                 rowCount = dataFormatReference.getHeight();
