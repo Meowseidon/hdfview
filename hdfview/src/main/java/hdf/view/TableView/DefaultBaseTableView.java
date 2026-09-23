@@ -1006,6 +1006,12 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             }
         });
 
+        // Keep the chart action visually separate from the text-labelled
+        // Dataset Statistics action.  There is no existing statistics icon
+        // whose meaning is clearer than this explicit toolbar label.
+        ToolItem statisticsSeparator = new ToolItem(toolbar, SWT.SEPARATOR);
+        statisticsSeparator.setWidth(8);
+
         // Dataset statistics button
         item = new ToolItem(toolbar, SWT.PUSH);
         I18n.bind(item, "table.statistics");

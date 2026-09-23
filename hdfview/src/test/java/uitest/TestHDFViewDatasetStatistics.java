@@ -18,7 +18,10 @@ import org.eclipse.swtbot.swt.finder.widgets.SWTBotShell;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTable;
 import org.eclipse.swtbot.swt.finder.widgets.SWTBotTreeItem;
 import org.eclipse.nebula.widgets.nattable.NatTable;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
 import org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory;
@@ -44,6 +47,8 @@ public class TestHDFViewDatasetStatistics extends AbstractWindowTest {
                          mainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).getText());
             mainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).click();
             statisticsShell = bot.shell(ui("statistics.title"));
+            assertEquals(ui("statistics.highlightHint"),
+                         statisticsShell.bot().label(ui("statistics.highlightHint")).getText());
             waitForValue(statisticsShell.bot().table(), 0, 1);
 
             switchLanguage(I18n.Language.SIMPLIFIED_CHINESE);
@@ -209,6 +214,50 @@ public class TestHDFViewDatasetStatistics extends AbstractWindowTest {
             statisticsShell.bot().button(ui("statistics.positive")).click();
             waitForHighlight(table, positiveCell, true);
             waitForHighlight(table, negativeCell, false);
+        }
+        finally {
+            if (statisticsShell != null && statisticsShell.isOpen())
+                statisticsShell.close();
+            closeFile(hdfFile, false);
+        }
+    }
+
+    @Test
+    public void unsupportedStringDatasetShowsStatisticsErrorWithoutEnablingHighlights()
+    {
+        selectLanguage(I18n.Language.ENGLISH);
+        File hdfFile = openFile("tscalarstring.h5", FILE_MODE.READ_ONLY);
+        SWTBotShell statisticsShell = null;
+        try {
+            SWTBotTreeItem dataset = bot.tree().getTreeItem(hdfFile.getName()).getNode("the_str");
+            dataset.click();
+
+            SWTBotShell mainShell = new SWTBotShell(shell);
+            mainShell.bot().toolbarButtonWithTooltip(ui("table.statistics.tooltip")).click();
+            statisticsShell = bot.shell(ui("statistics.title"));
+
+            final SWTBotShell dialog = statisticsShell;
+            final String errorPrefix = ui("statistics.status.error", "");
+            final String unsupportedMessage = ui("statistics.unsupported", "");
+            bot.waitUntil(new DefaultCondition() {
+                @Override
+                public boolean test()
+                {
+                    String status = findLabelStartingWith(dialog.widget, errorPrefix);
+                    return status != null && status.contains(unsupportedMessage);
+                }
+
+                @Override
+                public String getFailureMessage()
+                {
+                    return "Timed out waiting for the explicit unsupported Dataset statistics error";
+                }
+            });
+
+            assertFalse(statisticsShell.bot().button(ui("statistics.zero")).isEnabled(),
+                        "Unsupported Dataset statistics must not enable highlight actions");
+            String status = findLabelStartingWith(statisticsShell.widget, errorPrefix);
+            assertTrue(status.contains(unsupportedMessage));
         }
         finally {
             if (statisticsShell != null && statisticsShell.isOpen())
@@ -428,6 +477,27 @@ public class TestHDFViewDatasetStatistics extends AbstractWindowTest {
             }
         }
         return false;
+    }
+
+    private String findLabelStartingWith(final Shell root, final String prefix)
+    {
+        final String[] result = new String[1];
+        Display.getDefault().syncExec(() -> findLabelStartingWith(root, prefix, result));
+        return result[0];
+    }
+
+    private void findLabelStartingWith(Control control, String prefix, String[] result)
+    {
+        if (control == null || control.isDisposed() || result[0] != null)
+            return;
+        if (control instanceof Label && ((Label)control).getText().startsWith(prefix)) {
+            result[0] = ((Label)control).getText();
+            return;
+        }
+        if (control instanceof Composite) {
+            for (Control child : ((Composite)control).getChildren())
+                findLabelStartingWith(child, prefix, result);
+        }
     }
 
     private void closeEditedFixtureWithoutSaving(File hdfFile)
