@@ -8,10 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory.widgetOfType;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
+import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -116,6 +118,8 @@ public class ThemeManagerRuntimeStateSwtBotTest {
                 uiDisplay.setData(DISPLAY_THEME_MANAGER_KEY, injectedManager);
 
                 HDFView application = new HDFView(rootDir, startDir);
+                /* Keep the runtime test independent of a previous persisted choice. */
+                injectedManager.setThemeMode(ThemeManager.ThemeMode.SYSTEM);
                 application.setTestState(true);
                 hdfView.set(application);
 
@@ -153,6 +157,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         SWTBotPreferences.PLAYBACK_DELAY = 10;
         fixtureAccess.install(bot, mainShell.get());
         assertNotNull(themeManager.get());
+        assertEquals(ThemeManager.ThemeMode.SYSTEM, themeManager.get().getThemeMode());
         assertFalse(themeManager.get().isDark(), "The deterministic test must start in Light mode");
     }
 
@@ -175,7 +180,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
     }
 
     @Test
-    void lightDarkLightPreservesDatasetEditFrameHighlightAndOpenDialogs() throws Exception
+    void forcedLightDarkSystemPreservesDatasetEditFrameHighlightAndOpenDialogs() throws Exception
     {
         Path fixturePath = fixturePath();
         Files.copy(fixturePath.resolveSibling(SOURCE_FIXTURE), fixturePath,
@@ -186,6 +191,9 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         SWTBotShell applicationShell = new SWTBotShell(mainShell.get());
         SWTBotNatTable dataTable = null;
         try {
+            selectThemeMode(ThemeManager.ThemeMode.LIGHT);
+            assertEquals("light", persistedTheme());
+
             hdfFile = fixtureAccess.openReadWrite(EDIT_FIXTURE);
             SWTBotTreeItem datasetItem = bot.tree().getTreeItem(hdfFile.getName()).getNode(DATASET_NAME);
             datasetItem.click();
@@ -226,15 +234,29 @@ public class ThemeManagerRuntimeStateSwtBotTest {
             assertEquals(DatasetStatisticsEngine.Kind.NON_ZERO, before.highlightKind);
             assertTrue(before.dirty, "The edited Dataset must still be dirty before theme refresh");
 
-            refreshSystemTheme(true);
+            selectThemeMode(ThemeManager.ThemeMode.DARK);
+            assertEquals("dark", persistedTheme());
             State dark = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
-            assertStateUnchanged(before, dark, "Light -> Dark");
-            assertShellsUnchanged(shellsBefore, statisticsWidget, "Light -> Dark");
+            assertEquals(ThemeManager.ThemeMode.DARK, themeManager.get().getThemeMode());
+            assertStateUnchanged(before, dark, "Forced Light -> Forced Dark");
+            assertShellsUnchanged(shellsBefore, statisticsWidget, "Forced Light -> Forced Dark");
+
+            selectThemeMode(ThemeManager.ThemeMode.SYSTEM);
+            assertEquals("system", persistedTheme());
+            State system = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
+            assertEquals(ThemeManager.ThemeMode.SYSTEM, themeManager.get().getThemeMode());
+            assertStateUnchanged(before, system, "Forced Dark -> System");
+            assertShellsUnchanged(shellsBefore, statisticsWidget, "Forced Dark -> System");
+
+            refreshSystemTheme(true);
+            State systemDark = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
+            assertStateUnchanged(before, systemDark, "System Light -> System Dark");
+            assertShellsUnchanged(shellsBefore, statisticsWidget, "System Light -> System Dark");
 
             refreshSystemTheme(false);
-            State lightAgain = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
-            assertStateUnchanged(before, lightAgain, "Dark -> Light");
-            assertShellsUnchanged(shellsBefore, statisticsWidget, "Dark -> Light");
+            State systemLight = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
+            assertStateUnchanged(before, systemLight, "System Dark -> System Light");
+            assertShellsUnchanged(shellsBefore, statisticsWidget, "System Dark -> System Light");
         }
         finally {
             if (statisticsShell != null && statisticsShell.isOpen())
@@ -387,6 +409,45 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         });
         assertEquals(dark, themeManager.get().isDark(),
                      "ThemeManager must refresh through its Settings listener");
+    }
+
+    private static void selectThemeMode(ThemeManager.ThemeMode mode)
+    {
+        SWTBotShell applicationShell = new SWTBotShell(mainShell.get());
+        applicationShell.activate();
+
+        String themeKey = "menu.tools.theme." + mode.getPropertyValue();
+        SWTBotMenu themeMenu = applicationShell.bot().menu().menu(text("menu.tools"))
+            .menu(text("menu.tools.theme"));
+        SWTBotMenu selectedItem = themeMenu.menu(text(themeKey));
+        selectedItem.click();
+
+        bot.waitUntil(new DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                return themeManager.get().getThemeMode() == mode;
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for HDFView theme mode to become " + mode;
+            }
+        });
+        assertTrue(selectedItem.isChecked(), "The selected theme radio item must remain checked");
+    }
+
+    private static String persistedTheme() throws Exception
+    {
+        String propertyFile = ViewProperties.getPropertyFile();
+        assertNotNull(propertyFile, "HDFView must have a user property file");
+
+        Properties properties = new Properties();
+        try (InputStream input = Files.newInputStream(Path.of(propertyFile))) {
+            properties.load(input);
+        }
+        return properties.getProperty(ViewProperties.THEME_PROPERTY);
     }
 
     private static Shell[] openShells()

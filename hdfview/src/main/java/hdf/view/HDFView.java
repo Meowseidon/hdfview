@@ -242,6 +242,11 @@ public class HDFView implements DataViewManager {
     private MenuItem englishLanguageItem;
     private MenuItem simplifiedChineseLanguageItem;
 
+    /** Theme mode radio items in the Tools menu. */
+    private MenuItem systemThemeItem;
+    private MenuItem lightThemeItem;
+    private MenuItem darkThemeItem;
+
     /** The modeless Dataset content search window, if it is open. */
     private DatasetSearchDialog datasetSearchDialog;
 
@@ -328,6 +333,8 @@ public class HDFView implements DataViewManager {
         catch (Exception ex) {
             log.debug("Failed to load View Properties from {}", rootDir);
         }
+        themeManager.setThemeMode(
+            ThemeManager.ThemeMode.fromProperty(props.getString(ViewProperties.THEME_PROPERTY)));
         ensureDefaultViewModules();
 
         I18n.initialize(props);
@@ -1079,6 +1086,45 @@ public class HDFView implements DataViewManager {
             }
         });
 
+        MenuItem themeMenuItem = new MenuItem(toolsMenu, SWT.CASCADE);
+        I18n.bind(themeMenuItem, "menu.tools.theme");
+
+        Menu themeMenu = new Menu(themeMenuItem);
+        themeMenuItem.setMenu(themeMenu);
+
+        systemThemeItem = new MenuItem(themeMenu, SWT.RADIO);
+        I18n.bind(systemThemeItem, "menu.tools.theme.system");
+        systemThemeItem.setSelection(themeManager.getThemeMode() == ThemeManager.ThemeMode.SYSTEM);
+        systemThemeItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                changeTheme(ThemeManager.ThemeMode.SYSTEM);
+            }
+        });
+
+        lightThemeItem = new MenuItem(themeMenu, SWT.RADIO);
+        I18n.bind(lightThemeItem, "menu.tools.theme.light");
+        lightThemeItem.setSelection(themeManager.getThemeMode() == ThemeManager.ThemeMode.LIGHT);
+        lightThemeItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                changeTheme(ThemeManager.ThemeMode.LIGHT);
+            }
+        });
+
+        darkThemeItem = new MenuItem(themeMenu, SWT.RADIO);
+        I18n.bind(darkThemeItem, "menu.tools.theme.dark");
+        darkThemeItem.setSelection(themeManager.getThemeMode() == ThemeManager.ThemeMode.DARK);
+        darkThemeItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e)
+            {
+                changeTheme(ThemeManager.ThemeMode.DARK);
+            }
+        });
+
         item = new MenuItem(toolsMenu, SWT.PUSH);
         I18n.bind(item, "menu.tools.searchDatasetContent");
         item.addSelectionListener(new SelectionAdapter() {
@@ -1299,6 +1345,56 @@ public class HDFView implements DataViewManager {
             ? "menu.tools.language.english"
             : "menu.tools.language.simplifiedChinese";
         showStatus(I18n.text("status.languageChanged", I18n.text(languageLabelKey)));
+    }
+
+    /**
+     * Apply a theme mode to the current HDFView session and persist it through
+     * the existing user preference store.  ThemeManager updates its semantic
+     * palette and registered controls in place; no DataView or Shell is rebuilt.
+     *
+     * @param mode the selected user theme mode
+     */
+    private void changeTheme(ThemeManager.ThemeMode mode)
+    {
+        ThemeManager.ThemeMode selectedMode = mode == null
+            ? ThemeManager.ThemeMode.SYSTEM
+            : mode;
+        themeManager.setThemeMode(selectedMode);
+        props.setValue(ViewProperties.THEME_PROPERTY, selectedMode.getPropertyValue());
+
+        try {
+            props.save();
+        }
+        catch (Exception ex) {
+            log.warn("Unable to persist HDFView theme preference", ex);
+            showError(I18n.text("status.errorSavingTheme", ex.getMessage()));
+        }
+
+        updateThemeMenuSelection(selectedMode);
+        String themeLabelKey;
+        switch (selectedMode) {
+        case LIGHT:
+            themeLabelKey = "menu.tools.theme.light";
+            break;
+        case DARK:
+            themeLabelKey = "menu.tools.theme.dark";
+            break;
+        case SYSTEM:
+        default:
+            themeLabelKey = "menu.tools.theme.system";
+            break;
+        }
+        showStatus(I18n.text("status.themeChanged", I18n.text(themeLabelKey)));
+    }
+
+    private void updateThemeMenuSelection(ThemeManager.ThemeMode mode)
+    {
+        if (systemThemeItem != null && !systemThemeItem.isDisposed())
+            systemThemeItem.setSelection(mode == ThemeManager.ThemeMode.SYSTEM);
+        if (lightThemeItem != null && !lightThemeItem.isDisposed())
+            lightThemeItem.setSelection(mode == ThemeManager.ThemeMode.LIGHT);
+        if (darkThemeItem != null && !darkThemeItem.isDisposed())
+            darkThemeItem.setSelection(mode == ThemeManager.ThemeMode.DARK);
     }
 
     /** Open the global Dataset name/value search window. */

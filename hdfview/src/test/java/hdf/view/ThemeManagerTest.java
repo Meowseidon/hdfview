@@ -98,7 +98,68 @@ class ThemeManagerTest {
         manager = ThemeManager.forDisplay(display);
 
         assertEquals(Display.isSystemDarkTheme(), manager.isDark());
+        assertEquals(ThemeManager.ThemeMode.SYSTEM, manager.getThemeMode());
         assertSame(manager, ThemeManager.forDisplay(display));
+    }
+
+    @Test
+    void missingAndUnknownThemePropertiesFallBackToSystem()
+    {
+        assertEquals(ThemeManager.ThemeMode.SYSTEM,
+                     ThemeManager.ThemeMode.fromProperty(null));
+        assertEquals(ThemeManager.ThemeMode.SYSTEM,
+                     ThemeManager.ThemeMode.fromProperty(""));
+        assertEquals(ThemeManager.ThemeMode.SYSTEM,
+                     ThemeManager.ThemeMode.fromProperty("sepia"));
+        assertEquals(ThemeManager.ThemeMode.LIGHT,
+                     ThemeManager.ThemeMode.fromProperty(" LIGHT "));
+        assertEquals(ThemeManager.ThemeMode.DARK,
+                     ThemeManager.ThemeMode.fromProperty("DaRk"));
+    }
+
+    @Test
+    void forcedThemeModesIgnoreSettingsAndKeepTheirPalette()
+    {
+        AtomicBoolean dark = new AtomicBoolean(false);
+        manager = listeningManager(dark::get);
+
+        manager.setThemeMode(ThemeManager.ThemeMode.LIGHT);
+        assertEquals(ThemeManager.ThemeMode.LIGHT, manager.getThemeMode());
+        assertEquals(ThemeManager.Theme.LIGHT, manager.getTheme());
+
+        manager.setThemeMode(ThemeManager.ThemeMode.DARK);
+        Color forcedDarkColor = manager.color(ThemeManager.ColorRole.SURFACE);
+        assertEquals(ThemeManager.ThemeMode.DARK, manager.getThemeMode());
+        assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
+
+        dark.set(false);
+        fireSettingsEvent();
+
+        assertEquals(ThemeManager.ThemeMode.DARK, manager.getThemeMode());
+        assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
+        assertFalse(forcedDarkColor.isDisposed(),
+                    "SWT.Settings must not replace a forced palette");
+    }
+
+    @Test
+    void switchingBackToSystemResumesSettingsThemeChanges()
+    {
+        AtomicBoolean dark = new AtomicBoolean(false);
+        manager = listeningManager(dark::get);
+
+        manager.setThemeMode(ThemeManager.ThemeMode.DARK);
+        dark.set(true);
+        fireSettingsEvent();
+        assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
+
+        manager.setThemeMode(ThemeManager.ThemeMode.SYSTEM);
+        assertEquals(ThemeManager.ThemeMode.SYSTEM, manager.getThemeMode());
+        assertEquals(ThemeManager.Theme.DARK, manager.getTheme());
+
+        dark.set(false);
+        fireSettingsEvent();
+        assertEquals(ThemeManager.Theme.LIGHT, manager.getTheme());
+        assertEquals(ThemeManager.ThemeMode.SYSTEM, manager.getThemeMode());
     }
 
     @Test

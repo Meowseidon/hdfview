@@ -27,13 +27,13 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
 
 /**
- * Owns HDFView's semantic colors and follows the operating-system theme.
+ * Owns HDFView's semantic colors and applies the selected user theme mode.
  *
  * <p>SWT reports a system-theme change through {@link SWT#Settings}.  The
- * manager deliberately does not poll the Windows registry or keep a second
- * user preference.  It updates the native SWT dark-theme preference for the
- * display and existing shells, then replaces one cached color palette and
- * notifies the controls which use custom colors.</p>
+ * manager deliberately does not poll the Windows registry.  It updates the
+ * native SWT dark-theme preference for the display and existing shells, then
+ * replaces one cached color palette and notifies the controls which use custom
+ * colors.</p>
  */
 public final class ThemeManager {
     /** Semantic themes supported by the viewer. */
@@ -42,6 +42,44 @@ public final class ThemeManager {
         LIGHT,
         /** The operating system is using a dark theme. */
         DARK
+    }
+
+    /** User-selectable theme modes persisted by HDFView. */
+    public enum ThemeMode {
+        /** Resolve the palette from SWT's current system-theme value. */
+        SYSTEM("system"),
+        /** Always use HDFView's light palette. */
+        LIGHT("light"),
+        /** Always use HDFView's dark palette. */
+        DARK("dark");
+
+        private final String propertyValue;
+
+        ThemeMode(String propertyValue)
+        {
+            this.propertyValue = propertyValue;
+        }
+
+        /** @return the stable value stored in the user properties file. */
+        public String getPropertyValue() { return propertyValue; }
+
+        /**
+         * Convert a persisted value to a supported user theme mode.
+         *
+         * @param value a persisted theme value
+         * @return the matching mode, or {@link #SYSTEM} for missing/unknown values
+         */
+        public static ThemeMode fromProperty(String value)
+        {
+            if (value != null) {
+                String normalized = value.trim();
+                for (ThemeMode mode : values()) {
+                    if (mode.propertyValue.equalsIgnoreCase(normalized))
+                        return mode;
+                }
+            }
+            return SYSTEM;
+        }
     }
 
     /** Semantic colors used by HDFView's custom-painted or explicitly-colored controls. */
@@ -74,6 +112,7 @@ public final class ThemeManager {
     private Runnable removeSettingsListener = () -> {};
 
     private EnumMap<ColorRole, Color> colors;
+    private ThemeMode themeMode;
     private Theme theme;
     private boolean disposed;
     private boolean refreshing;
@@ -121,7 +160,8 @@ public final class ThemeManager {
         this.systemThemeDetector = Objects.requireNonNull(systemThemeDetector, "systemThemeDetector");
         Objects.requireNonNull(addSettingsListener, "addSettingsListener");
         Objects.requireNonNull(removeSettingsListener, "removeSettingsListener");
-        this.theme = systemThemeDetector.getAsBoolean() ? Theme.DARK : Theme.LIGHT;
+        this.themeMode = ThemeMode.SYSTEM;
+        this.theme = resolveTheme(themeMode);
         this.colors = createPalette(theme);
 
         applyNativeThemePreference(theme);
@@ -135,11 +175,33 @@ public final class ThemeManager {
     /** @return the SWT display owned by this manager. */
     public Display getDisplay() { return display; }
 
-    /** @return the current system theme. */
+    /** @return the current resolved light/dark palette theme. */
     public Theme getTheme() { return theme; }
 
-    /** @return whether the current system theme is dark. */
+    /** @return the user-selected theme mode. */
+    public ThemeMode getThemeMode() { return themeMode; }
+
+    /** @return whether the current resolved palette is dark. */
     public boolean isDark() { return theme == Theme.DARK; }
+
+    /**
+     * Apply a user-selected theme mode to the existing display and listeners.
+     *
+     * <p>The {@link ThemeMode#SYSTEM} mode resolves through SWT's current
+     * system-theme value.  The forced modes never consult that value when a
+     * later {@link SWT#Settings} event arrives.</p>
+     *
+     * @param selectedMode the mode to apply; {@code null} means SYSTEM
+     */
+    public void setThemeMode(ThemeMode selectedMode)
+    {
+        if (disposed || display.isDisposed())
+            return;
+
+        ThemeMode nextMode = selectedMode == null ? ThemeMode.SYSTEM : selectedMode;
+        themeMode = nextMode;
+        applyResolvedTheme(resolveTheme(nextMode));
+    }
 
     /**
      * Return a cached semantic color.  The returned Color is owned by this
@@ -166,21 +228,13 @@ public final class ThemeManager {
 
         refreshing = true;
         try {
-            Theme nextTheme = systemThemeDetector.getAsBoolean() ? Theme.DARK : Theme.LIGHT;
-            applyNativeThemePreference(nextTheme);
-            if (nextTheme == theme)
-                return;
-
-            EnumMap<ColorRole, Color> previousColors = colors;
-            colors = createPalette(nextTheme);
-            theme = nextTheme;
-            try {
-                for (Consumer<ThemeManager> listener : new ArrayList<>(listeners))
-                    listener.accept(this);
-            }
-            finally {
-                disposePalette(previousColors);
-            }
+            if (themeMode == ThemeMode.SYSTEM)
+                applyResolvedTheme(resolveTheme(themeMode));
+            else
+                // SWT.Settings can be emitted after a forced native preference
+                // is applied. Reassert the user's choice without changing the
+                // semantic palette or notifying listeners.
+                applyNativeThemePreference(theme);
         }
         finally {
             refreshing = false;
@@ -269,6 +323,33 @@ public final class ThemeManager {
             control.setBackground(color(backgroundRole));
         if (foregroundRole != null)
             control.setForeground(color(foregroundRole));
+    }
+
+    private Theme resolveTheme(ThemeMode selectedMode)
+    {
+        if (selectedMode == ThemeMode.LIGHT)
+            return Theme.LIGHT;
+        if (selectedMode == ThemeMode.DARK)
+            return Theme.DARK;
+        return systemThemeDetector.getAsBoolean() ? Theme.DARK : Theme.LIGHT;
+    }
+
+    private void applyResolvedTheme(Theme nextTheme)
+    {
+        applyNativeThemePreference(nextTheme);
+        if (nextTheme == theme)
+            return;
+
+        EnumMap<ColorRole, Color> previousColors = colors;
+        colors = createPalette(nextTheme);
+        theme = nextTheme;
+        try {
+            for (Consumer<ThemeManager> listener : new ArrayList<>(listeners))
+                listener.accept(this);
+        }
+        finally {
+            disposePalette(previousColors);
+        }
     }
 
     private void applyNativeThemePreference(Theme selectedTheme)

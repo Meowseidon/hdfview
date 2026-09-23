@@ -69,6 +69,9 @@ public class ViewProperties extends PreferenceStore {
     /** User preference key for the HDFView UI language. */
     public static final String LANGUAGE_PROPERTY = "language";
 
+    /** User preference key for the HDFView theme mode. */
+    public static final String THEME_PROPERTY = "theme";
+
     /** name of the tab delimiter. */
     public static final String DELIMITER_TAB = "Tab";
 
@@ -355,6 +358,7 @@ public class ViewProperties extends PreferenceStore {
         setDefault("palette.file", "");
         setDefault("data.delimiter", DELIMITER_TAB);
         setDefault(LANGUAGE_PROPERTY, "en");
+        setDefault(THEME_PROPERTY, ThemeManager.ThemeMode.SYSTEM.getPropertyValue());
     }
 
     /**
