@@ -46,6 +46,13 @@ mvn -pl hdfview -am package -DskipTests -B
 
 The first command is a fast compile check. The second creates the direct-launch artifact `libs\hdfview-99.99.99.jar` and runtime dependencies under `hdfview\target\lib` without running tests.
 
+On Windows, `build-and-run-hdfview.bat` runs the package command above and launches the freshly built JAR. Pass `--debug` to enable debug logging:
+
+```powershell
+.\build-and-run-hdfview.bat
+.\build-and-run-hdfview.bat --debug
+```
+
 ### Run
 
 `run-hdfview.bat` launches an already-built artifact; it does not compile automatically. Its default direct-JAR mode only needs Java, the configured native libraries, `libs\hdfview-*.jar`, and `hdfview\target\lib`:
