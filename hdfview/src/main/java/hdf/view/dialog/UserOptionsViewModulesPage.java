@@ -17,6 +17,7 @@ package hdf.view.dialog;
 import java.util.ArrayList;
 
 import hdf.view.ViewProperties;
+import hdf.view.ThemeManager;
 import hdf.view.i18n.I18n;
 
 import org.slf4j.Logger;
@@ -147,6 +148,9 @@ public class UserOptionsViewModulesPage extends UserOptionsDefaultPage {
     {
         shell               = parent.getShell();
         Composite composite = new Composite(parent, SWT.NONE);
+        ThemeManager.forDisplay(parent.getDisplay()).bind(composite,
+                                                          ThemeManager.ColorRole.SURFACE,
+                                                          ThemeManager.ColorRole.FOREGROUND);
         composite.setLayout(new GridLayout());
 
         org.eclipse.swt.widgets.Group treeViewGroup = new org.eclipse.swt.widgets.Group(composite, SWT.NONE);

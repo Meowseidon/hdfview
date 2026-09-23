@@ -500,7 +500,7 @@ public class Chart extends Dialog {
                         for (int i = 0; i < numberOfLines; i++) {
                             // Display each line with a unique color for clarity
                             if ((lineColors != null) && (lineColors.length >= numberOfLines))
-                                g.setForeground(Display.getCurrent().getSystemColor(lineColors[i]));
+                                g.setForeground(lineColor(lineColors[i]));
 
                             // set up the line data for drawing one line a time
                             if (hasXdata)
@@ -559,6 +559,15 @@ public class Chart extends Dialog {
                     }                       // (chartStyle == HISTOGRAM)
                 }
             });
+        }
+
+        /** Keep the historical Light palette while making the default black
+         * series readable on HDFView's dark surface. */
+        private Color lineColor(int systemColorId)
+        {
+            if (themeManager.isDark() && systemColorId == SWT.COLOR_BLACK)
+                return themeManager.color(ThemeManager.ColorRole.FOREGROUND);
+            return Display.getCurrent().getSystemColor(systemColorId);
         }
     }
 }

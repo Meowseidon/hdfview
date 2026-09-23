@@ -103,6 +103,9 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
     /** The default display. */
     protected final Display display = Display.getDefault();
 
+    /** Semantic colors for the application-owned metadata page chrome. */
+    protected final ThemeManager themeManager = ThemeManager.forDisplay(display);
+
     /** The view manger reference. */
     protected final DataViewManager viewManager;
 
@@ -311,6 +314,8 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             control.dispose();
 
         Composite page = new Composite(contentTabFolder, SWT.NONE);
+        themeManager.bind(page, ThemeManager.ColorRole.SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         page.setLayout(new GridLayout(1, false));
         tab.setControl(page);
         return page;
@@ -342,9 +347,8 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
 
         attributeInfoGroup = new org.eclipse.swt.widgets.Group(aparent, SWT.NONE);
         attributeInfoGroup.setFont(curFont);
-        ThemeManager.forDisplay(display).bind(attributeInfoGroup,
-                                              ThemeManager.ColorRole.SECONDARY_SURFACE,
-                                              ThemeManager.ColorRole.FOREGROUND);
+        themeManager.bind(attributeInfoGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         attributeInfoGroup.setLayout(new GridLayout(3, false));
         attributeInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -556,9 +560,8 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             new org.eclipse.swt.widgets.Group(goparent, SWT.NONE);
         generalInfoGroup.setFont(curFont);
         generalInfoGroup.setLayout(new GridLayout(2, false));
-        ThemeManager.forDisplay(display).bind(generalInfoGroup,
-                                              ThemeManager.ColorRole.SECONDARY_SURFACE,
-                                              ThemeManager.ColorRole.FOREGROUND);
+        themeManager.bind(generalInfoGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         generalInfoGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         /* Object name section */
@@ -1384,6 +1387,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
         {
             Shell openParent = getParent();
             shell            = new Shell(openParent, SWT.DIALOG_TRIM | SWT.RESIZE);
+            themeManager.applyTo(shell);
             shell.setFont(curFont);
             I18n.bind(shell, "dialog.userBlock.title", obj);
             shell.setLayout(new GridLayout(5, false));
@@ -1453,6 +1457,7 @@ public abstract class DefaultBaseMetaDataView implements MetaDataView {
             });
 
             ScrolledComposite userBlockScroller = new ScrolledComposite(shell, SWT.V_SCROLL | SWT.BORDER);
+            themeManager.bindBackground(userBlockScroller, ThemeManager.ColorRole.SURFACE);
             userBlockScroller.setExpandHorizontal(true);
             userBlockScroller.setExpandVertical(true);
             userBlockScroller.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 5, 1));

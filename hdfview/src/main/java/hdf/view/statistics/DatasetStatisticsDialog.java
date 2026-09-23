@@ -118,7 +118,8 @@ public final class DatasetStatisticsDialog {
         }
 
         shell = new Shell(parent, SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MODELESS);
-        ThemeManager.forDisplay(shell.getDisplay()).applyTo(shell);
+        ThemeManager themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         I18n.bind(shell, "statistics.title");
         shell.setLayout(new GridLayout(1, false));
         shell.addListener(SWT.Close, event -> {
@@ -137,6 +138,7 @@ public final class DatasetStatisticsDialog {
                          () -> safe(host.getStatisticsPageLabel()));
 
         Composite scopeRow = new Composite(shell, SWT.NONE);
+        themeManager.bindBackground(scopeRow, ThemeManager.ColorRole.SURFACE);
         scopeRow.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         scopeRow.setLayout(new GridLayout(4, false));
 
@@ -198,6 +200,8 @@ public final class DatasetStatisticsDialog {
         progressBar.setMaximum(100);
 
         Group highlightGroup = new Group(shell, SWT.NONE);
+        themeManager.bind(highlightGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         I18n.bind(highlightGroup, "statistics.highlightGroup");
         highlightGroup.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         highlightGroup.setLayout(new GridLayout(5, false));
@@ -241,6 +245,7 @@ public final class DatasetStatisticsDialog {
         });
 
         Composite buttonRow = new Composite(shell, SWT.NONE);
+        themeManager.bindBackground(buttonRow, ThemeManager.ColorRole.SURFACE);
         buttonRow.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
         buttonRow.setLayout(new GridLayout(1, false));
         closeButton = new Button(buttonRow, SWT.PUSH);

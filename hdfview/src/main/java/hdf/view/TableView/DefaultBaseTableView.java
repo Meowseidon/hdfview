@@ -374,6 +374,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
         shell      = viewParent.getShell();
         if (!isEmbedded)
             themeManager.applyTo(shell);
+        else
+            themeManager.bindBackground(viewParent, ThemeManager.ColorRole.SURFACE);
 
         if (!isEmbedded)
             viewParent.setData(this);
@@ -555,24 +557,31 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
          * location of the current cell, as well as the index base.
          */
         indexBaseGroup = new org.eclipse.swt.widgets.Group(viewParent, SWT.SHADOW_ETCHED_OUT);
+        themeManager.bind(indexBaseGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         indexBaseGroup.setFont(curFont);
         I18n.bind(indexBaseGroup, "table.indexBased", indexBase);
         indexBaseGroup.setLayout(new GridLayout(1, true));
         indexBaseGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
         SashForm content = new SashForm(indexBaseGroup, SWT.VERTICAL);
+        themeManager.bindBackground(content, ThemeManager.ColorRole.SURFACE);
         content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
         content.setSashWidth(10);
 
         SashForm cellValueComposite = new SashForm(content, SWT.HORIZONTAL);
+        themeManager.bindBackground(cellValueComposite, ThemeManager.ColorRole.SURFACE);
         cellValueComposite.setSashWidth(8);
 
         cellLabel = new Label(cellValueComposite, SWT.RIGHT | SWT.BORDER);
+        themeManager.bind(cellLabel, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         cellLabel.setAlignment(SWT.CENTER);
         cellLabel.setFont(curFont);
 
         final ScrolledComposite cellValueFieldScroller =
             new ScrolledComposite(cellValueComposite, SWT.V_SCROLL | SWT.H_SCROLL);
+        themeManager.bindBackground(cellValueFieldScroller, ThemeManager.ColorRole.SURFACE);
         cellValueFieldScroller.setLayout(new FillLayout());
 
         cellValueField = new Text(cellValueFieldScroller, SWT.MULTI | SWT.BORDER | SWT.WRAP);
@@ -980,6 +989,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
     private ToolBar createToolbar(final Composite parent)
     {
         ToolBar toolbar = new ToolBar(parent, SWT.HORIZONTAL | SWT.RIGHT | SWT.BORDER);
+        themeManager.bind(toolbar, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         toolbar.setFont(curFont);
         toolbar.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
@@ -1037,6 +1048,8 @@ public abstract class DefaultBaseTableView implements TableView, DatasetStatisti
             ToolItem separator = new ToolItem(toolbar, SWT.SEPARATOR);
 
             frameField = new Text(toolbar, SWT.SINGLE | SWT.BORDER | SWT.CENTER);
+            themeManager.bind(frameField, ThemeManager.ColorRole.INPUT_BACKGROUND,
+                              ThemeManager.ColorRole.INPUT_FOREGROUND);
             frameField.setFont(curFont);
             frameField.setText(String.valueOf(curDataFrame));
             frameField.addTraverseListener(new TraverseListener() {

@@ -40,6 +40,7 @@ import hdf.view.HDFView;
 import hdf.view.ImageView.DefaultImageView;
 import hdf.view.ImageView.DefaultImageView.FlipFilter;
 import hdf.view.ImageView.DefaultImageView.Rotate90Filter;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
 import hdf.view.i18n.I18n;
@@ -90,6 +91,7 @@ public class DataOptionDialog extends Dialog {
     private static final Logger log = LoggerFactory.getLogger(DataOptionDialog.class);
 
     private Shell shell;
+    private ThemeManager themeManager;
 
     private Font curFont;
 
@@ -221,6 +223,8 @@ public class DataOptionDialog extends Dialog {
     {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+        themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         shell.setFont(curFont);
         I18n.bind(shell, "dialog.dataOption.title", ((HObject)dataObject).getName(),
                   ((HObject)dataObject).getPath());
@@ -236,6 +240,7 @@ public class DataOptionDialog extends Dialog {
 
         // Create Ok/Cancel button region
         Composite buttonComposite = new Composite(shell, SWT.NONE);
+        themeManager.bindBackground(buttonComposite, ThemeManager.ColorRole.SURFACE);
         buttonComposite.setLayout(new GridLayout(2, true));
         buttonComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false, 2, 1));
 
@@ -1620,10 +1625,22 @@ public class DataOptionDialog extends Dialog {
         private Rectangle selectedArea;
         private Image previewImage = null;
         private String selStr;
+        private ThemeManager.Registration previewThemeRegistration;
 
         private PreviewNavigator(Composite parent, int style, int w, int h)
         {
             super(parent, style);
+            themeManager.bindBackground(this, ThemeManager.ColorRole.SURFACE);
+            previewThemeRegistration = themeManager.addListener(manager -> {
+                if (!isDisposed())
+                    redraw();
+            });
+            addDisposeListener(event -> {
+                if (previewThemeRegistration != null) {
+                    previewThemeRegistration.dispose();
+                    previewThemeRegistration = null;
+                }
+            });
 
             GridData data   = new GridData(SWT.FILL, SWT.FILL, false, true);
             data.widthHint  = NAVIGATOR_SIZE;
@@ -1740,7 +1757,7 @@ public class DataOptionDialog extends Dialog {
 
                     org.eclipse.swt.graphics.Rectangle bounds = ((Canvas)e.widget).getBounds();
                     Point textSize                            = gc.stringExtent(selStr);
-                    gc.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
+                    gc.setForeground(themeManager.color(ThemeManager.ColorRole.FOREGROUND));
                     gc.drawString(selStr, (bounds.width / 2) - (textSize.x / 2),
                                   bounds.height - textSize.y - 4);
                 }

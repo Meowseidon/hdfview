@@ -23,6 +23,7 @@ import hdf.object.HObject;
 import hdf.object.h5.H5Link;
 import hdf.object.nc2.NC2Group;
 import hdf.view.DataView.DataViewManager;
+import hdf.view.ThemeManager;
 import hdf.view.ViewProperties;
 import hdf.view.i18n.I18n;
 
@@ -152,6 +153,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
 
             ScrolledComposite dimensionScroller =
                 new ScrolledComposite(generalObjectInfoPane, SWT.V_SCROLL | SWT.BORDER);
+            themeManager.bindBackground(dimensionScroller, ThemeManager.ColorRole.SURFACE);
             dimensionScroller.setExpandHorizontal(true);
             dimensionScroller.setExpandVertical(true);
             dimensionScroller.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 5, 1));
@@ -195,6 +197,7 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
 
             ScrolledComposite enumScroller =
                 new ScrolledComposite(generalObjectInfoPane, SWT.V_SCROLL | SWT.BORDER);
+            themeManager.bindBackground(enumScroller, ThemeManager.ColorRole.SURFACE);
             enumScroller.setExpandHorizontal(true);
             enumScroller.setExpandVertical(true);
             enumScroller.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 5, 1));
@@ -210,6 +213,8 @@ public class DefaultGroupMetaDataView extends DefaultLinkMetaDataView implements
         }
         org.eclipse.swt.widgets.Group groupInfoGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
+        themeManager.bind(groupInfoGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         groupInfoGroup.setFont(curFont);
         I18n.bind(groupInfoGroup, "meta.groupMembers");
         groupInfoGroup.setLayout(new GridLayout(1, true));

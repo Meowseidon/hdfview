@@ -27,6 +27,7 @@ import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Shell;
 
+import hdf.view.ThemeManager;
 import hdf.view.i18n.I18n;
 
 /**
@@ -72,6 +73,7 @@ public class UserOptionsDialog extends PreferenceDialog {
     public void create()
     {
         super.create();
+        ThemeManager.forDisplay(getShell().getDisplay()).applyTo(getShell());
         I18n.bind(getShell(), "dialog.userOptions.title");
         I18n.bind(getButton(IDialogConstants.OK_ID), "button.applyAndClose");
         I18n.bind(getButton(IDialogConstants.CANCEL_ID), "button.cancel");

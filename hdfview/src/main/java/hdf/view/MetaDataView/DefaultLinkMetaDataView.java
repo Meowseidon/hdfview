@@ -19,6 +19,7 @@ import hdf.object.Group;
 import hdf.object.HObject;
 import hdf.object.h5.H5Link;
 import hdf.view.DataView.DataViewManager;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.i18n.I18n;
 
@@ -61,6 +62,8 @@ public class DefaultLinkMetaDataView extends DefaultBaseMetaDataView implements 
         if (dataObject.getLinkTargetObjName() != null) {
             org.eclipse.swt.widgets.Group linkTargetGroup =
                 new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
+            themeManager.bind(linkTargetGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                              ThemeManager.ColorRole.FOREGROUND);
             linkTargetGroup.setFont(curFont);
             I18n.bind(linkTargetGroup, "meta.linkTargetInfo");
             linkTargetGroup.setLayout(new GridLayout(2, false));

@@ -25,6 +25,7 @@ import hdf.object.HObject;
 import hdf.object.ScalarDS;
 import hdf.view.DataView.DataViewManager;
 import hdf.view.ImageView.ImageView;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.ViewProperties;
 import hdf.view.i18n.I18n;
@@ -70,6 +71,8 @@ import org.eclipse.swt.widgets.Text;
  */
 public class DefaultPaletteView extends Dialog implements PaletteView {
     private Shell shell;
+    private ThemeManager themeManager;
+    private ThemeManager.Registration themeRegistration;
 
     private Font curFont;
 
@@ -170,6 +173,8 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
     {
         Shell parent = getParent();
         shell        = new Shell(parent, SWT.SHELL_TRIM | SWT.APPLICATION_MODAL);
+        themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         shell.setFont(curFont);
         I18n.bind(shell, "dialog.palette.title", dataset.getPath() + dataset.getName());
         shell.setImages(ViewProperties.getHdfIcons());
@@ -181,6 +186,12 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
                                    I18n.text("common.blue")};
 
         chartP          = new ChartCanvas(shell, SWT.DOUBLE_BUFFERED | SWT.BORDER);
+        themeManager.bind(chartP, ThemeManager.ColorRole.SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
+        themeRegistration = themeManager.addListener(manager -> {
+            if (chartP != null && !chartP.isDisposed())
+                chartP.redraw();
+        });
         GridData data   = new GridData(SWT.FILL, SWT.FILL, true, true);
         data.widthHint  = 700 + (ViewProperties.getFontSize() - 12) * 15;
         data.heightHint = 500 + (ViewProperties.getFontSize() - 12) * 10;
@@ -188,11 +199,14 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         // Create the toolbar composite
         Composite tools = new Composite(shell, SWT.NONE);
+        themeManager.bindBackground(tools, ThemeManager.ColorRole.SURFACE);
         tools.setLayout(new GridLayout(3, false));
         tools.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
         // Add buttons for changing line colors
         Composite rgbComposite = new Composite(tools, SWT.BORDER);
+        themeManager.bind(rgbComposite, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         rgbComposite.setLayout(new GridLayout(3, true));
         rgbComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
 
@@ -220,6 +234,8 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         // Add controls for selecting palettes and showing values
         Composite paletteComposite = new Composite(tools, SWT.BORDER);
+        themeManager.bind(paletteComposite, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         paletteComposite.setLayout(new GridLayout(2, false));
         paletteComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, false));
 
@@ -329,6 +345,8 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
 
         // Add Ok/Cancel/Preview buttons
         Composite buttonComposite = new Composite(tools, SWT.BORDER);
+        themeManager.bind(buttonComposite, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         buttonComposite.setLayout(new RowLayout(SWT.HORIZONTAL));
         buttonComposite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, false, false));
 
@@ -380,6 +398,10 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
             @Override
             public void widgetDisposed(DisposeEvent e)
             {
+                if (themeRegistration != null) {
+                    themeRegistration.dispose();
+                    themeRegistration = null;
+                }
                 if (curFont != null)
                     curFont.dispose();
             }
@@ -471,8 +493,6 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
         ChartCanvas(Composite parent, int style)
         {
             super(parent, style);
-
-            this.setBackground(Display.getCurrent().getSystemColor(SWT.COLOR_WHITE));
 
             this.addPaintListener(new PaintListener() {
                 @Override
@@ -570,7 +590,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
                     }
 
                     // draw a box on the legend
-                    g.setForeground(Display.getCurrent().getSystemColor(SWT.COLOR_BLACK));
+                    g.setForeground(themeManager.color(ThemeManager.ColorRole.FOREGROUND));
                     g.drawRectangle(canvasBounds.width - LEGEND_WIDTH - gap, gap, LEGEND_WIDTH,
                                     LEGEND_HEIGHT);
 
@@ -657,6 +677,7 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
     private class PaletteValueTable extends Dialog {
         private Display display;
         private Shell tableShell;
+        private ThemeManager.Registration tableThemeRegistration;
 
         private Table valueTable;
 
@@ -671,12 +692,20 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
             display      = parent.getDisplay();
 
             tableShell = new Shell(parent, SWT.SHELL_TRIM);
+            themeManager.applyTo(tableShell);
+            tableShell.addDisposeListener(event -> {
+                if (tableThemeRegistration != null) {
+                    tableThemeRegistration.dispose();
+                    tableThemeRegistration = null;
+                }
+            });
             tableShell.setFont(curFont);
             I18n.bind(tableShell, "palette.valueTable.title");
             tableShell.setImages(ViewProperties.getHdfIcons());
             tableShell.setLayout(new GridLayout(1, true));
 
             Composite content = new Composite(tableShell, SWT.NONE);
+            themeManager.bindBackground(content, ThemeManager.ColorRole.SURFACE);
             content.setLayout(new GridLayout(1, true));
             content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
 
@@ -712,6 +741,8 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
                 public void paintControl(PaintEvent e)
                 {
                     for (int i = 0; i < valueTable.getItemCount(); i++) {
+                        valueTable.getItem(i).setBackground(
+                            0, themeManager.color(ThemeManager.ColorRole.READ_ONLY_BACKGROUND));
                         Color cellColor =
                             new Color(display, paletteData[0][i], paletteData[1][i], paletteData[2][i]);
 
@@ -739,8 +770,15 @@ public class DefaultPaletteView extends Dialog implements PaletteView {
                                            String.valueOf(paletteData[1][i]),
                                            String.valueOf(paletteData[2][i]), null});
 
-                item.setBackground(0, Display.getCurrent().getSystemColor(SWT.COLOR_GRAY));
+                // The index column is application chrome; preserve its Light
+                // gray while giving it a dark semantic surface.
+                item.setBackground(0, themeManager.color(ThemeManager.ColorRole.READ_ONLY_BACKGROUND));
             }
+
+            tableThemeRegistration = themeManager.addListener(manager -> {
+                if (valueTable != null && !valueTable.isDisposed())
+                    valueTable.redraw();
+            });
 
             // set cell height for large fonts
             // int cellRowHeight = Math.max(16, valueTable.getFontMetrics(

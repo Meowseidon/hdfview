@@ -18,6 +18,7 @@ import java.awt.GraphicsEnvironment;
 import java.io.File;
 
 import hdf.view.Tools;
+import hdf.view.ThemeManager;
 import hdf.view.ViewProperties;
 import hdf.view.i18n.I18n;
 
@@ -383,6 +384,9 @@ public class UserOptionsGeneralPage extends UserOptionsDefaultPage {
     {
         shell               = parent.getShell();
         Composite composite = new Composite(parent, SWT.NONE);
+        ThemeManager.forDisplay(parent.getDisplay()).bind(composite,
+                                                          ThemeManager.ColorRole.SURFACE,
+                                                          ThemeManager.ColorRole.FOREGROUND);
         composite.setLayout(new GridLayout());
 
         org.eclipse.swt.widgets.Group workingDirectoryGroup =

@@ -29,11 +29,20 @@ import hdf.view.statistics.DatasetStatisticsEngine;
 
 import org.eclipse.nebula.widgets.nattable.NatTable;
 import org.eclipse.nebula.widgets.nattable.selection.SelectionLayer;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.custom.ScrolledComposite;
+import org.eclipse.swt.graphics.RGB;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Monitor;
 import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.TabFolder;
+import org.eclipse.swt.widgets.TabItem;
+import org.eclipse.swt.widgets.ToolBar;
 import org.eclipse.swtbot.nebula.nattable.finder.widgets.SWTBotNatTable;
 import org.eclipse.swtbot.swt.finder.waits.DefaultCondition;
 import org.eclipse.swtbot.swt.finder.SWTBot;
@@ -200,6 +209,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
 
             dataTable = waitForDataContent(applicationShell);
             assertRankThreeDataset();
+            assertEmbeddedTableChrome(dataTable);
 
             String firstFrame = currentFrame();
             applicationShell.activate();
@@ -229,6 +239,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
             State before = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
             Shell[] shellsBefore = openShells();
             Shell statisticsWidget = statisticsShell.widget;
+            assertStatisticsChrome(statisticsWidget);
             assertSame(mainShell.get(), applicationShell.widget, "The test must use the existing main Shell");
             assertSame(statisticsWidget, statisticsShell.widget);
             assertEquals(DatasetStatisticsEngine.Kind.NON_ZERO, before.highlightKind);
@@ -240,6 +251,8 @@ public class ThemeManagerRuntimeStateSwtBotTest {
             assertEquals(ThemeManager.ThemeMode.DARK, themeManager.get().getThemeMode());
             assertStateUnchanged(before, dark, "Forced Light -> Forced Dark");
             assertShellsUnchanged(shellsBefore, statisticsWidget, "Forced Light -> Forced Dark");
+            assertEmbeddedTableChrome(dataTable);
+            assertStatisticsChrome(statisticsWidget);
 
             selectThemeMode(ThemeManager.ThemeMode.SYSTEM);
             assertEquals("system", persistedTheme());
@@ -247,16 +260,22 @@ public class ThemeManagerRuntimeStateSwtBotTest {
             assertEquals(ThemeManager.ThemeMode.SYSTEM, themeManager.get().getThemeMode());
             assertStateUnchanged(before, system, "Forced Dark -> System");
             assertShellsUnchanged(shellsBefore, statisticsWidget, "Forced Dark -> System");
+            assertEmbeddedTableChrome(dataTable);
+            assertStatisticsChrome(statisticsWidget);
 
             refreshSystemTheme(true);
             State systemDark = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
             assertStateUnchanged(before, systemDark, "System Light -> System Dark");
             assertShellsUnchanged(shellsBefore, statisticsWidget, "System Light -> System Dark");
+            assertEmbeddedTableChrome(dataTable);
+            assertStatisticsChrome(statisticsWidget);
 
             refreshSystemTheme(false);
             State systemLight = captureState(dataTable, EDIT_COLUMN, EDIT_ROW);
             assertStateUnchanged(before, systemLight, "System Dark -> System Light");
             assertShellsUnchanged(shellsBefore, statisticsWidget, "System Dark -> System Light");
+            assertEmbeddedTableChrome(dataTable);
+            assertStatisticsChrome(statisticsWidget);
         }
         finally {
             if (statisticsShell != null && statisticsShell.isOpen())
@@ -302,6 +321,127 @@ public class ThemeManagerRuntimeStateSwtBotTest {
             rank[0] = ((Dataset)selected).getRank();
         });
         assertTrue(rank[0] > 2, "The existing multi-frame Dataset fixture must be rank > 2");
+    }
+
+    /** Verify the application-owned Data Content chrome, not NatTable's data palette. */
+    private static void assertEmbeddedTableChrome(SWTBotNatTable table)
+    {
+        display.get().syncExec(() -> {
+            assertNotNull(table, "Data Content NatTable must still exist");
+            Control tableControl = table.widget;
+            TabFolder tabFolder = null;
+            for (Control parent = tableControl.getParent(); parent != null; parent = parent.getParent()) {
+                if (parent instanceof TabFolder) {
+                    tabFolder = (TabFolder)parent;
+                    break;
+                }
+            }
+            assertNotNull(tabFolder, "Data Content must remain inside the main TabFolder");
+            int selectionIndex = tabFolder.getSelectionIndex();
+            assertTrue(selectionIndex >= 0, "The Data Content tab must remain selected");
+            TabItem selectedTab = tabFolder.getItem(selectionIndex);
+            Control dataPage = selectedTab.getControl();
+            assertNotNull(dataPage, "The selected Data Content tab must own a page Composite");
+
+            ThemeManager manager = themeManager.get();
+            RGB surface = manager.color(ThemeManager.ColorRole.SURFACE).getRGB();
+            assertEquals(surface, dataPage.getBackground().getRGB(),
+                         "Data Content page chrome must follow the active surface palette");
+
+            Group indexGroup = findGroupWithPrefix(dataPage, "table.index");
+            assertNotNull(indexGroup, "The embedded table must retain its index/value Group");
+            assertEquals(manager.color(ThemeManager.ColorRole.SECONDARY_SURFACE).getRGB(),
+                         indexGroup.getBackground().getRGB(),
+                         "The embedded table index/value chrome must follow the active secondary surface");
+
+            ToolBar toolbar = findDescendant(dataPage, ToolBar.class);
+            assertNotNull(toolbar, "The embedded table must retain its application toolbar");
+            assertEquals(manager.color(ThemeManager.ColorRole.SECONDARY_SURFACE).getRGB(),
+                         toolbar.getBackground().getRGB(),
+                         "The embedded table toolbar must follow the active secondary surface");
+
+            SashForm[] tableSashes = findDescendants(dataPage, SashForm.class);
+            assertTrue(tableSashes.length >= 2,
+                       "The embedded table must retain both application-owned SashForms");
+            for (SashForm sash : tableSashes)
+                assertEquals(surface, sash.getBackground().getRGB(),
+                             "Embedded table SashForm chrome must follow the active surface palette");
+
+            ScrolledComposite valueScroller = findDescendant(dataPage, ScrolledComposite.class);
+            assertNotNull(valueScroller, "The embedded table must retain its value ScrolledComposite");
+            assertEquals(surface, valueScroller.getBackground().getRGB(),
+                         "The cell-value chrome must follow the active surface palette");
+        });
+    }
+
+    private static void assertStatisticsChrome(Shell statisticsShell)
+    {
+        display.get().syncExec(() -> {
+            Group highlightGroup = findGroupWithPrefix(statisticsShell, "statistics.highlightGroup");
+            assertNotNull(highlightGroup, "Statistics dialog must retain its highlight Group");
+            assertEquals(themeManager.get().color(ThemeManager.ColorRole.SECONDARY_SURFACE).getRGB(),
+                         highlightGroup.getBackground().getRGB(),
+                         "Statistics highlight chrome must follow the active secondary surface");
+        });
+    }
+
+    private static Group findGroupWithPrefix(Control root, String keyPrefix)
+    {
+        if (root instanceof Group) {
+            String key = I18n.getKey(root);
+            if (key != null && key.startsWith(keyPrefix))
+                return (Group)root;
+        }
+        return findDescendant(root, Group.class, keyPrefix);
+    }
+
+    private static <T extends Control> T findDescendant(Control root, Class<T> type)
+    {
+        return findDescendant(root, type, null);
+    }
+
+    private static <T extends Control> T findDescendant(Control root, Class<T> type, String keyPrefix)
+    {
+        if (root == null || root.isDisposed())
+            return null;
+        if (type.isInstance(root) && (keyPrefix == null || hasKeyPrefix(root, keyPrefix)))
+            return type.cast(root);
+        if (!(root instanceof Composite))
+            return null;
+        for (Control child : ((Composite)root).getChildren()) {
+            T match = findDescendant(child, type, keyPrefix);
+            if (match != null)
+                return match;
+        }
+        return null;
+    }
+
+    private static boolean hasKeyPrefix(Control control, String keyPrefix)
+    {
+        String key = I18n.getKey(control);
+        return key != null && key.startsWith(keyPrefix);
+    }
+
+    private static <T extends Control> T[] findDescendants(Control root, Class<T> type)
+    {
+        java.util.List<T> matches = new java.util.ArrayList<>();
+        collectDescendants(root, type, matches);
+        @SuppressWarnings("unchecked")
+        T[] result = (T[])java.lang.reflect.Array.newInstance(type, matches.size());
+        return matches.toArray(result);
+    }
+
+    private static <T extends Control> void collectDescendants(Control root, Class<T> type,
+                                                                java.util.List<T> matches)
+    {
+        if (root == null || root.isDisposed())
+            return;
+        if (type.isInstance(root))
+            matches.add(type.cast(root));
+        if (root instanceof Composite) {
+            for (Control child : ((Composite)root).getChildren())
+                collectDescendants(child, type, matches);
+        }
     }
 
     private static void editCell(SWTBotNatTable table, String newValue)

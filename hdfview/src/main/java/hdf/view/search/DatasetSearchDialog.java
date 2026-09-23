@@ -55,7 +55,8 @@ public final class DatasetSearchDialog {
     {
         this.viewer = viewer;
         shell = new Shell(parent, SWT.DIALOG_TRIM | SWT.RESIZE | SWT.MODELESS);
-        ThemeManager.forDisplay(shell.getDisplay()).applyTo(shell);
+        ThemeManager themeManager = ThemeManager.forDisplay(shell.getDisplay());
+        themeManager.applyTo(shell);
         createContents();
     }
 
@@ -65,6 +66,8 @@ public final class DatasetSearchDialog {
         I18n.bind(shell, "dialog.datasetSearch.title");
 
         Composite queryArea = new Composite(shell, SWT.NONE);
+        ThemeManager.forDisplay(shell.getDisplay()).bindBackground(
+            queryArea, ThemeManager.ColorRole.SURFACE);
         queryArea.setLayout(new GridLayout(5, false));
         queryArea.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 
@@ -125,6 +128,8 @@ public final class DatasetSearchDialog {
         resultTable.addListener(SWT.DefaultSelection, event -> activateSelectedResult());
 
         Composite buttonArea = new Composite(shell, SWT.NONE);
+        ThemeManager.forDisplay(shell.getDisplay()).bindBackground(
+            buttonArea, ThemeManager.ColorRole.SURFACE);
         buttonArea.setLayout(new GridLayout(3, false));
         buttonArea.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
 

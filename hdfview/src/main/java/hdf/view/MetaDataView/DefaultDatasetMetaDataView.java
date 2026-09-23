@@ -22,6 +22,7 @@ import hdf.object.Datatype;
 import hdf.object.HObject;
 import hdf.object.ScalarDS;
 import hdf.view.DataView.DataViewManager;
+import hdf.view.ThemeManager;
 import hdf.view.Tools;
 import hdf.view.i18n.I18n;
 
@@ -77,6 +78,8 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
 
         org.eclipse.swt.widgets.Group datasetInfoGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
+        themeManager.bind(datasetInfoGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         datasetInfoGroup.setFont(curFont);
         I18n.bind(datasetInfoGroup, "meta.datasetDataspaceDatatype");
         datasetInfoGroup.setLayout(new GridLayout(2, false));
@@ -174,6 +177,8 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
          */
         org.eclipse.swt.widgets.Group datasetLayoutGroup =
             new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
+        themeManager.bind(datasetLayoutGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         datasetLayoutGroup.setFont(curFont);
         I18n.bind(datasetLayoutGroup, "meta.miscDatasetInfo");
         datasetLayoutGroup.setLayout(new GridLayout(2, false));
@@ -293,6 +298,8 @@ public class DefaultDatasetMetaDataView extends DefaultLinkMetaDataView implemen
 
             org.eclipse.swt.widgets.Group compoundMembersGroup =
                 new org.eclipse.swt.widgets.Group(generalObjectInfoPane, SWT.NONE);
+            themeManager.bind(compoundMembersGroup, ThemeManager.ColorRole.SECONDARY_SURFACE,
+                              ThemeManager.ColorRole.FOREGROUND);
             compoundMembersGroup.setFont(curFont);
             I18n.bind(compoundMembersGroup, "meta.compoundDatasetMembers");
             compoundMembersGroup.setLayout(new FillLayout(SWT.VERTICAL));

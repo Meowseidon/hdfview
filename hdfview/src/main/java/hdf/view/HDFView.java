@@ -2094,11 +2094,13 @@ public class HDFView implements DataViewManager {
     private void createContentArea(final Shell shell)
     {
         SashForm content = new SashForm(shell, SWT.VERTICAL);
+        themeManager.bindBackground(content, ThemeManager.ColorRole.WINDOW_BACKGROUND);
         content.setSashWidth(10);
         content.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 5, 1));
 
         // Add Data content area and Status Area to main window
         Composite container = new Composite(content, SWT.NONE);
+        themeManager.bindBackground(container, ThemeManager.ColorRole.SURFACE);
         container.setLayout(new FillLayout());
 
         Composite statusArea = new Composite(content, SWT.NONE);
@@ -2106,6 +2108,7 @@ public class HDFView implements DataViewManager {
         statusArea.setLayout(new FillLayout(SWT.HORIZONTAL));
 
         final SashForm contentArea = new SashForm(container, SWT.HORIZONTAL);
+        themeManager.bindBackground(contentArea, ThemeManager.ColorRole.SURFACE);
         contentArea.setSashWidth(10);
 
         // Add TreeView and DataView to content area pane
@@ -2129,6 +2132,8 @@ public class HDFView implements DataViewManager {
         themeManager.bindBackground(rightTabContent, ThemeManager.ColorRole.SURFACE);
         rightTabContent.setLayout(new FillLayout());
         rightTabFolder = new TabFolder(rightTabContent, SWT.NONE);
+        themeManager.bind(rightTabFolder, ThemeManager.ColorRole.SURFACE,
+                          ThemeManager.ColorRole.FOREGROUND);
         generalArea.setContent(rightTabContent);
         generalArea.setMinSize(rightTabContent.computeSize(SWT.DEFAULT, SWT.DEFAULT));
 
@@ -2500,6 +2505,7 @@ public class HDFView implements DataViewManager {
 
         if (dataParent == null) {
             dataParent = new Composite(rightTabFolder, SWT.NONE);
+            themeManager.bindBackground(dataParent, ThemeManager.ColorRole.SURFACE);
             dataContentTab = new TabItem(rightTabFolder, SWT.NONE, 0);
             I18n.bind(dataContentTab, "tab.dataContent");
             dataContentTab.setData(MetaDataView.TAB_ROLE_KEY, MetaDataView.TAB_ROLE_DATA_CONTENT);
