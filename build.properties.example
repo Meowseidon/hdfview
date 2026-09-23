@@ -1,0 +1,46 @@
+# =============================================================================
+# HDFView Build Configuration Example
+# Copy this file to build.properties and customize it for the local machine.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Native Library Configuration
+# -----------------------------------------------------------------------------
+
+# Absolute path to the HDF5 library directory (required).
+# Windows: use the directory containing the HDF5 import libraries.
+# Linux/macOS: use the directory containing the HDF5 shared libraries.
+hdf5.lib.dir=
+
+# HDF5 plugin directory (optional).
+hdf5.plugin.dir=${hdf5.lib.dir}/plugin
+
+# Absolute path to the HDF4 library directory (optional).
+hdf.lib.dir=
+
+# Runtime library path used by Java. Use ';' between Windows directories and
+# ':' between Linux/macOS directories.
+platform.hdf.lib=
+
+# -----------------------------------------------------------------------------
+# Build Configuration
+# -----------------------------------------------------------------------------
+
+build.debug=true
+build.antoutput.append=false
+build.log.level=info
+build.log.level.run=trace
+build.log.level.test=
+build.object.test=
+
+# Uncomment to enable JaCoCo code coverage analysis.
+#build.jacoco=true
+
+# -----------------------------------------------------------------------------
+# Optional Packaging Configuration
+# -----------------------------------------------------------------------------
+
+install.mac.jre=${env.OSX_JRE_HOME}
+jre.dir.name=${env.OSX_JRE_NAME}
+userguide.dir=
+wix.dir=${env.WIX}/bin
