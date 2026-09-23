@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.eclipse.swtbot.swt.finder.matchers.WidgetMatcherFactory.widgetOfType;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -17,6 +19,7 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import hdf.object.Dataset;
@@ -81,6 +84,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
     private static final AtomicReference<Listener> settingsListener = new AtomicReference<>();
     private static final AtomicReference<ThemeManager> themeManager = new AtomicReference<>();
     private static final AtomicReference<HDFView> hdfView = new AtomicReference<>();
+    private static final AtomicReference<CountingViewProperties> countingProperties = new AtomicReference<>();
     private static final AtomicReference<Display> display = new AtomicReference<>();
     private static final AtomicReference<Shell> mainShell = new AtomicReference<>();
 
@@ -127,6 +131,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
                 uiDisplay.setData(DISPLAY_THEME_MANAGER_KEY, injectedManager);
 
                 HDFView application = new HDFView(rootDir, startDir);
+                installSaveCountingProperties(application, rootDir, startDir);
                 /* Keep the runtime test independent of a previous persisted choice. */
                 injectedManager.setThemeMode(ThemeManager.ThemeMode.SYSTEM);
                 application.setTestState(true);
@@ -200,6 +205,15 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         SWTBotShell applicationShell = new SWTBotShell(mainShell.get());
         SWTBotNatTable dataTable = null;
         try {
+            if (I18n.getLanguage() != I18n.Language.ENGLISH)
+                selectLanguage(I18n.Language.ENGLISH);
+            selectLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+            assertEquals(I18n.Language.SIMPLIFIED_CHINESE.getPropertyValue(),
+                         persistedProperty(ViewProperties.LANGUAGE_PROPERTY));
+            selectLanguage(I18n.Language.ENGLISH);
+            assertEquals(I18n.Language.ENGLISH.getPropertyValue(),
+                         persistedProperty(ViewProperties.LANGUAGE_PROPERTY));
+
             selectThemeMode(ThemeManager.ThemeMode.LIGHT);
             assertEquals("light", persistedTheme());
 
@@ -560,6 +574,7 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         SWTBotMenu themeMenu = applicationShell.bot().menu().menu(text("menu.tools"))
             .menu(text("menu.tools.theme"));
         SWTBotMenu selectedItem = themeMenu.menu(text(themeKey));
+        countingProperties.get().resetSaveCount();
         selectedItem.click();
 
         bot.waitUntil(new DefaultCondition() {
@@ -576,9 +591,48 @@ public class ThemeManagerRuntimeStateSwtBotTest {
             }
         });
         assertTrue(selectedItem.isChecked(), "The selected theme radio item must remain checked");
+        assertEquals(1, countingProperties.get().getSaveCount(),
+                     "One theme radio selection must persist exactly once, not also run the deselected item");
+    }
+
+    private static void selectLanguage(I18n.Language language)
+    {
+        SWTBotShell applicationShell = new SWTBotShell(mainShell.get());
+        applicationShell.activate();
+
+        String languageKey = language == I18n.Language.ENGLISH
+            ? "menu.tools.language.english"
+            : "menu.tools.language.simplifiedChinese";
+        SWTBotMenu languageMenu = applicationShell.bot().menu().menu(text("menu.tools"))
+            .menu(text("menu.tools.language"));
+        SWTBotMenu selectedItem = languageMenu.menu(text(languageKey));
+        countingProperties.get().resetSaveCount();
+        selectedItem.click();
+
+        bot.waitUntil(new DefaultCondition() {
+            @Override
+            public boolean test()
+            {
+                return I18n.getLanguage() == language;
+            }
+
+            @Override
+            public String getFailureMessage()
+            {
+                return "Timed out waiting for HDFView language to become " + language;
+            }
+        });
+        assertTrue(selectedItem.isChecked(), "The selected language radio item must remain checked");
+        assertEquals(1, countingProperties.get().getSaveCount(),
+                     "One language radio selection must persist exactly once, not also run the deselected item");
     }
 
     private static String persistedTheme() throws Exception
+    {
+        return persistedProperty(ViewProperties.THEME_PROPERTY);
+    }
+
+    private static String persistedProperty(String propertyName) throws Exception
     {
         String propertyFile = ViewProperties.getPropertyFile();
         assertNotNull(propertyFile, "HDFView must have a user property file");
@@ -587,7 +641,20 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         try (InputStream input = Files.newInputStream(Path.of(propertyFile))) {
             properties.load(input);
         }
-        return properties.getProperty(ViewProperties.THEME_PROPERTY);
+        return properties.getProperty(propertyName);
+    }
+
+    private static void installSaveCountingProperties(HDFView application,
+                                                       String rootDir,
+                                                       String startDir) throws Exception
+    {
+        CountingViewProperties properties = new CountingViewProperties(rootDir, startDir);
+        properties.load();
+
+        Field propertiesField = HDFView.class.getDeclaredField("props");
+        propertiesField.setAccessible(true);
+        propertiesField.set(application, properties);
+        countingProperties.set(properties);
     }
 
     private static Shell[] openShells()
@@ -722,6 +789,32 @@ public class ThemeManagerRuntimeStateSwtBotTest {
         void resetCount()
         {
             resetOpenFileCount();
+        }
+    }
+
+    private static final class CountingViewProperties extends ViewProperties {
+        private final AtomicInteger saveCount = new AtomicInteger();
+
+        CountingViewProperties(String rootDir, String startDir)
+        {
+            super(rootDir, startDir);
+        }
+
+        @Override
+        public void save() throws IOException
+        {
+            saveCount.incrementAndGet();
+            super.save();
+        }
+
+        void resetSaveCount()
+        {
+            saveCount.set(0);
+        }
+
+        int getSaveCount()
+        {
+            return saveCount.get();
         }
     }
 

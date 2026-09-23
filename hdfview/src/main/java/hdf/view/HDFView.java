@@ -1071,7 +1071,8 @@ public class HDFView implements DataViewManager {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                changeLanguage(I18n.Language.ENGLISH);
+                if (englishLanguageItem.getSelection())
+                    changeLanguage(I18n.Language.ENGLISH);
             }
         });
 
@@ -1082,7 +1083,8 @@ public class HDFView implements DataViewManager {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                changeLanguage(I18n.Language.SIMPLIFIED_CHINESE);
+                if (simplifiedChineseLanguageItem.getSelection())
+                    changeLanguage(I18n.Language.SIMPLIFIED_CHINESE);
             }
         });
 
@@ -1099,7 +1101,8 @@ public class HDFView implements DataViewManager {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                changeTheme(ThemeManager.ThemeMode.SYSTEM);
+                if (systemThemeItem.getSelection())
+                    changeTheme(ThemeManager.ThemeMode.SYSTEM);
             }
         });
 
@@ -1110,7 +1113,8 @@ public class HDFView implements DataViewManager {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                changeTheme(ThemeManager.ThemeMode.LIGHT);
+                if (lightThemeItem.getSelection())
+                    changeTheme(ThemeManager.ThemeMode.LIGHT);
             }
         });
 
@@ -1121,7 +1125,8 @@ public class HDFView implements DataViewManager {
             @Override
             public void widgetSelected(SelectionEvent e)
             {
-                changeTheme(ThemeManager.ThemeMode.DARK);
+                if (darkThemeItem.getSelection())
+                    changeTheme(ThemeManager.ThemeMode.DARK);
             }
         });
 
