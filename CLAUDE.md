@@ -230,7 +230,11 @@ The project consists of three main Maven modules:
 
 ### Prerequisites
 
-1. Configure native library paths in `build.properties`:
+1. On a fresh clone, create the machine-local, gitignored `build.properties` from the tracked template
+   if it does not exist:
+   - Linux/macOS: `cp build.properties.example build.properties`
+   - Windows PowerShell: `Copy-Item .\build.properties.example .\build.properties`
+   Then configure the local native library paths in that copy:
    - `hdf.lib.dir` - HDF4 native libraries
    - `hdf5.lib.dir` - HDF5 native libraries
    - `hdf5.plugin.dir` - HDF5 plugins

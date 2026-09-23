@@ -31,7 +31,9 @@ REM Function to load properties from build.properties
 REM =============================================================================
 set "PROPS_FILE=build.properties"
 if not exist "%PROPS_FILE%" (
-    echo [ERROR] build.properties file not found!
+    echo [ERROR] build.properties is missing. From the repository root, run:
+    echo         copy build.properties.example build.properties
+    echo         Then set the local HDF5/HDF4 paths in build.properties.
     goto :failure
 )
 
@@ -66,7 +68,7 @@ if not exist "pom.xml" (
     goto :failure
 )
 if not exist "%PROPS_FILE%" (
-    echo [ERROR] build.properties not found
+    echo [ERROR] build.properties not found. Copy build.properties.example to build.properties first.
     goto :failure
 )
 echo [OK] Found project files

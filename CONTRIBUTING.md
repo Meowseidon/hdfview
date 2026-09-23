@@ -34,10 +34,15 @@ HDFView is a Java-based GUI application for viewing and editing HDF files. The p
 
 2. **Configure native libraries**
    ```bash
-
-   # Edit build.properties to point to your HDF4/HDF5 installations
+   # Create the machine-local config from the tracked template on a fresh clone
+   if [ ! -f build.properties ]; then cp build.properties.example build.properties; fi
+   # Edit the local copy to point to your HDF4/HDF5 installations
    vi build.properties
    ```
+
+   `build.properties` is gitignored and should not be committed. In Windows PowerShell, create it with
+   `Copy-Item .\build.properties.example .\build.properties` if it does not already exist, then fill
+   in the local library paths.
 
 3. **Build the project**
    ```bash
@@ -57,7 +62,8 @@ HDFView is a Java-based GUI application for viewing and editing HDF files. The p
 
 ### Required Configuration
 
-Modify the `build.properties` file in the project root:
+After creating the machine-local, gitignored `build.properties` from `build.properties.example` as
+described above, modify the copy in the project root:
 
 ```properties
 # HDF4 library path

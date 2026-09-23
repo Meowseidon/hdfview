@@ -21,8 +21,8 @@ This guide explains how to run tests for HDFView locally and in CI environments.
 
 1. **Java 21** - Installed and configured
 2. **Maven 3.9+** - Build system
-3. **HDF5 Native Libraries** - Configured in `build.properties`
-4. **HDF4 Native Libraries** - Configured in `build.properties`
+3. **HDF5 Native Libraries** - Configured in the local `build.properties` (see Configuration)
+4. **HDF4 Native Libraries** - Configured in the local `build.properties` (see Configuration)
 5. HDFView must be built with testing enabled
 
 ### Optional (for UI tests)
@@ -32,7 +32,24 @@ This guide explains how to run tests for HDFView locally and in CI environments.
 
 ### Configuration
 
-Ensure your `build.properties` file has the correct paths:
+The root `build.properties` is machine-local and gitignored; a fresh clone contains only
+`build.properties.example`. Before building or running tests, copy the template once from the
+repository root if the local file is absent:
+
+```bash
+if [ ! -f build.properties ]; then cp build.properties.example build.properties; fi
+```
+
+In Windows PowerShell, use:
+
+```powershell
+if (-not (Test-Path .\build.properties)) {
+    Copy-Item .\build.properties.example .\build.properties
+}
+```
+
+Then set the HDF5/HDF4 paths for the libraries installed on this machine. Do not commit the local
+`build.properties` file. For example:
 
 ```properties
 # HDF5 Library Configuration

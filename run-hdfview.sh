@@ -54,6 +54,7 @@ print_error() {
 if [[ ! -f "pom.xml" ]] || [[ ! -f "build.properties" ]]; then
     print_error "Please run this script from the HDFView project root directory"
     print_error "Expected files: pom.xml, build.properties"
+    print_error "If build.properties is missing, copy build.properties.example to build.properties and set the local library paths."
     exit 1
 fi
 
@@ -88,7 +89,7 @@ if [[ -f "build.properties" ]]; then
     load_properties "build.properties"
     print_success "build.properties loaded"
 else
-    print_error "build.properties file not found!"
+    print_error "build.properties is missing. Copy build.properties.example to build.properties and set the local library paths."
     exit 1
 fi
 

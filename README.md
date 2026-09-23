@@ -12,7 +12,7 @@
 
 ## Custom fork / Windows development
 
-The following commands describe the Windows workflow for this custom fork. Run them from the repository root (`D:\Git\HDFView-custom` in the local setup used for verification).
+The following commands describe the Windows workflow for this custom fork. Run them from the repository root.
 
 ### Prerequisites
 
@@ -21,7 +21,19 @@ The following commands describe the Windows workflow for this custom fork. Run t
 - HDF5 2.2.0 native libraries are required. HDF4 4.4.0 libraries are optional unless HDF4 files are needed. Configure the local `build.properties` entries `hdf5.lib.dir`, `hdf5.plugin.dir`, `hdf.lib.dir`, and the Windows semicolon-separated `platform.hdf.lib` DLL path. Keep absolute machine paths in local configuration; do not commit them.
 - Windows SWT is selected by the Maven profile as `org.eclipse.swt.win32.win32.x86_64` version 3.134.0. SWTBot tests need a real Windows desktop/display and the configured native libraries.
 
-`build.properties` is the Maven user-properties input, not a portable native-library bundle. Set its paths for the local machine before building. A packaged app-image or installer contains its own jpackage runtime; end users do not need Maven or a separate JDK, but source development still requires JDK 21+.
+`build.properties` is the Maven user-properties input, not a portable native-library bundle. It is
+machine-local and gitignored, so a fresh clone does not include it. From the repository root, create it
+from the tracked template if it does not already exist:
+
+```powershell
+if (-not (Test-Path .\build.properties)) {
+    Copy-Item .\build.properties.example .\build.properties
+}
+```
+
+Then set the HDF5/HDF4 paths for the local machine before building. Do not commit the generated
+`build.properties`. A packaged app-image or installer contains its own jpackage runtime; end users do
+not need Maven or a separate JDK, but source development still requires JDK 21+.
 
 ### Build
 
